@@ -1,0 +1,276 @@
+<title>Cortex Concept</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,300..800&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Concept C, "Cortex". One cloud of 16,000 particles in a pale fog. As you scroll it reorganises into the
+   shape of each system: a mind, an ontology graph, a sealed vault, a budget, then an open ring. */
+:root{
+  color-scheme: light;
+  --fog:#DDE1E2;
+  --fog-2:#C9CFD2;
+  --ink:#151A1E;
+  --ink-2:#4E575D;
+  --sig:#FF4F1A;        /* signal orange, used sparingly */
+  --f-d:"Bricolage Grotesque","Helvetica Neue",Arial,sans-serif;
+  --f-m:"Geist Mono",ui-monospace,Menlo,monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--fog);color:var(--ink);font-family:var(--f-d);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--sig);outline-offset:3px}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:radial-gradient(120% 90% at 60% 40%, #E8EBEC, var(--fog) 50%, var(--fog-2))}
+.g{padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.mono{font-family:var(--f-m);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+
+header{position:fixed;top:0;left:0;right:0;z-index:10;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:calc(18px + env(safe-area-inset-top, 0px));padding-bottom:18px}
+.logo{font-weight:700;font-size:15px;letter-spacing:-.01em}
+.logo span{color:var(--sig)}
+header nav{display:flex;gap:20px}
+header nav a{text-decoration:none;color:var(--ink-2)}
+header nav a:hover{color:var(--ink)}
+
+.prog{position:fixed;z-index:10;right:max(16px, env(safe-area-inset-right, 0px));top:50%;transform:translateY(-50%);display:grid;gap:10px;justify-items:end}
+.prog button{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;color:var(--ink-2)}
+.prog button i{display:block;width:18px;height:1px;background:currentColor;transition:width .4s}
+.prog button[aria-current="true"]{color:var(--ink)}
+.prog button[aria-current="true"] i{width:42px;background:var(--sig)}
+.prog button span{opacity:0;transition:opacity .3s}
+.prog:hover button span,.prog button[aria-current="true"] span{opacity:1}
+
+main{position:relative;z-index:2;pointer-events:none}
+main a,main button{pointer-events:auto}
+.sec{min-height:100svh;display:grid;align-content:end;padding-bottom:clamp(40px,8vh,96px);padding-top:100px}
+.sec.mid{align-content:center}
+.kicker{color:var(--ink-2);display:flex;gap:14px;align-items:center}
+.kicker b{color:var(--sig);font-weight:500}
+h1{font-size:clamp(48px,8.6vw,150px);line-height:.86;font-weight:700;letter-spacing:-.045em;margin:.12em 0 0;font-variation-settings:"wdth" 88,"opsz" 96;max-width:9.5ch}
+h1 i{font-style:normal;font-weight:300;color:var(--ink-2)}
+.lede{display:flex;flex-wrap:wrap;gap:16px 48px;justify-content:space-between;align-items:end;margin-top:clamp(20px,3vw,40px)}
+.lede p{margin:0;max-width:40ch;font-size:clamp(16px,1.3vw,19px);line-height:1.5;color:var(--ink-2)}
+.cue{display:flex;align-items:center;gap:10px;color:var(--ink-2)}
+.cue::before{content:"";width:1px;height:34px;background:var(--ink);animation:cue 2s cubic-bezier(.6,0,.2,1) infinite;transform-origin:top}
+@keyframes cue{0%{transform:scaleY(0)}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+
+.card{max-width:min(520px,100%);background:rgba(232,235,236,.62);backdrop-filter:blur(14px) saturate(1.1);-webkit-backdrop-filter:blur(14px) saturate(1.1);padding:clamp(18px,2.2vw,28px);border-radius:2px}
+.right .card{margin-left:auto;margin-right:clamp(0px,5vw,72px)}
+.card h2{font-size:clamp(56px,8vw,136px);line-height:.85;margin:.1em 0 .18em;font-weight:700;letter-spacing:-.045em;font-variation-settings:"wdth" 80,"opsz" 96}
+.card p{margin:0 0 18px;font-size:16px;line-height:1.55;color:var(--ink-2)}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;border-top:1px solid rgba(21,26,30,.2);padding-top:14px;margin:0}
+.stats div{min-width:0}
+.stats dt{font-size:clamp(22px,2.2vw,30px);font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stats dd{margin:2px 0 0;font-size:12.5px;line-height:1.35;color:var(--ink-2)}
+
+.end h2{font-size:clamp(44px,8vw,140px);line-height:.88;font-weight:700;letter-spacing:-.045em;margin:.1em 0 .3em;max-width:12ch;font-variation-settings:"wdth" 85,"opsz" 96}
+.mail{font-size:clamp(20px,3vw,40px);font-weight:500;letter-spacing:-.02em;text-decoration:none;border-bottom:2px solid var(--sig);word-break:break-all}
+.end .row{display:flex;flex-wrap:wrap;gap:20px 32px;margin-top:28px;color:var(--ink-2)}
+.end .row a{text-decoration:none}
+.tag{position:fixed;right:max(16px, env(safe-area-inset-right, 0px));top:calc(56px + env(safe-area-inset-top, 0px));z-index:12;background:var(--ink);color:var(--fog);padding:6px 10px}
+
+@media (max-width:760px){
+  header nav{display:none}
+  .prog{display:none}
+  .sec{align-content:end}
+  .tag{left:auto;right:max(16px, env(safe-area-inset-right, 0px));top:calc(56px + env(safe-area-inset-top, 0px));bottom:auto}
+}
+@media (prefers-reduced-motion:reduce){.cue::before{animation:none}}
+</style>
+
+<canvas id="gl" aria-hidden="true"></canvas>
+
+<header class="g">
+  <span class="logo">Farhad Maleki<span>.</span></span>
+  <nav class="mono"><a href="#s1">Work</a><a href="#s4">Contact</a></nav>
+  <span class="mono" id="clock" style="color:var(--ink-2)">Dubai --:--</span>
+</header>
+
+<div class="prog mono" id="prog" aria-label="Sections">
+  <button data-i="0" aria-current="true"><span>Intro</span><i></i></button>
+  <button data-i="1"><span>Cyrus</span><i></i></button>
+  <button data-i="2"><span>Zagros</span><i></i></button>
+  <button data-i="3"><span>Falah</span><i></i></button>
+  <button data-i="4"><span>Contact</span><i></i></button>
+</div>
+
+<main>
+  <section class="sec g" id="s0">
+    <div class="kicker mono"><b>●</b> AI &amp; agentic systems engineer · CTO, OnePharma · Dubai</div>
+    <h1>Most systems remember. <i>I build systems that understand.</i></h1>
+    <div class="lede">
+      <p>Ontologies, knowledge graphs, agentic AI, and the identity and governance that make them safe to trust. Move the cursor through the field.</p>
+      <span class="cue mono">Scroll</span>
+    </div>
+  </section>
+
+  <section class="sec mid g right" id="s1">
+    <div class="card">
+      <div class="kicker mono"><b>01</b> Ontology platform · in development</div>
+      <h2>Cyrus</h2>
+      <p>Every company runs on data scattered across systems that disagree on what a customer, a batch or a contract is. Cyrus gives it one shared meaning: an ontology of the objects the business runs on, so people and AI agents can ask in business terms and trace every answer to its source. Built for any industry, first modelled on pharma.</p>
+      <dl class="stats"><div><dt>95%</dt><dd>Bilingual document accuracy</dd></div><div><dt>13</dt><dd>Security layers</dd></div><div><dt>AR / EN</dt><dd>Documents, one model</dd></div></dl>
+    </div>
+  </section>
+
+  <section class="sec mid g" id="s2">
+    <div class="card">
+      <div class="kicker mono"><b>02</b> Governance &amp; identity · private</div>
+      <h2>Zagros</h2>
+      <p>Authentication, authorization and governance in one self-hosted system, with no outside identity provider. An instance is founded in a sealed ceremony that needs three of five constitutional keys, and every decision after that runs through policy.</p>
+      <dl class="stats"><div><dt>3 / 5</dt><dd>Key quorum to found an instance</dd></div><div><dt>0</dt><dd>External identity providers</dd></div><div><dt>4</dt><dd>Deployment modes</dd></div></dl>
+    </div>
+  </section>
+
+  <section class="sec mid g right" id="s3">
+    <div class="card">
+      <div class="kicker mono"><b>03</b> iPhone app · pre-launch</div>
+      <h2>Falah</h2>
+      <p>A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. SwiftUI on Supabase, built end to end.</p>
+      <dl class="stats"><div><dt>2</dt><dd>Automatic sources: bank and email</dd></div><div><dt>9</dt><dd>Supabase edge functions</dd></div><div><dt>iOS</dt><dd>Swift and SwiftUI</dd></div></dl>
+    </div>
+  </section>
+
+  <section class="sec g end" id="s4">
+    <div class="kicker mono"><b>●</b> Also: OnePharma (CTO) · Black Pearl CNC telemetry · intrusion detection research, ICNGN 2023</div>
+    <h2>Let's build something that understands.</h2>
+    <div><a class="mail" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a></div>
+    <div class="row mono"><a href="https://github.com/Farhad1618">GitHub</a><a href="https://linkedin.com/in/farhad-maleki">LinkedIn</a><span>+971 58 558 1618</span></div>
+  </section>
+</main>
+<span class="tag mono">Concept C · Cortex</span>
+
+<script>
+(function(){
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cv=document.getElementById('gl');
+const gl=cv.getContext('webgl',{antialias:true,premultipliedAlpha:false,alpha:true});
+const N = innerWidth<760 ? 9000 : 16000;
+
+/* ---------- shapes: each fills a Float32Array of N xyz targets ---------- */
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const R=mulberry(1618);
+const gauss=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)};
+function shape(fn){const a=new Float32Array(N*3);for(let i=0;i<N;i++){const p=fn(i);a[i*3]=p[0];a[i*3+1]=p[1];a[i*3+2]=p[2]}return a}
+
+// 0: a mind. Two folded hemispheres.
+const mind=shape(i=>{
+  const u=R()*2-1,th=R()*Math.PI*2,s=Math.sqrt(1-u*u);let x=s*Math.cos(th),y=u*.82,z=s*Math.sin(th)*.95;
+  const fold=1+.09*Math.sin(x*9+y*7)*Math.sin(z*8);const side=x<0?-1:1;
+  const r=1.15*fold*(.96+R()*.06);return[x*r*1.12+side*.05,y*r,z*r];
+});
+// 1: ontology graph. Nodes + particles flowing along edges.
+const NODES=[];for(let k=0;k<36;k++){const u=R()*2-1,t=R()*6.283,s=Math.sqrt(1-u*u),r=.55+R()*.85;NODES.push([s*Math.cos(t)*r*1.4,u*r*.95,s*Math.sin(t)*r])}
+const EDGES=[];NODES.forEach((a,i)=>{const d=NODES.map((b,j)=>[Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]),j]).sort((p,q)=>p[0]-q[0]);for(let k=1;k<=2;k++)EDGES.push([i,d[k][1]])});
+const graph=shape(i=>{
+  if(i%5<2){const n=NODES[i%36],s=.035+(i%36===0?.05:0);return[n[0]+gauss()*s,n[1]+gauss()*s,n[2]+gauss()*s]}
+  const e=EDGES[i%EDGES.length],a=NODES[e[0]],b=NODES[e[1]],t=R();return[a[0]+(b[0]-a[0])*t+gauss()*.006,a[1]+(b[1]-a[1])*t+gauss()*.006,a[2]+(b[2]-a[2])*t+gauss()*.006];
+});
+// 2: sealed vault. Hexagonal prism shell + five key clusters orbiting.
+const vault=shape(i=>{
+  if(i%9===0){const k=i%5,a=-Math.PI/2+k*Math.PI*2/5;return[Math.cos(a)*1.65+gauss()*.05,Math.sin(a)*1.65*.62+gauss()*.05,Math.sin(a)*.6+gauss()*.05]}
+  const side=Math.floor(R()*6),a0=side*Math.PI/3,a1=a0+Math.PI/3,t=R(),y=(R()*2-1)*.9;
+  const cap=R()<.22;const r=cap?Math.sqrt(R())*.85:.85;const ang=cap?R()*6.283:a0+(a1-a0)*t;
+  const hx=cap?Math.cos(ang)*r:Math.cos(a0)*r*(1-t)+Math.cos(a1)*r*t, hz=cap?Math.sin(ang)*r:Math.sin(a0)*r*(1-t)+Math.sin(a1)*r*t;
+  return[hx,cap?(R()<.5?-.9:.9):y,hz];
+});
+// 3: a budget. Six volumetric bars, February over the dashed line.
+const H=[.9,1.55,1.05,.8,1.15,.95];
+const budget=shape(i=>{
+  if(i%14===0){const x=-1.7+R()*3.4;return[x,-.9+1.25,(Math.floor(x*12)%2?0:.4)+gauss()*.01]}
+  const b=i%6,x=-1.45+b*.58,h=H[b];return[x+(R()-.5)*.36,-.9+R()*h,(R()-.5)*.36];
+});
+// 4: open ring.
+const ring=shape(i=>{const a=R()*6.283,b=R()*6.283,r=.18*Math.sqrt(R());return[(1.25+r*Math.cos(b))*Math.cos(a),(1.25+r*Math.cos(b))*Math.sin(a)*.98,r*Math.sin(b)]});
+const SHAPES=[mind,graph,vault,budget,ring];
+// per-section accent: which particles glow orange
+const ACC=[i=>i%47===0, i=>i%5<2&&(i%36)%7===0, i=>i%9===0&&(i%5)<3, i=>i%6===1&&i%14!==0, i=>i%31===0];
+
+/* ---------- GL ---------- */
+const VS=`attribute vec3 aPos;attribute float aSeed;attribute float aAcc;
+uniform float uT,uAspect,uYaw,uPitch,uDist,uPx;uniform vec2 uMouse,uOff;
+varying float vAcc;varying float vDepth;
+void main(){
+  vec3 p=aPos;
+  float s=aSeed*6.2831;
+  p+=0.018*vec3(sin(uT*.9+s*3.),cos(uT*.7+s*5.),sin(uT*.8+s*7.));
+  float cy=cos(uYaw),sy=sin(uYaw),cp=cos(uPitch),sp=sin(uPitch);
+  p=vec3(cy*p.x+sy*p.z,p.y,-sy*p.x+cy*p.z);
+  p=vec3(p.x,cp*p.y-sp*p.z,sp*p.y+cp*p.z);
+  p.xy+=uOff;
+  float z=uDist-p.z;
+  vec2 ndc=vec2(p.x/uAspect,p.y)*1.9/z;
+  vec2 d=ndc-uMouse;d.x*=uAspect;float l=length(d);
+  ndc+=normalize(d+1e-5)*0.11*smoothstep(.32,0.,l)*vec2(1./uAspect,1.);
+  gl_Position=vec4(ndc,0.,1.);
+  vDepth=clamp((z-uDist+1.6)/3.2,0.,1.);
+  vAcc=aAcc;
+  gl_PointSize=uPx*(aAcc>.5?3.8:2.6)*(3.2/z);
+}`;
+const FS=`precision mediump float;varying float vAcc;varying float vDepth;
+uniform vec3 uInk,uSig,uFog;
+void main(){
+  vec2 c=gl_PointCoord-.5;float r=length(c);if(r>.5)discard;
+  float a=smoothstep(.5,.2,r);
+  vec3 col=mix(uInk,uSig,vAcc);
+  col=mix(col,uFog,vDepth*.72*(1.-vAcc*.6));
+  gl_FragColor=vec4(col,a*(.9-vDepth*.35));
+}`;
+if(!gl){return}
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(o));return o}
+const pr=gl.createProgram();gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);gl.useProgram(pr);
+const pos=new Float32Array(mind), seed=new Float32Array(N), acc=new Float32Array(N), accT=new Float32Array(N), delay=new Float32Array(N);
+for(let i=0;i<N;i++){seed[i]=R();delay[i]=.025+R()*.06}
+// start scattered so the mind condenses on load
+for(let i=0;i<N*3;i++)pos[i]=RM?mind[i]:(R()-.5)*9;
+function buf(data,name,size,dyn){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,dyn?gl.DYNAMIC_DRAW:gl.STATIC_DRAW);const l=gl.getAttribLocation(pr,name);gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,size,gl.FLOAT,false,0,0);return b}
+const bPos=buf(pos,'aPos',3,true);buf(seed,'aSeed',1);const bAcc=buf(acc,'aAcc',1,true);
+const U=n=>gl.getUniformLocation(pr,n);
+const hex=h=>[1,3,5].map(k=>parseInt(h.substr(k,2),16)/255);
+gl.uniform3fv(U('uInk'),hex('#151A1E'));gl.uniform3fv(U('uSig'),hex('#FF4F1A'));gl.uniform3fv(U('uFog'),hex('#DDE1E2'));
+gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.clearColor(0,0,0,0);
+
+let W,Hh,DPR;
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;Hh=innerHeight;cv.width=W*DPR;cv.height=Hh*DPR;gl.viewport(0,0,cv.width,cv.height);gl.uniform1f(U('uAspect'),W/Hh);gl.uniform1f(U('uPx'),DPR*Math.max(1,Math.min(1.5,W/1100)))}
+addEventListener('resize',resize);resize();
+
+/* ---------- scroll → section ---------- */
+const secs=[...document.querySelectorAll('.sec')], btns=[...document.querySelectorAll('#prog button')];
+let sec=0;
+function setSec(i){if(i===sec)return;sec=i;btns.forEach((b,k)=>b.setAttribute('aria-current',k===i));for(let k=0;k<N;k++)accT[k]=ACC[i](k)?1:0}
+for(let k=0;k<N;k++)accT[k]=ACC[0](k)?1:0;
+btns.forEach(b=>b.addEventListener('click',()=>secs[+b.dataset.i].scrollIntoView({behavior:RM?'auto':'smooth'})));
+function pickSec(){const m=innerHeight*.5;let best=0,bd=1e9;secs.forEach((s,i)=>{const r=s.getBoundingClientRect(),d=Math.abs(r.top+r.height/2-m);if(d<bd){bd=d;best=i}});setSec(best)}
+addEventListener('scroll',pickSec,{passive:true});
+
+let mx=9,my=9,smx=9,smy=9;
+addEventListener('pointermove',e=>{mx=e.clientX/W*2-1;my=-(e.clientY/Hh*2-1)});
+document.addEventListener('pointerleave',()=>{mx=my=9});
+
+// object placement per section: shift the shape away from the text card
+const OFF=[[.62,.18],[-.6,0],[.62,0],[-.6,-.05],[.5,.1]];
+let ox=OFF[0][0],oy=OFF[0][1],yaw=0,pitch=.18,spin=0;
+function frame(now){
+  const t=now/1000, T=SHAPES[sec], narrow=W<760;
+  const tx=narrow?0:OFF[sec][0], ty=narrow?.45:OFF[sec][1];
+  ox+=(tx-ox)*.05;oy+=(ty-oy)*.05;
+  for(let i=0;i<N;i++){const k=delay[i];const j=i*3;
+    pos[j]+=(T[j]-pos[j])*k;pos[j+1]+=(T[j+1]-pos[j+1])*k;pos[j+2]+=(T[j+2]-pos[j+2])*k;
+    acc[i]+=(accT[i]-acc[i])*.06}
+  gl.bindBuffer(gl.ARRAY_BUFFER,bPos);gl.bufferSubData(gl.ARRAY_BUFFER,0,pos);
+  gl.bindBuffer(gl.ARRAY_BUFFER,bAcc);gl.bufferSubData(gl.ARRAY_BUFFER,0,acc);
+  smx+=(mx-smx)*.1;smy+=(my-smy)*.1;
+  if(sec===3){const home=Math.round(spin/6.2832)*6.2832+Math.sin(t*.3)*.3;spin+=(home-spin)*.04}else if(!RM)spin+=.0022;
+  yaw+=((spin+(mx<5?mx*.5:0))-yaw)*.08;
+  pitch+=(((sec===3?.12:.18)+(my<5?-my*.25:0))-pitch)*.05;
+  gl.uniform1f(U('uT'),RM?0:t);gl.uniform1f(U('uYaw'),yaw);gl.uniform1f(U('uPitch'),pitch);gl.uniform1f(U('uDist'),narrow?6.2:4.6);
+  gl.uniform2f(U('uMouse'),smx,smy);gl.uniform2f(U('uOff'),ox*1.9,oy*1.6);
+  gl.clear(gl.COLOR_BUFFER_BIT);gl.drawArrays(gl.POINTS,0,N);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+const ck=document.getElementById('clock');
+function tick(){try{ck.textContent='Dubai '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}).format(new Date())}catch(e){}}
+tick();setInterval(tick,15000);
+})();
+</script>

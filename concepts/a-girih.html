@@ -1,0 +1,319 @@
+<title>Girih Concept</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gloock&family=Vazirmatn:wght@200;400;700&family=Spline+Sans+Mono:wght@400;500&family=Hanken+Grotesk:wght@300;400;500&display=swap">
+<style>
+/* Concept A, "Girih". A fixed lattice of Persian star geometry sits behind the page.
+   It assembles itself from loose strokes on load, and each project re-draws it with a different rule. */
+:root{
+  color-scheme: dark;
+  --lapis:#0F1E55;       /* ground: lapis lazuli */
+  --lapis-2:#162a6e;
+  --gold:#D8B262;        /* gilded line work, the accent */
+  --ivory:#F1E9D8;       /* text */
+  --ivory-dim:#B9B3A6;
+  --turq:#49B9AE;        /* Persian turquoise, for labels and status */
+  --f-d:"Gloock","Didot",Georgia,serif;
+  --f-fa:"Vazirmatn","Tahoma",sans-serif;
+  --f-b:"Hanken Grotesk","Helvetica Neue",Arial,sans-serif;
+  --f-m:"Spline Sans Mono",ui-monospace,Menlo,monospace;
+  --gut:max(16px, env(safe-area-inset-left, 0px));
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:auto}
+body{margin:0;background:var(--lapis);color:var(--ivory);font-family:var(--f-b);font-weight:300;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--gold);outline-offset:4px}
+#lattice{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block}
+.veil{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 80% at 50% 45%, rgba(15,30,85,.15), rgba(15,30,85,.78) 70%)}
+main{position:relative;z-index:2}
+.wrap{padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));max-width:1440px;margin:0 auto}
+.mono{font-family:var(--f-m);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+
+header.top{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:calc(18px + env(safe-area-inset-top, 0px));padding-bottom:18px;padding-left:max(clamp(16px,3vw,40px), env(safe-area-inset-left, 0px));padding-right:max(clamp(16px,3vw,40px), env(safe-area-inset-right, 0px));mix-blend-mode:normal}
+.brand{display:flex;align-items:baseline;gap:12px}
+.brand b{font-family:var(--f-fa);font-weight:700;font-size:20px;color:var(--gold)}
+.brand span{color:var(--ivory-dim)}
+nav{display:flex;gap:22px}
+nav a{text-decoration:none;color:var(--ivory-dim);transition:color .2s}
+nav a:hover{color:var(--gold)}
+.tag{position:fixed;z-index:6;top:calc(64px + env(safe-area-inset-top, 0px));right:max(16px, env(safe-area-inset-right, 0px));color:var(--lapis);background:var(--gold);padding:6px 10px;border-radius:2px}
+
+.hero{min-height:100svh;display:grid;align-content:end;padding-bottom:clamp(48px,9vh,110px);padding-top:120px}
+.fa-name{font-family:var(--f-fa);font-weight:200;font-size:clamp(56px,13vw,210px);line-height:1;color:var(--gold);margin:0 0 .1em;direction:rtl;text-align:right}
+h1{font-family:var(--f-d);font-weight:400;font-size:clamp(42px,7.4vw,124px);line-height:.96;letter-spacing:-.02em;margin:0;max-width:11ch;text-wrap:balance}
+h1 em{font-style:normal;color:var(--gold)}
+.hero-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px 40px;margin-top:clamp(28px,4vw,48px);align-items:end}
+.hero-foot p{margin:0;max-width:44ch;color:var(--ivory-dim)}
+.hero-foot .mono{color:var(--turq)}
+
+.rule-label{display:flex;align-items:center;gap:14px;color:var(--turq)}
+.rule-label::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent);opacity:.5}
+
+.proj{min-height:110svh;display:grid;align-content:center;padding-block:80px}
+.proj-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:clamp(24px,5vw,90px);align-items:end}
+.proj .fa{font-family:var(--f-fa);font-weight:200;font-size:clamp(64px,12vw,190px);line-height:1;color:var(--gold);direction:rtl;margin:0}
+.proj h2{font-family:var(--f-d);font-weight:400;font-size:clamp(48px,8vw,128px);line-height:.9;margin:.05em 0 0;letter-spacing:-.02em}
+.proj .kind{margin-top:14px;color:var(--turq)}
+.panel{background:rgba(12,24,70,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-top:1px solid rgba(216,178,98,.55);padding:clamp(20px,2.4vw,32px);min-width:0}
+.panel p{margin:0 0 20px;max-width:56ch}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;border-top:1px solid rgba(241,233,216,.14);padding-top:16px;margin:0}
+.facts div{min-width:0}
+.facts dt{font-family:var(--f-d);font-size:clamp(24px,2.6vw,34px);color:var(--ivory);line-height:1.1;font-variant-numeric:tabular-nums}
+.facts dd{margin:4px 0 0;color:var(--ivory-dim);font-size:13px;line-height:1.35}
+.rulecap{margin-top:18px;color:var(--ivory-dim)}
+.rulecap b{color:var(--gold);font-weight:500}
+
+.also{padding-block:100px}
+.also ul{list-style:none;margin:28px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+.also li{border-top:1px solid rgba(216,178,98,.4);padding-top:14px;min-width:0}
+.also h3{font-family:var(--f-d);font-weight:400;font-size:clamp(26px,2.6vw,36px);margin:0 0 6px;line-height:1.1}
+.also p{margin:0;color:var(--ivory-dim);font-size:15px}
+
+.contact{min-height:90svh;display:grid;align-content:center;padding-block:100px;text-align:center}
+.contact h2{font-family:var(--f-d);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:1;margin:18px auto 30px;max-width:14ch;text-wrap:balance}
+.mail{font-family:var(--f-d);font-size:clamp(20px,3.2vw,44px);color:var(--gold);text-decoration:none;border-bottom:1px solid rgba(216,178,98,.5);word-break:break-all}
+.contact .links{display:flex;justify-content:center;flex-wrap:wrap;gap:24px;margin-top:34px;color:var(--ivory-dim)}
+.contact .links a{text-decoration:none}
+
+@media (max-width:800px){
+  nav{display:none}
+  .proj-grid{grid-template-columns:minmax(0,1fr)}
+  .also ul{grid-template-columns:minmax(0,1fr)}
+  .fa-name{text-align:left;direction:rtl}
+}
+@media (prefers-reduced-motion:reduce){ .reveal{transition:none!important} }
+.reveal{opacity:1;transform:none;transition:transform 1s cubic-bezier(.2,.7,.1,1), opacity 1s}
+.js .reveal.pending{opacity:.001;transform:translateY(40px)}
+</style>
+
+<canvas id="lattice" aria-hidden="true"></canvas>
+<div class="veil"></div>
+
+<header class="top">
+  <div class="brand"><b>ف.م</b><span class="mono">Farhad Maleki</span></div>
+  <nav class="mono"><a href="#cyrus">Work</a><a href="#also">Also</a><a href="#contact">Contact</a></nav>
+  <span class="mono" id="clock" style="color:var(--ivory-dim)">Dubai --:--</span>
+</header>
+<span class="tag mono">Concept A · Girih</span>
+
+<main>
+  <section class="hero wrap" data-rule="0">
+    <p class="fa-name" lang="fa">فرهاد ملکی</p>
+    <h1>Most systems remember. <em>Mine understand.</em></h1>
+    <div class="hero-foot">
+      <p>Farhad Maleki, AI and agentic systems engineer. CTO at OnePharma, Dubai. I build ontologies, knowledge graphs and the governance that makes AI safe to trust.</p>
+      <span class="mono">Scroll · each project redraws the pattern with its own rule</span>
+    </div>
+  </section>
+
+  <section class="proj wrap" id="cyrus" data-rule="1">
+    <div class="rule-label mono">Ontology platform</div>
+    <div class="proj-grid reveal pending">
+      <div>
+        <p class="fa" lang="fa">کوروش</p>
+        <h2>Cyrus</h2>
+      </div>
+      <div class="panel">
+        <p>Every company runs on data scattered across systems that disagree on what a customer, a batch or a contract is. Cyrus gives that data one shared meaning: an ontology of the objects a business runs on, so people and AI agents can ask questions in the language of the business and trace every answer back to its source. Built for any industry, first modelled on pharma, in Arabic and English.</p>
+        <dl class="facts">
+          <div><dt>95%</dt><dd>Bilingual document accuracy</dd></div>
+          <div><dt>13</dt><dd>Security layers</dd></div>
+          <div><dt>1</dt><dd>Ontology, every industry</dd></div>
+        </dl>
+        <p class="rulecap mono">Rule: <b>hexagonal, 6-fold</b>. Many sources, one structure.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="proj wrap" id="zagros" data-rule="2">
+    <div class="rule-label mono">Enterprise governance and identity</div>
+    <div class="proj-grid reveal pending">
+      <div>
+        <p class="fa" lang="fa">زاگرس</p>
+        <h2>Zagros</h2>
+      </div>
+      <div class="panel">
+        <p>Who is allowed to do what, and who decided? Zagros is one self-hosted system for authentication, authorization and governance, with no outside identity provider in the loop. An instance is founded in a sealed ceremony where three of five constitutional keys must agree, and every decision after that runs through policy.</p>
+        <dl class="facts">
+          <div><dt>3 / 5</dt><dd>Constitutional key quorum</dd></div>
+          <div><dt>0</dt><dd>External identity providers</dd></div>
+          <div><dt>4</dt><dd>Deployment modes, incl. air-gapped</dd></div>
+        </dl>
+        <p class="rulecap mono">Rule: <b>octagonal, 8-fold, tight</b>. Nothing gets through unchecked.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="proj wrap" id="falah" data-rule="3">
+    <div class="rule-label mono">iPhone finance app · in development</div>
+    <div class="proj-grid reveal pending">
+      <div>
+        <p class="fa" lang="fa">فلاح</p>
+        <h2>Falah</h2>
+      </div>
+      <div class="panel">
+        <p>A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in your Gmail or Outlook receipts with consent, and lets you ask an AI about your money in plain words. SwiftUI on a Supabase backend, built end to end. Not on the App Store yet.</p>
+        <dl class="facts">
+          <div><dt>2</dt><dd>Automatic sources: bank and email</dd></div>
+          <div><dt>9</dt><dd>Supabase edge functions</dd></div>
+          <div><dt>iOS</dt><dd>Swift and SwiftUI</dd></div>
+        </dl>
+        <p class="rulecap mono">Rule: <b>square, open</b>. Simple on the surface.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="also wrap" id="also" data-rule="0">
+    <div class="rule-label mono">Also</div>
+    <ul class="reveal pending">
+      <li><h3>OnePharma</h3><p>The pharmaceutical intelligence product I lead as CTO. Next.js, GraphQL and a Neo4j activity graph.</p></li>
+      <li><h3>Black Pearl</h3><p>Live control and telemetry for a steel-framing CNC machine, demoable in a browser with no hardware.</p></li>
+      <li><h3>Intrusion detection</h3><p>A CNN that flags malicious network traffic at 97% accuracy. Published at ICNGN 2023.</p></li>
+    </ul>
+  </section>
+
+  <section class="contact wrap" id="contact" data-rule="4">
+    <span class="mono" style="color:var(--turq)">Contact</span>
+    <h2>Have a system that needs to understand?</h2>
+    <div><a class="mail" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a></div>
+    <div class="links mono"><a href="https://github.com/Farhad1618">GitHub</a><a href="https://linkedin.com/in/farhad-maleki">LinkedIn</a><span>+971 58 558 1618</span></div>
+  </section>
+</main>
+
+<script>
+(function(){
+document.documentElement.classList.add('js');
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cv = document.getElementById('lattice'), g = cv.getContext('2d');
+let W=0,H=0,DPR=1, mx=-9999, my=-9999, smx=-9999, smy=-9999;
+
+/* ---------- tilings: each returns polygons (arrays of [x,y]) covering the viewport ---------- */
+function poly(cx,cy,n,R,rot){const p=[];for(let k=0;k<n;k++){const a=rot+k*2*Math.PI/n;p.push([cx+R*Math.cos(a),cy+R*Math.sin(a)])}return p}
+function t488(a){ // octagons + squares
+  const w=a*(1+Math.SQRT2), R=a/(2*Math.sin(Math.PI/8)), out=[];
+  for(let y=-w;y<H+w;y+=w)for(let x=-w;x<W+w;x+=w){
+    out.push(poly(x,y,8,R,Math.PI/8));
+    out.push(poly(x+w/2,y+w/2,4,a/Math.SQRT2,0));
+  } return out}
+function t666(a){ // hexagons
+  const out=[], dx=Math.sqrt(3)*a, dy=1.5*a; let j=0;
+  for(let y=-dy;y<H+dy;y+=dy,j++)for(let x=-dx;x<W+dx;x+=dx) out.push(poly(x+(j&1?dx/2:0),y,6,a,Math.PI/6));
+  return out}
+function t444(a){const out=[];for(let y=-a;y<H+a;y+=a)for(let x=-a;x<W+a;x+=a)out.push(poly(x+a/2,y+a/2,4,a/Math.SQRT2,Math.PI/4));return out}
+
+/* rules: tiling, size, hankin angle (deg). Index matches data-rule on sections. */
+const RULES=[
+  {t:t488,a:46,th:67.5},
+  {t:t666,a:58,th:60},
+  {t:t488,a:34,th:72},
+  {t:t444,a:84,th:58},
+  {t:t488,a:60,th:52}
+];
+let built=[]; // per rule: list of {mids, cen, edges...}
+function build(){
+  built = RULES.map(r=>{
+    const s = r.a * Math.max(.72, Math.min(1.15, W/1400));
+    return r.t(s).map((p,i)=>{
+      const n=p.length, c=p.reduce((s,v)=>[s[0]+v[0]/n,s[1]+v[1]/n],[0,0]);
+      const mids=[],dirs=[];
+      for(let k=0;k<n;k++){const A=p[k],B=p[(k+1)%n];mids.push([(A[0]+B[0])/2,(A[1]+B[1])/2]);const L=Math.hypot(B[0]-A[0],B[1]-A[1]);dirs.push([(B[0]-A[0])/L,(B[1]-A[1])/L])}
+      // seeded scatter for the assembly intro
+      const h=Math.sin((c[0]*12.9898+c[1]*78.233))*43758.5453; const r1=h-Math.floor(h), r2=(h*7.13)-Math.floor(h*7.13);
+      const d=Math.hypot(c[0]-W/2,c[1]-H*.45)/Math.hypot(W/2,H/2);
+      return {c,mids,dirs,n,ox:(r1-.5)*520,oy:(r2-.5)*520,rot:(r1-.5)*2.4,delay:d*1.1+r2*.25};
+    });
+  });
+}
+function rot(v,a){const c=Math.cos(a),s=Math.sin(a);return[v[0]*c-v[1]*s,v[0]*s+v[1]*c]}
+function inward(m,v,c,th){ // rotate v by +/-th so it points toward centre c
+  const a=rot(v,th), b=rot(v,-th);
+  return ((c[0]-m[0])*a[0]+(c[1]-m[1])*a[1]) > ((c[0]-m[0])*b[0]+(c[1]-m[1])*b[1]) ? a : b;
+}
+function trace(P,th,e){ // Hankin's method: two rays from each edge midpoint meet inside the cell
+  const {mids,dirs,n,c}=P;
+  const k=e>=1?0:(1-e), ox=P.ox*k, oy=P.oy*k, rr=P.rot*k, cs=Math.cos(rr), sn=Math.sin(rr);
+  const T=(x,y)=>{if(!k)return[x,y];const dx=x-c[0],dy=y-c[1];return[c[0]+dx*cs-dy*sn+ox,c[1]+dx*sn+dy*cs+oy]};
+  for(let i=0;i<n;i++){
+    const j=(i+1)%n, m1=mids[i], m2=mids[j];
+    const r1=inward(m1,dirs[i],c,th), r2=inward(m2,[-dirs[j][0],-dirs[j][1]],c,th);
+    const den=r1[0]*r2[1]-r1[1]*r2[0]; if(Math.abs(den)<1e-6)continue;
+    const t=((m2[0]-m1[0])*r2[1]-(m2[1]-m1[1])*r2[0])/den;
+    const X=m1[0]+r1[0]*t, Y=m1[1]+r1[1]*t;
+    const a=T(m1[0],m1[1]), b=T(X,Y), d=T(m2[0],m2[1]);
+    g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(d[0],d[1]);
+  }
+}
+function drawRule(idx,th,alpha,t,bright){
+  const list=built[idx]; if(!list||alpha<.01)return;
+  g.beginPath();
+  for(const P of list){
+    let e=RM?1:Math.min(1,Math.max(0,(t-P.delay)/1.3)); e=1-Math.pow(1-e,4);
+    if(e<=0)continue;
+    trace(P,th,e);
+  }
+  g.globalAlpha=alpha*(bright?1:.42);
+  g.stroke();
+}
+
+/* ---------- scroll → rule blend ---------- */
+const secs=[...document.querySelectorAll('[data-rule]')];
+function ruleState(){
+  const mid=innerHeight*.5; let best=0, bestD=1e9, blend=0, next=0;
+  for(let i=0;i<secs.length;i++){
+    const r=secs[i].getBoundingClientRect(), c=r.top+r.height/2, d=c-mid;
+    if(Math.abs(d)<Math.abs(bestD)){bestD=d;best=i}
+  }
+  const r=secs[best].getBoundingClientRect();
+  // blend toward neighbour as the section's centre leaves the viewport middle
+  blend=Math.min(1,Math.abs(bestD)/(r.height*.5+innerHeight*.25));
+  next=bestD<0?Math.min(secs.length-1,best+1):Math.max(0,best-1);
+  return {a:+secs[best].dataset.rule,b:+secs[next].dataset.rule,k:blend*blend*.5};
+}
+
+let t0=performance.now(), curTh=RULES[0].th;
+function frame(now){
+  const t=(now-t0)/1000;
+  smx+=(mx-smx)*.12; smy+=(my-smy)*.12;
+  g.setTransform(DPR,0,0,DPR,0,0); g.clearRect(0,0,W,H);
+  const s=ruleState(), A=RULES[s.a], B=RULES[s.b];
+  const breathe=RM?0:Math.sin(t*.35)*2.2;
+  const mouseTh = mx>-999 ? (mx/W-.5)*10 : 0;
+  const targetTh=A.th*(1-s.k)+B.th*s.k+breathe+mouseTh;
+  curTh+=(targetTh-curTh)*.08;
+  const th=curTh*Math.PI/180;
+  g.lineJoin='round'; g.strokeStyle='#D8B262'; g.lineWidth=1.1;
+  drawRule(s.a,th,1-s.k,t,false);
+  if(s.k>.01&&s.b!==s.a) drawRule(s.b,th,s.k,t,false);
+  // cursor lamp: same lattice, brighter, clipped to a disc
+  if(smx>-999){
+    g.save(); g.beginPath(); g.arc(smx,smy,Math.min(220,W*.28),0,Math.PI*2); g.clip();
+    const grad=g.createRadialGradient(smx,smy,0,smx,smy,Math.min(220,W*.28));
+    grad.addColorStop(0,'rgba(73,185,174,.10)'); grad.addColorStop(1,'rgba(73,185,174,0)');
+    g.fillStyle=grad; g.fillRect(smx-240,smy-240,480,480);
+    g.strokeStyle='#F3D28A'; g.lineWidth=1.6;
+    drawRule(s.a,th,1-s.k,t,true);
+    if(s.k>.01&&s.b!==s.a) drawRule(s.b,th,s.k,t,true);
+    g.restore();
+  }
+  g.globalAlpha=1;
+  requestAnimationFrame(frame);
+}
+
+function resize(){DPR=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;cv.width=W*DPR;cv.height=H*DPR;build()}
+addEventListener('resize',resize);
+addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;if(smx<-999){smx=mx;smy=my}});
+document.addEventListener('pointerleave',()=>{mx=my=-9999;smx=smy=-9999});
+resize(); requestAnimationFrame(frame);
+
+/* reveal */
+const io=new IntersectionObserver(es=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.remove('pending');io.unobserve(en.target)}}),{threshold:.15});
+document.querySelectorAll('.reveal.pending').forEach(el=>io.observe(el));
+
+/* Dubai clock */
+const ck=document.getElementById('clock');
+function tick(){try{ck.textContent='Dubai '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}).format(new Date())+' GST'}catch(e){}}
+tick(); setInterval(tick,15000);
+})();
+</script>
