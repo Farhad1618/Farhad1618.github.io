@@ -1,0 +1,1253 @@
+<title>Farhad Maleki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;1,6..96,400;1,6..96,500&family=Archivo:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ============================================================
+   FARHAD MALEKI — "The Graph Beneath"
+   A committed dark visual world: navy ink, titanium bone,
+   sodium amber. Mineral teal is reserved for graph data only.
+   ============================================================ */
+
+:root{
+  color-scheme: dark;
+
+  --ink:        #0A111A;
+  --ink-2:      #0D1622;
+  --ink-3:      #101E2C;
+  --rule:       #1C2A39;
+  --rule-soft:  #15212D;
+
+  --bone:       #ECE7DC;
+  --bone-dim:   #A5AEB9;
+  --muted:      #6A7785;
+
+  --signal:     #E9A03B;
+  --signal-dim: #8A6224;
+  --trace:      #5FA8B8;
+
+  --f-display: "Bodoni Moda", "Didot", "Times New Roman", serif;
+  --f-body:    "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-mono:    "IBM Plex Mono", "SFMono-Regular", Menlo, monospace;
+
+  --gutter: clamp(20px, 5vw, 84px);
+  --maxw: 1440px;
+
+  --step--1: clamp(11px, 0.72rem, 12.5px);
+  --step-0:  clamp(15px, 0.95rem, 17px);
+  --step-1:  clamp(19px, 1.35rem, 24px);
+  --step-2:  clamp(26px, 2.4vw, 38px);
+  --step-3:  clamp(34px, 4.4vw, 68px);
+  --step-4:  clamp(44px, 7.6vw, 124px);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background:var(--ink);
+  color:var(--bone);
+  font-family:var(--f-body);
+  font-size:var(--step-0);
+  font-weight:300;
+  line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+
+/* Fine grain over the whole page — keeps the flat ink from reading as plastic */
+body::after{
+  content:"";
+  position:fixed; inset:-50%;
+  pointer-events:none; z-index:9;
+  opacity:.032;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
+}
+
+a{ color:inherit; text-decoration:none; }
+:focus-visible{ outline:1px solid var(--signal); outline-offset:3px; }
+
+.wrap{ max-width:var(--maxw); margin:0 auto; padding-inline:var(--gutter); }
+
+/* ---------- shared type roles ---------- */
+.mono{
+  font-family:var(--f-mono);
+  font-size:var(--step--1);
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  color:var(--muted);
+  font-weight:400;
+}
+.display{
+  font-family:var(--f-display);
+  font-weight:400;
+  line-height:1.02;
+  letter-spacing:-.012em;
+  text-wrap:balance;
+  margin:0;
+}
+.serif-i{ font-style:italic; }
+.amber{ color:var(--signal); }
+
+.section-head{
+  display:flex; align-items:baseline; gap:18px;
+  padding-block:18px;
+  border-top:1px solid var(--rule);
+  margin-bottom:clamp(34px,5vw,72px);
+}
+.section-head .idx{ color:var(--signal-dim); }
+.section-head h2{
+  font-family:var(--f-mono);
+  font-size:var(--step--1);
+  letter-spacing:.13em;
+  text-transform:uppercase;
+  color:var(--bone-dim);
+  font-weight:500;
+  margin:0;
+}
+.section-head .tail{ margin-left:auto; }
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+.topbar{
+  position:sticky; top:0; z-index:8;
+  display:flex; align-items:center; gap:20px;
+  padding:14px var(--gutter);
+  background:linear-gradient(var(--ink) 62%, rgba(10,17,26,0));
+  backdrop-filter:blur(3px);
+}
+.topbar .sig{
+  font-family:var(--f-mono); font-size:var(--step--1);
+  letter-spacing:.18em; text-transform:uppercase;
+  color:var(--bone); font-weight:500;
+}
+.topbar nav{ margin-left:auto; display:flex; gap:22px; align-items:center; }
+.topbar nav a{
+  font-family:var(--f-mono); font-size:var(--step--1);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--muted);
+  transition:color .25s ease;
+}
+.topbar nav a:hover{ color:var(--signal); }
+.clock{ font-variant-numeric:tabular-nums; }
+@media (max-width:820px){ .topbar nav a:not(.cta-link){ display:none; } }
+
+/* ============================================================
+   HERO + GRAPH CANVAS
+   ============================================================ */
+.hero{
+  position:relative;
+  min-height:clamp(540px, 86vh, 880px);
+  display:flex; flex-direction:column; justify-content:center;
+  padding-block:clamp(40px,7vh,90px) clamp(28px,5vh,56px);
+  isolation:isolate;
+}
+#graph{
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  z-index:-1;
+  cursor:none;
+}
+.hero::before{ /* keeps type legible over the densest part of the graph */
+  content:""; position:absolute; inset:0; z-index:-1;
+  background:
+    linear-gradient(100deg, var(--ink) 0%, rgba(10,17,26,.97) 30%, rgba(10,17,26,.62) 50%, rgba(10,17,26,0) 68%),
+    radial-gradient(120% 82% at 20% 52%, rgba(10,17,26,.92) 0%, rgba(10,17,26,.55) 46%, rgba(10,17,26,0) 80%);
+  pointer-events:none;
+}
+/* Narrow viewports: the text column spans the graph, so the graph becomes texture. */
+@media (max-width:1000px){
+  #graph{ opacity:.42; }
+  .hero::before{
+    background:linear-gradient(180deg, rgba(10,17,26,.9) 0%, rgba(10,17,26,.78) 55%, rgba(10,17,26,.9) 100%);
+  }
+}
+.hero-inner{ position:relative; }
+
+.eyebrow{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin-bottom:clamp(18px,3vh,34px); }
+.eyebrow .dot{ width:5px; height:5px; border-radius:50%; background:var(--signal); box-shadow:0 0 10px var(--signal); }
+
+h1.display{ font-size:var(--step-4); max-width:15ch; }
+h1.display .l2{ display:block; color:var(--signal); }
+
+.hero-sub{
+  margin:clamp(22px,3.4vh,38px) 0 0;
+  max-width:54ch; color:var(--bone-dim);
+  font-size:var(--step-1); font-weight:300; line-height:1.5;
+}
+.hero-cta{ display:flex; flex-wrap:wrap; gap:14px; margin-top:clamp(26px,4vh,42px); }
+
+.btn{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:var(--f-mono); font-size:var(--step--1);
+  letter-spacing:.13em; text-transform:uppercase;
+  padding:13px 22px; border:1px solid var(--rule);
+  color:var(--bone); background:transparent;
+  transition:border-color .3s ease, color .3s ease, background .3s ease;
+}
+.btn:hover{ border-color:var(--signal); color:var(--signal); }
+.btn--solid{ background:var(--signal); color:#0A111A; border-color:var(--signal); font-weight:500; }
+.btn--solid:hover{ background:var(--bone); border-color:var(--bone); color:#0A111A; }
+.btn .arw{ transition:transform .3s ease; }
+.btn:hover .arw{ transform:translateX(4px); }
+
+/* graph readout — instrument panel detail */
+.readout{
+  position:absolute; left:var(--gutter); bottom:clamp(14px,3vh,30px);
+  display:flex; gap:22px; flex-wrap:wrap; align-items:center;
+  font-variant-numeric:tabular-nums;
+}
+.readout b{ color:var(--bone-dim); font-weight:500; }
+.hint{
+  position:absolute; right:var(--gutter); bottom:clamp(14px,3vh,30px);
+  display:flex; align-items:center; gap:9px;
+}
+.hint i{ display:block; width:1px; height:22px; background:linear-gradient(var(--signal), transparent); animation:drip 2.4s ease-in-out infinite; }
+@keyframes drip{ 0%,100%{ transform:scaleY(.35); opacity:.4 } 50%{ transform:scaleY(1); opacity:1 } }
+@media (max-width:700px){ .hint{ display:none; } }
+
+/* reticle cursor, hero only */
+.reticle{
+  position:fixed; z-index:20; pointer-events:none;
+  width:26px; height:26px; margin:-13px 0 0 -13px;
+  border:1px solid var(--signal); border-radius:50%;
+  opacity:0; transition:opacity .25s ease, width .2s ease, height .2s ease, margin .2s ease;
+}
+.reticle::after{ content:""; position:absolute; inset:calc(50% - 1px); width:2px; height:2px; background:var(--signal); }
+.reticle.on{ opacity:1; }
+.reticle.lock{ width:46px; height:46px; margin:-23px 0 0 -23px; }
+@media (pointer:coarse){ .reticle{ display:none; } #graph{ cursor:default; } }
+
+/* ============================================================
+   STRATA
+   ============================================================ */
+.strata{ padding-block:clamp(70px,11vh,150px); }
+.strata-grid{ display:grid; grid-template-columns:1.1fr .9fr; gap:clamp(36px,6vw,90px); align-items:start; }
+@media (max-width:940px){ .strata-grid{ grid-template-columns:1fr; } }
+
+.layer{ padding-block:clamp(26px,4vh,44px); border-top:1px solid var(--rule-soft); }
+.layer:first-child{ border-top:0; padding-top:0; }
+.layer .tag{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+.layer .tag .bar{ width:26px; height:1px; background:var(--rule); }
+.layer.is-gov .tag .bar{ background:var(--signal); }
+.layer p.display{ font-size:var(--step-2); max-width:20ch; }
+.layer .note{ margin:14px 0 0; color:var(--muted); max-width:46ch; font-size:var(--step-0); }
+
+.strata-fig{ position:sticky; top:96px; }
+.strata-fig svg{ width:100%; height:auto; display:block; }
+
+/* ============================================================
+   WORK
+   ============================================================ */
+.work{ padding-block:clamp(40px,7vh,90px); position:relative; }
+
+.rail{
+  position:fixed; left:max(14px, calc((100vw - var(--maxw))/2 + 18px)); top:50%;
+  transform:translateY(-50%); z-index:7;
+  display:flex; flex-direction:column; gap:9px;
+  opacity:0; transition:opacity .45s ease; pointer-events:none;
+}
+.rail.on{ opacity:1; pointer-events:auto; }
+.rail a{
+  font-family:var(--f-mono); font-size:10px; letter-spacing:.1em;
+  color:var(--muted); display:flex; align-items:center; gap:8px;
+  transition:color .3s ease;
+}
+.rail a i{ display:block; width:10px; height:1px; background:currentColor; transition:width .35s ease; }
+.rail a.active{ color:var(--signal); }
+.rail a.active i{ width:24px; }
+.rail a:hover{ color:var(--bone); }
+@media (max-width:1180px){ .rail{ display:none; } }
+
+.proj{
+  display:grid; grid-template-columns:64px 1fr minmax(240px, .78fr);
+  gap:clamp(20px,3.4vw,56px);
+  padding-block:clamp(44px,7vh,92px);
+  border-top:1px solid var(--rule);
+  align-items:start;
+}
+@media (max-width:1000px){
+  .proj{ grid-template-columns:44px 1fr; }
+  .proj .fig{ grid-column:1 / -1; margin-top:8px; }
+}
+@media (max-width:560px){ .proj{ grid-template-columns:1fr; gap:18px; } }
+
+.proj .num{ font-family:var(--f-mono); font-size:var(--step--1); color:var(--signal-dim); letter-spacing:.08em; padding-top:.55em; }
+.proj h3.display{ font-size:var(--step-3); }
+.proj .kicker{ margin:12px 0 0; }
+.proj .body{ margin:20px 0 0; color:var(--bone-dim); max-width:58ch; }
+
+.metrics{ display:flex; flex-wrap:wrap; gap:10px 34px; margin-top:26px; }
+.metric .v{ font-family:var(--f-mono); font-size:var(--step-1); color:var(--bone); font-variant-numeric:tabular-nums; font-weight:500; letter-spacing:-.01em; }
+.metric .k{ display:block; margin-top:3px; }
+
+.chips{ display:flex; flex-wrap:wrap; gap:7px; margin-top:26px; }
+.chips span{
+  font-family:var(--f-mono); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--muted); border:1px solid var(--rule-soft); padding:5px 9px;
+}
+.proj .fig{ position:relative; }
+.proj .fig svg{ width:100%; height:auto; display:block; }
+.fig figcaption{ margin-top:12px; }
+
+.proj-links{ display:flex; gap:18px; margin-top:24px; flex-wrap:wrap; }
+.proj-links a{
+  font-family:var(--f-mono); font-size:var(--step--1); letter-spacing:.12em; text-transform:uppercase;
+  color:var(--bone-dim); border-bottom:1px solid var(--rule); padding-bottom:3px;
+  transition:color .28s ease, border-color .28s ease;
+}
+.proj-links a:hover{ color:var(--signal); border-color:var(--signal); }
+
+/* ============================================================
+   RESEARCH
+   ============================================================ */
+.research{ padding-block:clamp(70px,11vh,140px); }
+.paper{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:clamp(28px,5vw,72px); align-items:end; }
+@media (max-width:800px){ .paper{ grid-template-columns:1fr; align-items:start; } }
+.paper h3.display{ font-size:var(--step-2); max-width:22ch; }
+.paper .meta{ margin-top:16px; }
+.bigstat{ text-align:right; }
+@media (max-width:800px){ .bigstat{ text-align:left; } }
+.bigstat .v{ font-family:var(--f-display); font-size:var(--step-4); line-height:.9; color:var(--signal); font-variant-numeric:tabular-nums; }
+.bigstat .k{ margin-top:10px; }
+
+/* ============================================================
+   TRACK (experience)
+   ============================================================ */
+.track{ padding-block:clamp(60px,9vh,120px); }
+.role{
+  display:grid; grid-template-columns:190px 1fr auto; gap:10px clamp(18px,3vw,44px);
+  padding-block:20px; border-top:1px solid var(--rule-soft); align-items:baseline;
+}
+.role:hover .org{ color:var(--signal); }
+.role .yr{ font-variant-numeric:tabular-nums; }
+.org{ font-family:var(--f-display); font-size:var(--step-1); transition:color .3s ease; }
+.role .what{ color:var(--muted); font-family:var(--f-mono); font-size:var(--step--1); letter-spacing:.1em; text-transform:uppercase; }
+@media (max-width:780px){
+  .role{ grid-template-columns:1fr; gap:4px; padding-block:18px; }
+  .role .what{ order:3; }
+}
+
+/* ============================================================
+   STACK
+   ============================================================ */
+.stack{ padding-block:clamp(60px,9vh,120px); }
+.srow{ display:grid; grid-template-columns:230px 1fr; gap:12px clamp(18px,3vw,44px); padding-block:20px; border-top:1px solid var(--rule-soft); }
+.srow p{ margin:0; color:var(--bone-dim); font-size:var(--step-0); }
+@media (max-width:720px){ .srow{ grid-template-columns:1fr; gap:8px; } }
+
+/* ============================================================
+   CONTACT
+   ============================================================ */
+.contact{ padding-block:clamp(80px,13vh,170px); border-top:1px solid var(--rule); }
+.contact h2.display{ font-size:var(--step-3); max-width:17ch; }
+.mail{
+  display:inline-block; margin-top:clamp(28px,4vh,48px);
+  font-family:var(--f-display); font-size:var(--step-2);
+  color:var(--signal); border-bottom:1px solid var(--signal-dim);
+  padding-bottom:6px; word-break:break-word;
+  transition:border-color .3s ease, color .3s ease;
+}
+.mail:hover{ color:var(--bone); border-color:var(--bone); }
+.reach{ display:flex; flex-wrap:wrap; gap:14px 40px; margin-top:clamp(30px,5vh,54px); }
+.reach a, .reach span{ font-family:var(--f-mono); font-size:var(--step--1); letter-spacing:.12em; text-transform:uppercase; color:var(--bone-dim); }
+.reach a{ transition:color .28s ease; }
+.reach a:hover{ color:var(--signal); }
+
+footer{ padding:26px var(--gutter) 40px; display:flex; flex-wrap:wrap; gap:10px 26px; border-top:1px solid var(--rule-soft); }
+footer .tail{ margin-left:auto; }
+
+/* schematic shared */
+.sch-line{ stroke:var(--rule); stroke-width:1; fill:none; }
+.sch-bone{ stroke:var(--bone-dim); stroke-width:1; fill:none; }
+.sch-sig{ stroke:var(--signal); stroke-width:1; fill:none; }
+.sch-fill{ fill:var(--ink-2); }
+.sch-t{ font-family:var(--f-mono); font-size:8.5px; letter-spacing:.1em; fill:var(--muted); text-transform:uppercase; }
+.sch-t-sig{ fill:var(--signal); }
+
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+}
+</style>
+
+<header class="topbar">
+  <span class="sig">Farhad Maleki</span>
+  <nav>
+    <a href="#work">Work</a>
+    <a href="#research">Research</a>
+    <a href="#track">Track</a>
+    <a href="#stack">Stack</a>
+    <a class="cta-link" href="#contact">Contact</a>
+    <span class="mono clock" id="clock">—:—:— GST</span>
+  </nav>
+</header>
+
+<div class="reticle" id="reticle" aria-hidden="true"></div>
+
+<!-- ============================ HERO ============================ -->
+<section class="hero">
+  <canvas id="graph" role="img" aria-label="Interactive knowledge graph of Farhad Maleki's projects, technologies and concepts. Hover a node to reveal its relations."></canvas>
+  <div class="wrap hero-inner">
+    <div class="eyebrow">
+      <span class="dot" aria-hidden="true"></span>
+      <span class="mono">AI &amp; Agentic Systems Engineer</span>
+      <span class="mono">/</span>
+      <span class="mono">CTO, OnePharma</span>
+      <span class="mono">/</span>
+      <span class="mono">Dubai, UAE</span>
+    </div>
+
+    <h1 class="display">
+      Most systems remember.
+      <span class="l2 serif-i">I build systems that understand.</span>
+    </h1>
+
+    <p class="hero-sub">
+      An ontology and a graph beneath the surface, so an AI reasons across relations
+      rather than retrieving rows. A governance layer above, holding every system
+      to what it is permitted to know.
+    </p>
+
+    <div class="hero-cta">
+      <a class="btn btn--solid" href="#work">Selected work <span class="arw">→</span></a>
+      <a class="btn" href="#contact">Start a project <span class="arw">→</span></a>
+    </div>
+  </div>
+
+  <div class="readout mono" aria-hidden="true">
+    <span>Ontology</span>
+    <span><b id="ro-n">0</b> nodes</span>
+    <span><b id="ro-e">0</b> edges</span>
+    <span><b id="ro-p">0</b>% resolved</span>
+  </div>
+  <div class="hint mono" aria-hidden="true"><i></i> Scroll</div>
+</section>
+
+<!-- ============================ STRATA ============================ -->
+<section class="strata wrap" id="strata">
+  <div class="section-head">
+    <span class="mono idx">01</span>
+    <h2>How I build</h2>
+    <span class="mono tail">Three layers, always</span>
+  </div>
+
+  <div class="strata-grid">
+    <div>
+      <article class="layer is-gov">
+        <div class="tag"><i class="bar"></i><span class="mono amber">Above — Governance</span></div>
+        <p class="display">Every system held to what it is permitted to know.</p>
+        <p class="note">Policy-based authorization, attribute-based access control, hash-chained
+        audit trails. Agents and users act inside boundaries the system enforces rather than assumes.</p>
+      </article>
+
+      <article class="layer">
+        <div class="tag"><i class="bar"></i><span class="mono">The surface — Systems</span></div>
+        <p class="display">APIs, agents, and products people actually touch.</p>
+        <p class="note">Autonomous services that plan, call tools, and act against the platform's
+        own APIs. Typed SDKs, passwordless identity, and infrastructure that scales from day one.</p>
+      </article>
+
+      <article class="layer">
+        <div class="tag"><i class="bar"></i><span class="mono">Beneath — Ontology</span></div>
+        <p class="display">A graph, not a pile of rows.</p>
+        <p class="note">A domain ontology and the pipelines built on it — the semantic layer every
+        service and agent reads from. Relations are first-class, so reasoning is possible at all.</p>
+      </article>
+    </div>
+
+    <figure class="strata-fig" aria-hidden="true">
+      <svg viewBox="0 0 420 420" xmlns="http://www.w3.org/2000/svg">
+        <!-- governance plate -->
+        <g>
+          <path class="sch-sig" d="M210 40 L390 96 L210 152 L30 96 Z"/>
+          <path class="sch-sig" style="opacity:.35" d="M30 96 L30 110 L210 166 L390 110 L390 96"/>
+          <text class="sch-t sch-t-sig" x="30" y="30">Governance</text>
+        </g>
+        <!-- surface plate -->
+        <g>
+          <path class="sch-bone" d="M210 168 L390 224 L210 280 L30 224 Z"/>
+          <path class="sch-bone" style="opacity:.3" d="M30 224 L30 238 L210 294 L390 238 L390 224"/>
+          <text class="sch-t" x="30" y="205">Surface</text>
+        </g>
+        <!-- ontology plate with graph texture -->
+        <g>
+          <path class="sch-line" d="M210 296 L390 352 L210 408 L30 352 Z"/>
+          <g style="stroke:var(--trace);stroke-width:.8;opacity:.75;fill:none">
+            <path d="M120 348 L186 330 L258 356 L318 338"/>
+            <path d="M186 330 L204 372 L258 356"/>
+            <path d="M120 348 L168 376 L204 372"/>
+            <path d="M258 356 L292 380"/>
+          </g>
+          <g style="fill:var(--trace)">
+            <circle cx="120" cy="348" r="3"/><circle cx="186" cy="330" r="3.6"/>
+            <circle cx="258" cy="356" r="3.6"/><circle cx="318" cy="338" r="2.6"/>
+            <circle cx="204" cy="372" r="2.6"/><circle cx="168" cy="376" r="2.4"/>
+            <circle cx="292" cy="380" r="2.4"/>
+          </g>
+          <text class="sch-t" x="30" y="333">Ontology</text>
+        </g>
+        <!-- vertical read line -->
+        <g style="stroke:var(--rule);stroke-width:1;stroke-dasharray:2 5">
+          <path d="M210 152 L210 168"/><path d="M210 280 L210 296"/>
+        </g>
+      </svg>
+    </figure>
+  </div>
+</section>
+
+<!-- ============================ WORK ============================ -->
+<nav class="rail" id="rail" aria-label="Project index">
+  <a href="#p1"><i></i>01</a><a href="#p2"><i></i>02</a><a href="#p3"><i></i>03</a>
+  <a href="#p4"><i></i>04</a><a href="#p5"><i></i>05</a><a href="#p6"><i></i>06</a>
+</nav>
+
+<section class="work wrap" id="work">
+  <div class="section-head">
+    <span class="mono idx">02</span>
+    <h2>Selected work</h2>
+    <span class="mono tail">Six of them</span>
+  </div>
+
+  <!-- 01 ONYXS -->
+  <article class="proj" id="p1">
+    <div class="num">01</div>
+    <div>
+      <h3 class="display">Onyxs</h3>
+      <p class="kicker mono">Pharmaceutical analytics platform · Architecture &amp; build</p>
+      <p class="body">
+        Classifies bilingual Arabic and English regulatory documents at 95% accuracy and UAE Ministry
+        of Health price lists at 100%. Rust, Go and C++ hold the performance path while Python carries
+        business logic. Kubernetes microservices under multi-tenant isolation, PostgreSQL and ClickHouse
+        for OLAP, Neo4j for the graph, and local EmbeddingGemma vectors for semantic search. Thirteen
+        security layers and a hash-chained audit trail hold it to 21 CFR Part 11, SOC 2 Type II and ISO 27001.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">95%</span><span class="k mono">Bilingual doc accuracy</span></div>
+        <div class="metric"><span class="v">100%</span><span class="k mono">MoH price lists</span></div>
+        <div class="metric"><span class="v">13</span><span class="k mono">Security layers</span></div>
+      </div>
+      <div class="chips">
+        <span>Rust</span><span>Go</span><span>C++</span><span>Python</span><span>Kubernetes</span>
+        <span>PostgreSQL</span><span>ClickHouse</span><span>Neo4j</span><span>EmbeddingGemma</span>
+        <span>21 CFR Part 11</span><span>SOC 2 Type II</span><span>ISO 27001</span>
+      </div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- medallion pipeline -->
+        <g>
+          <rect class="sch-fill" x="14" y="16" width="272" height="34"/><rect class="sch-line" x="14" y="16" width="272" height="34"/>
+          <text class="sch-t" x="24" y="37">Bronze — raw regulatory intake</text>
+          <rect class="sch-fill" x="34" y="66" width="232" height="34"/><rect class="sch-bone" x="34" y="66" width="232" height="34"/>
+          <text class="sch-t" x="44" y="87">Silver — normalised · AR / EN</text>
+          <rect class="sch-fill" x="54" y="116" width="192" height="34"/><rect class="sch-sig" x="54" y="116" width="192" height="34"/>
+          <text class="sch-t sch-t-sig" x="64" y="137">Gold — classified · 95%</text>
+        </g>
+        <g style="stroke:var(--rule);stroke-width:1;stroke-dasharray:2 4">
+          <path d="M150 50 L150 66"/><path d="M150 100 L150 116"/>
+        </g>
+        <!-- hash chain -->
+        <g transform="translate(0,176)">
+          <text class="sch-t" x="14" y="0">Hash-chained audit</text>
+          <g style="stroke:var(--trace);stroke-width:1;fill:none;opacity:.85">
+            <path d="M14 22 L286 22"/>
+          </g>
+          <g style="fill:var(--ink);stroke:var(--trace);stroke-width:1">
+            <rect x="18" y="14" width="16" height="16"/><rect x="72" y="14" width="16" height="16"/>
+            <rect x="126" y="14" width="16" height="16"/><rect x="180" y="14" width="16" height="16"/>
+            <rect x="234" y="14" width="16" height="16"/><rect x="266" y="14" width="16" height="16"/>
+          </g>
+        </g>
+      </svg>
+      <figcaption class="mono">Fig. 01 — Medallion pipeline over a hash-chained ledger</figcaption>
+    </figure>
+  </article>
+
+  <!-- 02 SR-71 -->
+  <article class="proj" id="p2">
+    <div class="num">02</div>
+    <div>
+      <h3 class="display">SR-71 Blackbird</h3>
+      <p class="kicker mono">Identity, authorization &amp; governance platform · Apache 2.0</p>
+      <p class="body">
+        Multi-tenant identity and governance with no external identity provider in the loop. Passkeys,
+        email OTP and passwords are all verified in-instance. Authorization runs on Cerbos policies, and
+        the instance is brought up through a sealed Genesis ceremony with K-of-N constitutional keys and a
+        catastrophe policy. FastAPI, Next.js and PostgreSQL, with TypeScript and Python SDKs — the same
+        code runs local, on-premise, air-gapped or managed.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">3 / 5</span><span class="k mono">Constitutional key quorum</span></div>
+        <div class="metric"><span class="v">0</span><span class="k mono">External IdPs required</span></div>
+        <div class="metric"><span class="v">4</span><span class="k mono">Deployment modes</span></div>
+      </div>
+      <div class="chips">
+        <span>FastAPI</span><span>Next.js</span><span>PostgreSQL</span><span>Cerbos</span>
+        <span>WebAuthn</span><span>Passkeys</span><span>JWT</span><span>TypeScript SDK</span>
+        <span>Python SDK</span><span>Air-gapped</span>
+      </div>
+      <div class="proj-links"><a href="https://github.com/Farhad1618" target="_blank" rel="noopener">Source on GitHub ↗</a></div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <!-- K-of-N ceremony ring -->
+        <circle class="sch-line" cx="150" cy="112" r="78" style="stroke-dasharray:2 5"/>
+        <g style="stroke:var(--signal);stroke-width:1;opacity:.5">
+          <path d="M150 34 L150 88"/><path d="M224 88 L168 104"/><path d="M76 88 L132 104"/>
+        </g>
+        <g style="stroke:var(--rule);stroke-width:1">
+          <path d="M196 178 L162 128"/><path d="M104 178 L138 128"/>
+        </g>
+        <!-- keys: 3 filled, 2 open -->
+        <g>
+          <circle cx="150" cy="34" r="9" style="fill:var(--signal)"/>
+          <circle cx="224" cy="88" r="9" style="fill:var(--signal)"/>
+          <circle cx="76"  cy="88" r="9" style="fill:var(--signal)"/>
+          <circle cx="196" cy="178" r="9" style="fill:var(--ink);stroke:var(--rule);stroke-width:1"/>
+          <circle cx="104" cy="178" r="9" style="fill:var(--ink);stroke:var(--rule);stroke-width:1"/>
+        </g>
+        <!-- sealed core -->
+        <g transform="translate(150,112)">
+          <path class="sch-bone" d="M0 -26 L23 -13 L23 13 L0 26 L-23 13 L-23 -13 Z"/>
+          <path style="fill:none;stroke:var(--signal);stroke-width:1" d="M0 -14 L12 -7 L12 7 L0 14 L-12 7 L-12 -7 Z"/>
+        </g>
+        <text class="sch-t sch-t-sig" x="122" y="116" style="font-size:8px">Sealed</text>
+        <text class="sch-t" x="14" y="216">Genesis ceremony — quorum 3 of 5</text>
+      </svg>
+      <figcaption class="mono">Fig. 02 — K-of-N constitutional key ceremony</figcaption>
+    </figure>
+  </article>
+
+  <!-- 03 ONEPHARMA -->
+  <article class="proj" id="p3">
+    <div class="num">03</div>
+    <div>
+      <h3 class="display">OnePharma</h3>
+      <p class="kicker mono">Pharmaceutical intelligence product surface · CTO</p>
+      <p class="body">
+        The surface the whole platform is judged on. Next.js 16, React 19 and strict TypeScript, with
+        passwordless email and passkey sign-in. A GraphQL decision service sits between the product and
+        a Neo4j activity graph, and a pluggable LLM layer runs against a hosted gateway or a self-hosted
+        model without the product knowing the difference.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">0</span><span class="k mono">Passwords stored</span></div>
+        <div class="metric"><span class="v">2</span><span class="k mono">Interchangeable LLM backends</span></div>
+        <div class="metric"><span class="v">1</span><span class="k mono">Semantic layer, shared</span></div>
+      </div>
+      <div class="chips">
+        <span>Next.js 16</span><span>React 19</span><span>TypeScript</span><span>GraphQL</span>
+        <span>Neo4j</span><span>Passkeys</span><span>LLM gateway</span><span>Agentic AI</span>
+      </div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g>
+          <rect class="sch-fill" x="14" y="20" width="90" height="30"/><rect class="sch-bone" x="14" y="20" width="90" height="30"/>
+          <text class="sch-t" x="24" y="39">Request</text>
+
+          <rect class="sch-fill" x="14" y="86" width="90" height="30"/><rect class="sch-sig" x="14" y="86" width="90" height="30"/>
+          <text class="sch-t sch-t-sig" x="24" y="105">Policy gate</text>
+
+          <rect class="sch-fill" x="14" y="152" width="90" height="30"/><rect class="sch-line" x="14" y="152" width="90" height="30"/>
+          <text class="sch-t" x="24" y="171">Decision</text>
+
+          <rect class="sch-fill" x="180" y="53" width="106" height="30"/><rect class="sch-line" x="180" y="53" width="106" height="30"/>
+          <text class="sch-t" x="190" y="72">Neo4j graph</text>
+
+          <rect class="sch-fill" x="180" y="119" width="106" height="30"/><rect class="sch-line" x="180" y="119" width="106" height="30"/>
+          <text class="sch-t" x="190" y="138">LLM layer</text>
+        </g>
+        <g style="stroke:var(--rule);stroke-width:1;fill:none">
+          <path d="M59 50 L59 86"/><path d="M59 116 L59 152"/>
+          <path d="M104 96 L142 96 L142 68 L180 68"/>
+          <path d="M142 96 L142 134 L180 134"/>
+        </g>
+        <g style="stroke:var(--trace);stroke-width:1;fill:none;opacity:.8">
+          <path d="M286 68 L294 68 L294 200 L104 200 L104 182"/>
+        </g>
+        <text class="sch-t" x="118" y="216" style="font-size:8px">Graph answers the decision, not the model alone</text>
+      </svg>
+      <figcaption class="mono">Fig. 03 — Decision service between product and graph</figcaption>
+    </figure>
+  </article>
+
+  <!-- 04 BLACK PEARL -->
+  <article class="proj" id="p4">
+    <div class="num">04</div>
+    <div>
+      <h3 class="display">Black Pearl</h3>
+      <p class="kicker mono">Machine control &amp; visualization · Steel-framing CNC</p>
+      <p class="body">
+        Live telemetry over WebSocket with configuration over REST, behind a single connection interface
+        with swappable simulated and real machine implementations. The consequence is the good part: the
+        whole rig demonstrates in a browser with no hardware attached, and the same build drives the
+        actual machine on the factory floor.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">1</span><span class="k mono">Interface, two implementations</span></div>
+        <div class="metric"><span class="v">0</span><span class="k mono">Hardware needed to demo</span></div>
+        <div class="metric"><span class="v">WS</span><span class="k mono">Live telemetry transport</span></div>
+      </div>
+      <div class="chips"><span>WebSocket</span><span>REST</span><span>Telemetry</span><span>CNC</span><span>Simulation</span></div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g style="stroke:var(--rule-soft);stroke-width:1">
+          <path d="M14 40 L286 40"/><path d="M14 78 L286 78"/><path d="M14 116 L286 116"/>
+        </g>
+        <path style="fill:none;stroke:var(--signal);stroke-width:1.4"
+          d="M14 96 L38 96 L46 62 L58 108 L70 74 L84 90 L96 52 L112 104 L126 68 L140 86 L156 44 L170 100 L184 72 L198 90 L212 58 L228 102 L242 80 L258 88 L272 66 L286 84"/>
+        <text class="sch-t sch-t-sig" x="14" y="30">Live telemetry · WebSocket</text>
+
+        <g transform="translate(0,144)">
+          <text class="sch-t" x="14" y="0">Axis</text>
+          <g>
+            <rect class="sch-line" x="52" y="-10" width="234" height="10"/>
+            <rect x="52" y="-10" width="168" height="10" style="fill:var(--bone-dim);opacity:.55"/>
+            <text class="sch-t" x="14" y="22">X</text>
+            <rect class="sch-line" x="52" y="12" width="234" height="10"/>
+            <rect x="52" y="12" width="96" height="10" style="fill:var(--bone-dim);opacity:.55"/>
+            <text class="sch-t" x="14" y="44">Y</text>
+            <rect class="sch-line" x="52" y="34" width="234" height="10"/>
+            <rect x="52" y="34" width="210" height="10" style="fill:var(--signal);opacity:.8"/>
+            <text class="sch-t" x="14" y="66">Z</text>
+          </g>
+        </g>
+        <text class="sch-t" x="52" y="222" style="font-size:8px">Simulated ⇄ real — same interface</text>
+      </svg>
+      <figcaption class="mono">Fig. 04 — Telemetry stream and swappable machine interface</figcaption>
+    </figure>
+  </article>
+
+  <!-- 05 PURPLE FINANCE -->
+  <article class="proj" id="p5">
+    <div class="num">05</div>
+    <div>
+      <h3 class="display">Purple Finance</h3>
+      <p class="kicker mono">Full-stack budgeting app · Live on the App Store</p>
+      <p class="body">
+        Expense tracking, income tracking and smart budgeting in a Swift and SwiftUI client on a
+        full-stack backend. Shipped, reviewed and live — the whole loop from schema to store listing,
+        owned end to end.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">Live</span><span class="k mono">App Store status</span></div>
+        <div class="metric"><span class="v">3</span><span class="k mono">Core loops shipped</span></div>
+        <div class="metric"><span class="v">E2E</span><span class="k mono">Owned, schema to store</span></div>
+      </div>
+      <div class="chips"><span>Swift</span><span>SwiftUI</span><span>Combine</span><span>Node.js</span><span>Firebase</span></div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g style="stroke:var(--rule-soft);stroke-width:1">
+          <path d="M40 30 L286 30"/><path d="M40 74 L286 74"/><path d="M40 118 L286 118"/><path d="M40 162 L286 162"/>
+        </g>
+        <path style="stroke:var(--signal);stroke-width:1;stroke-dasharray:3 4;fill:none" d="M40 62 L286 62"/>
+        <text class="sch-t sch-t-sig" x="40" y="56">Budget target</text>
+        <g>
+          <rect x="52"  y="82"  width="26" height="80" style="fill:var(--bone-dim);opacity:.4"/>
+          <rect x="92"  y="46"  width="26" height="116" style="fill:var(--signal);opacity:.85"/>
+          <rect x="132" y="96"  width="26" height="66" style="fill:var(--bone-dim);opacity:.4"/>
+          <rect x="172" y="70"  width="26" height="92" style="fill:var(--bone-dim);opacity:.4"/>
+          <rect x="212" y="106" width="26" height="56" style="fill:var(--bone-dim);opacity:.4"/>
+          <rect x="252" y="88"  width="26" height="74" style="fill:var(--bone-dim);opacity:.4"/>
+        </g>
+        <path style="stroke:var(--rule);stroke-width:1" d="M40 162 L286 162"/>
+        <g class="sch-t">
+          <text x="55" y="180">Jan</text><text x="95" y="180">Feb</text><text x="135" y="180">Mar</text>
+          <text x="175" y="180">Apr</text><text x="215" y="180">May</text><text x="255" y="180">Jun</text>
+        </g>
+        <text class="sch-t" x="40" y="212" style="font-size:8px">February over target — flagged, not buried</text>
+      </svg>
+      <figcaption class="mono">Fig. 05 — Spend against target, month over month</figcaption>
+    </figure>
+  </article>
+
+  <!-- 06 NIDS -->
+  <article class="proj" id="p6">
+    <div class="num">06</div>
+    <div>
+      <h3 class="display">Network Intrusion Detection</h3>
+      <p class="kicker mono">CNN-based threat detection · Basis of the ICNGN paper</p>
+      <p class="body">
+        A convolutional network trained to separate intrusion traffic from ordinary traffic at 97%
+        detection accuracy in Python. The work became the foundation of a co-authored paper presented
+        at the 23rd International Conference on Next Generation Networks.
+      </p>
+      <div class="metrics">
+        <div class="metric"><span class="v">97%</span><span class="k mono">Detection accuracy</span></div>
+        <div class="metric"><span class="v">2023</span><span class="k mono">Published — ICNGN</span></div>
+        <div class="metric"><span class="v">CNN</span><span class="k mono">Architecture</span></div>
+      </div>
+      <div class="chips"><span>Python</span><span>PyTorch</span><span>CNN</span><span>IoT / Botnet</span><span>Research</span></div>
+    </div>
+    <figure class="fig">
+      <svg viewBox="0 0 300 230" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <g>
+          <rect class="sch-line" x="20" y="34" width="30" height="112"/>
+          <rect class="sch-line" x="66" y="48" width="26" height="84"/>
+          <rect class="sch-line" x="108" y="60" width="22" height="60"/>
+          <rect class="sch-bone" x="146" y="72" width="18" height="36"/>
+          <text class="sch-t" x="20" y="26">Traffic</text>
+          <text class="sch-t" x="66" y="26">Conv</text>
+          <text class="sch-t" x="108" y="26">Conv</text>
+          <text class="sch-t" x="142" y="26">Dense</text>
+        </g>
+        <g style="stroke:var(--rule);stroke-width:1;fill:none">
+          <path d="M50 90 L66 90"/><path d="M92 90 L108 90"/><path d="M130 90 L146 90"/><path d="M164 90 L196 90"/>
+        </g>
+        <g>
+          <rect x="196" y="60" width="88" height="26" style="fill:var(--signal);opacity:.9"/>
+          <text class="sch-t" x="202" y="77" style="fill:#0A111A">Detected 97%</text>
+          <rect class="sch-line" x="196" y="94" width="88" height="26"/>
+          <rect x="196" y="94" width="3" height="26" style="fill:var(--bone-dim);opacity:.5"/>
+          <text class="sch-t" x="204" y="111">Missed 3%</text>
+        </g>
+        <text class="sch-t" x="20" y="180">23rd International Conference on Next Generation Networks</text>
+        <path style="stroke:var(--trace);stroke-width:1" d="M20 192 L284 192"/>
+        <text class="sch-t sch-t-sig" x="20" y="212">Peer reviewed · co-author · 2023</text>
+      </svg>
+      <figcaption class="mono">Fig. 06 — Convolutional detection path</figcaption>
+    </figure>
+  </article>
+</section>
+
+<!-- ============================ RESEARCH ============================ -->
+<section class="research wrap" id="research">
+  <div class="section-head">
+    <span class="mono idx">03</span>
+    <h2>Research</h2>
+    <span class="mono tail">Peer reviewed</span>
+  </div>
+  <div class="paper">
+    <div>
+      <h3 class="display serif-i">Deep Learning for Preventing Botnet Attacks on IoT</h3>
+      <p class="meta mono">Co-author · 2023 · 23rd International Conference on Next Generation Networks (ICNGN)</p>
+      <p class="body" style="color:var(--bone-dim); max-width:56ch; margin-top:20px;">
+        CNN-based network intrusion detection reaching 97% detection accuracy on IoT botnet traffic.
+        The same instinct runs through everything below it: the model is only as good as the structure
+        you give it to reason over.
+      </p>
+    </div>
+    <div class="bigstat">
+      <div class="v">97<span style="font-size:.42em">%</span></div>
+      <div class="k mono">Detection accuracy</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TRACK ============================ -->
+<section class="track wrap" id="track">
+  <div class="section-head">
+    <span class="mono idx">04</span>
+    <h2>Track</h2>
+    <span class="mono tail">2018 — present</span>
+  </div>
+
+  <div class="role">
+    <span class="mono yr">Oct 2025 — Present</span>
+    <span class="org">OnePharma</span>
+    <span class="what">Chief Technology Officer · Dubai</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">Nov 2024 — Dec 2025</span>
+    <span class="org">FYI</span>
+    <span class="what">Software Developer</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">Feb 2023 — Present</span>
+    <span class="org">Freelance</span>
+    <span class="what">Full-stack · Fintech &amp; fitness clients</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">2020 — 2023</span>
+    <span class="org">American Spine Center</span>
+    <span class="what">Junior iOS Developer</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">2018 — 2020</span>
+    <span class="org">AMAL Counseling</span>
+    <span class="what">IT Support</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">2018</span>
+    <span class="org">STEMA</span>
+    <span class="what">Engineering Instructor</span>
+  </div>
+  <div class="role">
+    <span class="mono yr">2023</span>
+    <span class="org">Canadian University Dubai</span>
+    <span class="what">B.Sc. Computer Network Engineering</span>
+  </div>
+</section>
+
+<!-- ============================ STACK ============================ -->
+<section class="stack wrap" id="stack">
+  <div class="section-head">
+    <span class="mono idx">05</span>
+    <h2>Stack</h2>
+    <span class="mono tail">What I reach for</span>
+  </div>
+
+  <div class="srow"><span class="mono">AI &amp; Data</span>
+    <p>LLM integration and provider routing, agent orchestration, ontology and graph modeling in Neo4j, semantic search and vector indexing, medallion data pipelines, ClickHouse OLAP, PyTorch, CNNs</p></div>
+  <div class="srow"><span class="mono">Backend &amp; Platform</span>
+    <p>Python and FastAPI, Node.js, Rust and Go on performance paths, GraphQL and REST design, PostgreSQL, Kafka, Redis, Firebase</p></div>
+  <div class="srow"><span class="mono">Identity &amp; Governance</span>
+    <p>Passkeys and WebAuthn, OTP, JWT, Cerbos policy-based authorization, attribute-based access control, hash-chained audit trails, 21 CFR Part 11 and SOC 2 alignment</p></div>
+  <div class="srow"><span class="mono">Client</span>
+    <p>Next.js, React, TypeScript, Swift, SwiftUI, Combine</p></div>
+  <div class="srow"><span class="mono">Infrastructure</span>
+    <p>AWS with Lambda, ECS Fargate, Step Functions, S3 and DynamoDB, Kubernetes, Terraform, Docker, CI/CD with GitHub Actions</p></div>
+</section>
+
+<!-- ============================ CONTACT ============================ -->
+<section class="contact wrap" id="contact">
+  <div class="section-head">
+    <span class="mono idx">06</span>
+    <h2>Contact</h2>
+    <span class="mono tail">Open to hard problems</span>
+  </div>
+
+  <h2 class="display">I take the hardest problems on purpose. <span class="serif-i amber">Bring me one.</span></h2>
+  <a class="mail" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a>
+
+  <div class="reach">
+    <a href="tel:+971585581618">+971 58 558 1618</a>
+    <a href="https://github.com/Farhad1618" target="_blank" rel="noopener">GitHub ↗</a>
+    <a href="https://linkedin.com/in/farhad-maleki" target="_blank" rel="noopener">LinkedIn ↗</a>
+    <span>Dubai, United Arab Emirates</span>
+  </div>
+</section>
+
+<footer>
+  <span class="mono">Farhad Maleki — AI &amp; Agentic Systems Engineer</span>
+  <span class="mono tail">Extraordinary is the only standard worth keeping</span>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------- Dubai clock (GST, UTC+4) ---------------- */
+  var clockEl = document.getElementById("clock");
+  function tick(){
+    var d = new Date(Date.now() + (new Date().getTimezoneOffset() * 60000) + 4 * 3600000);
+    var p = function(n){ return String(n).padStart(2, "0"); };
+    clockEl.textContent = p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()) + " GST";
+  }
+  tick(); setInterval(tick, 1000);
+
+  /* ---------------- The graph ----------------
+     Nodes are real projects, technologies and concepts.
+     Edges are real relations between them.
+  -------------------------------------------- */
+  var P = "project", T = "tech", C = "concept";
+  var N = [
+    { id:"onyxs",    label:"Onyxs",          kind:P, href:"#p1" },
+    { id:"sr71",     label:"SR-71 Blackbird",kind:P, href:"#p2" },
+    { id:"onepharma",label:"OnePharma",      kind:P, href:"#p3" },
+    { id:"pearl",    label:"Black Pearl",    kind:P, href:"#p4" },
+    { id:"purple",   label:"Purple Finance", kind:P, href:"#p5" },
+    { id:"nids",     label:"NIDS",           kind:P, href:"#p6" },
+
+    { id:"ontology", label:"Ontology",       kind:C },
+    { id:"graphdb",  label:"Knowledge Graph",kind:C },
+    { id:"agentic",  label:"Agentic AI",     kind:C },
+    { id:"gov",      label:"Governance",     kind:C },
+    { id:"audit",    label:"Audit Trail",    kind:C },
+    { id:"semantic", label:"Semantic Search",kind:C },
+    { id:"tenancy",  label:"Multi-tenancy",  kind:C },
+    { id:"cfr",      label:"21 CFR Part 11", kind:C },
+
+    { id:"neo4j",  label:"Neo4j",       kind:T },
+    { id:"pg",     label:"PostgreSQL",  kind:T },
+    { id:"click",  label:"ClickHouse",  kind:T },
+    { id:"rust",   label:"Rust",        kind:T },
+    { id:"go",     label:"Go",          kind:T },
+    { id:"cpp",    label:"C++",         kind:T },
+    { id:"py",     label:"Python",      kind:T },
+    { id:"fastapi",label:"FastAPI",     kind:T },
+    { id:"next",   label:"Next.js",     kind:T },
+    { id:"react",  label:"React",       kind:T },
+    { id:"ts",     label:"TypeScript",  kind:T },
+    { id:"swift",  label:"Swift",       kind:T },
+    { id:"k8s",    label:"Kubernetes",  kind:T },
+    { id:"aws",    label:"AWS",         kind:T },
+    { id:"kafka",  label:"Kafka",       kind:T },
+    { id:"gql",    label:"GraphQL",     kind:T },
+    { id:"ws",     label:"WebSocket",   kind:T },
+    { id:"cerbos", label:"Cerbos",      kind:T },
+    { id:"passkey",label:"Passkeys",    kind:T },
+    { id:"torch",  label:"PyTorch",     kind:T },
+    { id:"llm",    label:"LLM Gateway", kind:T },
+    { id:"embed",  label:"EmbeddingGemma", kind:T }
+  ];
+
+  var E = [
+    ["onyxs","neo4j"],["onyxs","pg"],["onyxs","click"],["onyxs","rust"],["onyxs","go"],
+    ["onyxs","cpp"],["onyxs","py"],["onyxs","k8s"],["onyxs","embed"],["onyxs","ontology"],
+    ["onyxs","audit"],["onyxs","cfr"],["onyxs","tenancy"],["onyxs","semantic"],
+
+    ["sr71","fastapi"],["sr71","next"],["sr71","pg"],["sr71","cerbos"],["sr71","passkey"],
+    ["sr71","ts"],["sr71","py"],["sr71","gov"],["sr71","audit"],["sr71","tenancy"],
+
+    ["onepharma","next"],["onepharma","react"],["onepharma","ts"],["onepharma","gql"],
+    ["onepharma","neo4j"],["onepharma","passkey"],["onepharma","llm"],["onepharma","agentic"],
+    ["onepharma","ontology"],["onepharma","gov"],
+
+    ["pearl","ws"],["pearl","ts"],["pearl","react"],
+    ["purple","swift"],["purple","ts"],
+    ["nids","py"],["nids","torch"],
+
+    ["ontology","graphdb"],["graphdb","neo4j"],["semantic","embed"],["semantic","graphdb"],
+    ["agentic","llm"],["agentic","ontology"],["gov","cerbos"],["gov","audit"],["gov","cfr"],
+    ["gov","tenancy"],["k8s","aws"],["fastapi","py"],["next","react"],["react","ts"],
+    ["pg","kafka"],["click","kafka"],["llm","py"],["torch","py"],["cerbos","gov"]
+  ];
+
+  var byId = {}; N.forEach(function(n, i){ n.i = i; byId[n.id] = n; });
+  var links = E.map(function(e){ return { a: byId[e[0]], b: byId[e[1]] }; })
+               .filter(function(l){ return l.a && l.b; });
+
+  N.forEach(function(n){
+    n.deg = 0;
+    n.r = n.kind === P ? 6.5 : (n.kind === C ? 4.2 : 3);
+  });
+  links.forEach(function(l){ l.a.deg++; l.b.deg++; });
+
+  var adj = {};
+  N.forEach(function(n){ adj[n.id] = {}; });
+  links.forEach(function(l){ adj[l.a.id][l.b.id] = 1; adj[l.b.id][l.a.id] = 1; });
+
+  var cv = document.getElementById("graph");
+  var ctx = cv.getContext("2d");
+  var W = 0, H = 0, DPR = 1;
+  var alpha = 1, hot = null, raf = null, settled = false;
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+  var COL = { bone:"#ECE7DC", dim:"#A5AEB9", muted:"#6A7785", sig:"#E9A03B", trace:"#5FA8B8", ink:"#0A111A" };
+  try {
+    COL.bone = css("--bone") || COL.bone; COL.dim = css("--bone-dim") || COL.dim;
+    COL.muted = css("--muted") || COL.muted; COL.sig = css("--signal") || COL.sig;
+    COL.trace = css("--trace") || COL.trace; COL.ink = css("--ink") || COL.ink;
+  } catch(e){}
+
+  function rgba(hex, a){
+    var h = hex.replace("#","");
+    if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var n = parseInt(h, 16);
+    return "rgba(" + ((n>>16)&255) + "," + ((n>>8)&255) + "," + (n&255) + "," + a + ")";
+  }
+
+  function seed(){
+    // Deterministic seeding so every visitor sees the same composition settle.
+    var rnd = (function(s){ return function(){ s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; }; })(20231618);
+    N.forEach(function(n, i){
+      var ang = (i / N.length) * Math.PI * 2;
+      var rad = (n.kind === P ? 0.18 : n.kind === C ? 0.3 : 0.42) * Math.min(W, H);
+      n.x = W * 0.56 + Math.cos(ang) * rad + (rnd() - 0.5) * 60;
+      n.y = H * 0.5  + Math.sin(ang) * rad * 0.78 + (rnd() - 0.5) * 60;
+      n.vx = 0; n.vy = 0;
+    });
+  }
+
+  function resize(){
+    var rect = cv.getBoundingClientRect();
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width; H = rect.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    seed(); alpha = 1; settled = false; start();
+  }
+
+  function step(){
+    // repulsion
+    for (var i = 0; i < N.length; i++){
+      var a = N[i];
+      for (var j = i + 1; j < N.length; j++){
+        var b = N[j];
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var d2 = dx*dx + dy*dy || 0.01;
+        if (d2 > 90000) continue;
+        var f = 2400 / d2;
+        var d = Math.sqrt(d2);
+        var fx = (dx/d) * f, fy = (dy/d) * f;
+        a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+      }
+    }
+    // springs
+    for (var k = 0; k < links.length; k++){
+      var l = links[k], A = l.a, B = l.b;
+      var ddx = B.x - A.x, ddy = B.y - A.y;
+      var dist = Math.sqrt(ddx*ddx + ddy*ddy) || 0.01;
+      var rest = (A.kind === P || B.kind === P) ? 108 : 78;
+      var force = (dist - rest) * 0.012;
+      var ux = (ddx/dist) * force, uy = (ddy/dist) * force;
+      A.vx += ux; A.vy += uy; B.vx -= ux; B.vy -= uy;
+    }
+    // centring + integrate
+    var cx = W * 0.56, cy = H * 0.5;
+    for (var m = 0; m < N.length; m++){
+      var n = N[m];
+      n.vx += (cx - n.x) * 0.0022;
+      n.vy += (cy - n.y) * 0.0032;
+      n.vx *= 0.855; n.vy *= 0.855;
+      n.x += n.vx * alpha; n.y += n.vy * alpha;
+      var pad = 26;
+      n.x = Math.max(pad, Math.min(W - pad, n.x));
+      n.y = Math.max(pad, Math.min(H - pad, n.y));
+    }
+    alpha *= 0.988;
+    if (alpha < 0.02){ alpha = 0.02; settled = true; }
+  }
+
+  function near(id){ return hot && (hot.id === id || adj[hot.id][id]); }
+
+  function draw(){
+    ctx.clearRect(0, 0, W, H);
+
+    // edges
+    for (var k = 0; k < links.length; k++){
+      var l = links[k];
+      var lit = hot && (l.a.id === hot.id || l.b.id === hot.id);
+      ctx.beginPath();
+      ctx.moveTo(l.a.x, l.a.y);
+      ctx.lineTo(l.b.x, l.b.y);
+      ctx.strokeStyle = lit ? rgba(COL.sig, 0.5) : rgba(COL.trace, hot ? 0.05 : 0.13);
+      ctx.lineWidth = lit ? 1.1 : 0.8;
+      ctx.stroke();
+    }
+
+    // nodes
+    for (var m = 0; m < N.length; m++){
+      var n = N[m];
+      var lit = near(n.id);
+      var dim = hot && !lit;
+      var isP = n.kind === P;
+
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      if (isP){
+        ctx.fillStyle = lit || !hot ? rgba(COL.sig, dim ? 0.14 : 0.92) : rgba(COL.sig, 0.14);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = rgba(COL.ink, 1); ctx.fill();
+        ctx.strokeStyle = lit ? rgba(COL.sig, 0.9) : rgba(COL.dim, dim ? 0.14 : 0.45);
+        ctx.lineWidth = 1; ctx.stroke();
+      }
+
+      if (hot && hot.id === n.id){
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r + 9, 0, Math.PI * 2);
+        ctx.strokeStyle = rgba(COL.sig, 0.55); ctx.lineWidth = 1; ctx.stroke();
+      }
+
+      // labels: projects always, others when lit
+      var showLabel = isP || lit;
+      if (showLabel){
+        ctx.font = (isP ? "500 " : "400 ") + (isP ? 11 : 10) + "px 'IBM Plex Mono', monospace";
+        ctx.fillStyle = lit ? rgba(COL.bone, 0.95)
+                            : rgba(COL.dim, hot ? 0.2 : (isP ? 0.7 : 0.5));
+        ctx.textBaseline = "middle";
+        // Flip the label to the other side rather than let it run off the canvas.
+        var lw = ctx.measureText(n.label).width;
+        var lx = n.x + n.r + 8;
+        if (lx + lw > W - 10) lx = Math.max(10, n.x - n.r - 8 - lw);
+        ctx.fillText(n.label, lx, n.y);
+      }
+    }
+  }
+
+  function frame(){
+    if (!settled || alpha > 0.02) step();
+    draw();
+    raf = requestAnimationFrame(frame);
+  }
+  function start(){ if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); }
+
+  /* hover / reticle */
+  var ret = document.getElementById("reticle");
+  function pick(px, py){
+    var best = null, bd = 26 * 26;
+    for (var i = 0; i < N.length; i++){
+      var n = N[i];
+      var dx = n.x - px, dy = n.y - py, d = dx*dx + dy*dy;
+      if (d < bd){ bd = d; best = n; }
+    }
+    return best;
+  }
+  cv.addEventListener("pointermove", function(ev){
+    var r = cv.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    hot = pick(px, py);
+    cv.style.cursor = hot && hot.href ? "none" : "none";
+    ret.style.left = ev.clientX + "px";
+    ret.style.top = ev.clientY + "px";
+    ret.classList.add("on");
+    ret.classList.toggle("lock", !!hot);
+  });
+  cv.addEventListener("pointerleave", function(){ hot = null; ret.classList.remove("on","lock"); });
+  cv.addEventListener("click", function(){
+    if (hot && hot.href){
+      var t = document.querySelector(hot.href);
+      if (t) t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block:"start" });
+    }
+  });
+
+  window.addEventListener("resize", function(){
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(resize, 160);
+  });
+
+  resize();
+  if (reduced){ for (var w = 0; w < 400; w++) step(); alpha = 0.02; settled = true; draw(); }
+
+  /* readout counter */
+  (function(){
+    var nEl = document.getElementById("ro-n"), eEl = document.getElementById("ro-e"), pEl = document.getElementById("ro-p");
+    var t0 = performance.now(), dur = reduced ? 1 : 1400;
+    (function run(now){
+      var t = Math.min(1, ((now || performance.now()) - t0) / dur);
+      var e = 1 - Math.pow(1 - t, 3);
+      nEl.textContent = Math.round(N.length * e);
+      eEl.textContent = Math.round(links.length * e);
+      pEl.textContent = Math.round(100 * e);
+      if (t < 1) requestAnimationFrame(run);
+    })();
+  })();
+
+  /* project index rail */
+  var rail = document.getElementById("rail");
+  var railLinks = Array.prototype.slice.call(rail.querySelectorAll("a"));
+  var projects = Array.prototype.slice.call(document.querySelectorAll(".proj"));
+  var workSection = document.getElementById("work");
+
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if (!en.isIntersecting) return;
+      var id = en.target.id;
+      railLinks.forEach(function(a){ a.classList.toggle("active", a.getAttribute("href") === "#" + id); });
+    });
+  }, { rootMargin: "-45% 0px -45% 0px", threshold: 0 });
+  projects.forEach(function(p){ io.observe(p); });
+
+  var ioRail = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ rail.classList.toggle("on", en.isIntersecting); });
+  }, { rootMargin: "-15% 0px -25% 0px", threshold: 0 });
+  ioRail.observe(workSection);
+
+  /* smooth in-page nav */
+  document.querySelectorAll('a[href^="#"]').forEach(function(a){
+    a.addEventListener("click", function(ev){
+      var t = document.querySelector(a.getAttribute("href"));
+      if (!t) return;
+      ev.preventDefault();
+      t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+    });
+  });
+})();
+</script>
