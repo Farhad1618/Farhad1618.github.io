@@ -3,19 +3,21 @@
 Personal portfolio for Farhad Maleki, AI & Agentic Systems Engineer (CTO, OnePharma, Dubai).
 Goal: win clients and employers. Inspired by camillemormal.com (studied it directly — see "Reference" below).
 
-Live preview (Claude artifact, private until shared): https://claude.ai/artifact/2TVyGhJNC1EnD3yGFmDyBP
+Live preview of v4 (Claude artifact, private until shared): https://claude.ai/artifact/5rwmSVjGjYqqRrsiqyCY9h
+v3 preview, kept for comparison: https://claude.ai/artifact/2TVyGhJNC1EnD3yGFmDyBP
+Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so a push to main is live.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `site.html` | **Source of truth.** Body-only HTML (no doctype/head/body) so it can be published as a Claude artifact directly. |
-| `build.sh` | Wraps `site.html` into `index.html` with doctype, meta, OG tags, favicon. Run after every edit. |
+| `build.sh` | Wraps `site.html` into `index.html` with doctype, meta, OG tags, favicon. Splits head/body at the `<!-- body -->` marker line in `site.html`. Run after every edit. |
 | `index.html` | Deployable standalone build. One file, zero dependencies. Never edit by hand. |
 | `archive/v1-scroll.html` | v1: long scrolling page with hero knowledge graph. Superseded; kept for reference. |
 
 Workflow: edit `site.html` → `./build.sh` → republish the artifact from `site.html`.
-Fonts load from Google Fonts; everything else is inline.
+Fonts load from Google Fonts, GSAP 3.13.0 core from cdnjs; everything else is inline.
 
 ## Concept
 
@@ -51,12 +53,16 @@ The JS `C` palette object mirrors these and must stay in sync with `:root`.
 Type: **Bodoni Moda** (display: project titles, ledes), **Archivo** (body), **IBM Plex Mono** (labels, metrics, node names, uppercase + tracking).
 Avoid: Inter/Space Grotesk, purple gradients, emoji, badge soup, cards-everywhere.
 
-## Structure (v3, current)
+## Structure (v4, current)
 
-- Preloader `000→100`, skipped by any input.
-- Stage: `#plate` (canvas `#art` + vignette/centre scrim), `#titles` (slides), `#pgn`, `#strip` (filmstrip of real scene miniatures, text suppressed), `+` nav, Dubai GST clock.
-- Input: wheel (threshold 55, 780ms lock), pointer drag/swipe, arrow keys, filmstrip, `+`.
-- "Open project" → detail sheet (body, metrics, chips, links, prev/next). "About" → bio, track, research, stack, contact.
+- Preloader `000→100` (GSAP counter, waits ≤2.5s for fonts), then an intro timeline: plate opens from an inset card, title chars rise, chrome fades in. Any input fast-forwards.
+- Stage: `#plate` (2D canvas `#art`, WebGL canvas `#gl`, vignette), `#titles` (slides, h2 split into word > mask > char spans by a small in-file splitter, no SplitText dependency), `#pgn`, `#strip`, `+` nav, Dubai GST clock.
+- Transition `go()`: one `gsap.timeline()` per move. Plate shrinks to a card and grows back; meanwhile both scenes render into CSS-pixel offscreen buffers, upload as textures, and a fragment shader does an fbm-noise wavefront wipe with displacement, RGB shift and an amber seam. GL is shown only during transitions. No WebGL or reduced motion: crossfade.
+- Interruptible: input during a transition queues the newest target and speeds the running timeline up (timeScale 2.4); it chains on completion. No `busy` lock.
+- Wheel: steps on a fresh gesture (gap >180ms or a delta that jumps up); trackpad inertia tails are ignored, a sustained strong stream re-steps after 750ms.
+- Render loop is on `gsap.ticker`, removed on `visibilitychange` hidden, and draws nothing while About covers the stage.
+- Detail sheet has a live banner of the project's scene (the loop draws there instead of the stage while it's open). Sheets open with a clip-path wipe; the stage scales back behind them. Prev/next inside the sheet swaps content in place. Focus moves to Close and returns on close.
+- Mobile: `touch-action:none` on body so swipes reach pointer handlers (sheets use `pan-y`), "Swipe to browse" hint, tighter title padding, stronger centre scrim, NIDS verdict trays clamp to the viewport.
 
 ## Projects (display name → real name / repo)
 
@@ -76,27 +82,31 @@ Internal graph node ids still use `onyxs` / `sr71` / `purple`. Only labels chang
 All copy comes from Farhad's CV (`FindJob/Farhad_Maleki_CV.pdf` on his Mac, not in this repo).
 Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1618 · linkedin.com/in/farhad-maleki
 
-## Known weaknesses (why the next step matters)
+## Known weaknesses
 
-- Transitions are `setTimeout` + CSS with a `busy` lock. Scrolling fast feels stuck. Not interruptible.
-- Canvas 2D can't do displacement/ripple transitions; that's what makes the reference feel liquid.
-- Scene rAF runs continuously, even when the tab is hidden. Pause on `visibilitychange`.
-- Preview harness can't drive keyboard/scroll in the `data:` frame. Verify transitions by hand.
-- Mobile layout untested at depth.
+- Wheel heuristics were tested with synthetic events only; tune thresholds on a real trackpad and mouse.
+- Detail banner re-lays out scene caches (graph, Cyrus docs) when switching between stage and banner sizes. Cheap, but the graph re-settles.
+- Zagros "SEALED" label sits under the subtitle line; Cyrus docs crowd at banner height.
+- No `<noscript>` or static fallback if the GSAP CDN fails (page skips the preloader and shows nothing animated).
 
 ## Roadmap (agreed direction)
 
 Stack decision: **GSAP + OGL, no framework.** Next.js was rejected: animation code fights React's render cycle, and Farhad's projects already prove React.
 
-1. **GSAP rebuild (next).** Replace setTimeout choreography with one interruptible `gsap.timeline()`; remove the `busy` lock. SplitText per-character title reveals. GSAP is free including former Club plugins (verify terms before client work).
-2. **OGL shader transitions.** Do NOT port scenes to WebGL. Render each Canvas 2D scene to an offscreen canvas → upload as texture → shader-blend outgoing/incoming (displacement / RGB shift). Shader runs only during transitions.
+1. **GSAP rebuild (done in v4).** Replace setTimeout choreography with one interruptible `gsap.timeline()`; remove the `busy` lock. SplitText per-character title reveals. GSAP is free including former Club plugins (verify terms before client work).
+2. **Shader transitions (done in v4, raw WebGL instead of OGL, ~60 lines).** Do NOT port scenes to WebGL. Render each Canvas 2D scene to an offscreen canvas → upload as texture → shader-blend outgoing/incoming (displacement / RGB shift). Shader runs only during transitions.
 3. Move to **Vite + TypeScript**, static build, deploy to Vercel or Cloudflare Pages on Farhad's domain. Keep producing a single-file build for the artifact preview.
 
 Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com. GSAP and OGL are on those.
+
+## Copy facts confirmed by Farhad (Oct 20, 2026)
+
+- Falah: Supabase backend (follow the code), not live on the App Store yet.
+- Cyrus: Palantir Foundry-style ontology platform for any industry, first modelled on pharma, no real users yet. Describe the hard problem and how it solves it, not pipeline internals.
+- Zagros: private repo, enterprise governance/auth. No Apache 2.0, no public source link.
 
 ## Open questions for Farhad
 
 - Should Black Pearl and OnePharma also get Persian-rooted display names for consistency?
 - Are any real product screenshots NDA-safe to show (Cyrus, OnePharma)?
 - Domain name for deployment.
-- Zagros/Falah sub-lines ("Apache 2.0 · no external identity provider", "Live on the App Store"): still right?
