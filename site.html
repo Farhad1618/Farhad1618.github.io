@@ -1,1320 +1,460 @@
 <title>Farhad Maleki</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
-
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Outfit:wght@100;200;400;600&family=Vazirmatn:wght@200;400&family=Geist+Mono:wght@400;500&display=swap">
 <style>
-/* ============================================================
-   FARHAD MALEKI — fixed-viewport cinematic index. v4
-   No page scroll. One project at a time. Each project's
-   full-bleed plate is a live generative scene in its own language.
-   Motion: one GSAP timeline per transition (interruptible),
-   WebGL displacement blend between scenes, per-char titles.
-   ============================================================ */
-
+/* Concept D, "Farsh" (carpet). One continuous scroll-driven film in a single 3D scene.
+   ~900 hand-generated Persian tiles weave in, the carpet flies, breaks into a network, gives way to the
+   Cyrus Cylinder, closes into a sealed ring for Zagros, stacks into budget bars for Falah, and lays flat again. */
 :root{
   color-scheme: dark;
-  --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
-  --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68;
-  --sig:#E9A03B; --sig-dim:#8A6224; --trace:#5FA8B8;
-
-  --f-d:"Bodoni Moda","Didot","Times New Roman",serif;
-  --f-b:"Archivo","Helvetica Neue",Arial,sans-serif;
-  --f-m:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
-
-  --pad: clamp(16px, 2.6vw, 40px);
+  --ink:#0D1315;       /* deep teal-black ground */
+  --teal:#2E5E66;
+  --sage:#8FA48A;
+  --cream:#EADFC6;     /* text */
+  --peach:#D99A6C;     /* accent, from the tile glaze */
+  --plum:#4A3340;
+  --mist:#D8D7D2;      /* the network act turns the room pale */
+  --f-s:"Instrument Serif","Times New Roman",serif;
+  --f-d:"Outfit","Helvetica Neue",Arial,sans-serif;
+  --f-fa:"Vazirmatn",Tahoma,sans-serif;
+  --f-m:"Geist Mono",ui-monospace,Menlo,monospace;
 }
+*,*::before,*::after{box-sizing:border-box}
+html{background:var(--ink)}
+body{margin:0;background:var(--ink);color:var(--cream);font-family:var(--f-d);font-weight:400;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+:focus-visible{outline:1px solid var(--peach);outline-offset:4px}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+.vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(130% 100% at 50% 50%,transparent 45%,rgba(0,0,0,.55));transition:opacity .8s}
+body.light .vig{opacity:.15}
+.grain{position:fixed;inset:-50%;z-index:2;pointer-events:none;opacity:.06;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+#spacer{height:1300vh}
+.mono{font-family:var(--f-m);font-size:11px;letter-spacing:.14em;text-transform:uppercase}
 
-*,*::before,*::after{ box-sizing:border-box; }
-html,body{ height:100%; }
-body{
-  margin:0; background:var(--ink); color:var(--bone);
-  font-family:var(--f-b); font-weight:300;
-  overflow:hidden; -webkit-font-smoothing:antialiased;
-  overscroll-behavior:none;
-  touch-action:none;                 /* swipes reach our pointer handlers instead of the browser */
-  -webkit-tap-highlight-color:transparent;
-}
-a{ color:inherit; text-decoration:none; }
-button{ font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
-:focus-visible{ outline:1px solid var(--sig); outline-offset:4px; }
+header{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:calc(18px + env(safe-area-inset-top, 0px));padding-bottom:18px;padding-left:max(clamp(16px,2.6vw,36px), env(safe-area-inset-left, 0px));padding-right:max(clamp(16px,2.6vw,36px), env(safe-area-inset-right, 0px));transition:color .6s}
+.brand{display:flex;gap:12px;align-items:baseline}
+.brand b{font-family:var(--f-fa);font-weight:400;font-size:18px;color:var(--peach)}
+body.light header{color:#1A1A18}
+.rail{position:fixed;z-index:20;right:max(clamp(16px,2.6vw,36px), env(safe-area-inset-right, 0px));top:50%;transform:translateY(-50%);display:grid;gap:12px;justify-items:end;transition:color .6s}
+.rail button{all:unset;cursor:pointer;display:flex;gap:10px;align-items:center;opacity:.45;transition:opacity .4s}
+.rail button i{width:16px;height:1px;background:currentColor;transition:width .5s}
+.rail button.on{opacity:1}
+.rail button.on i{width:40px;background:var(--peach)}
+body.light .rail{color:#1A1A18}
+.pct{position:fixed;z-index:20;left:max(clamp(16px,2.6vw,36px), env(safe-area-inset-left, 0px));bottom:calc(18px + env(safe-area-inset-bottom, 0px));display:flex;gap:14px;align-items:center;transition:color .6s}
+.pct .bar{width:120px;height:1px;background:currentColor;opacity:.3;position:relative}
+.pct .bar i{position:absolute;inset:0;background:var(--peach);transform-origin:left;transform:scaleX(0);opacity:1}
+body.light .pct{color:#1A1A18}
+.tag{position:fixed;z-index:20;right:max(clamp(16px,2.6vw,36px), env(safe-area-inset-right, 0px));bottom:calc(14px + env(safe-area-inset-bottom, 0px));background:var(--peach);color:var(--ink);padding:6px 10px}
 
-.mono{ font-family:var(--f-m); font-size:clamp(9.5px,.68rem,11.5px); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:400; }
-.tnum{ font-variant-numeric:tabular-nums; }
-.sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+/* acts: text that belongs to a stretch of the film */
+.acts{position:fixed;inset:0;z-index:10;pointer-events:none}
+.act{position:absolute;inset:0;display:grid;padding-top:calc(90px + env(safe-area-inset-top, 0px));padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));padding-left:max(clamp(16px,5vw,80px), env(safe-area-inset-left, 0px));padding-right:max(clamp(16px,5vw,80px), env(safe-area-inset-right, 0px));visibility:hidden}
+.act.on{visibility:visible}
+.act a{pointer-events:auto}
+.ln{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+.ln > span{display:block;transform:translateY(110%);transition:transform 1.1s cubic-bezier(.16,.84,.24,1)}
+.act.on .ln > span{transform:none}
+.act.on .ln:nth-child(2) > span{transition-delay:.08s}
+.act.on .ln:nth-child(3) > span{transition-delay:.16s}
+.fade{opacity:0;transform:translateY(14px);transition:opacity .9s .25s,transform .9s .25s cubic-bezier(.16,.84,.24,1)}
+.act.on .fade{opacity:1;transform:none}
 
-/* grain */
-.grain{
-  position:fixed; inset:-40%; pointer-events:none; z-index:60; opacity:.035;
-  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
-}
+.msg{align-content:center;justify-items:center;text-align:center}
+.msg::before,.end::before,.name::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(64% 56% at 50% 50%,rgba(8,12,13,.86),rgba(8,12,13,.25) 100%);opacity:0;transition:opacity 1s}
+.name::before{background:linear-gradient(0deg,rgba(8,12,13,.85),rgba(8,12,13,0) 70%)}
+.act.on::before{opacity:1}
+.msg h2{font-family:var(--f-s);font-weight:400;font-size:clamp(46px,9vw,168px);line-height:.92;letter-spacing:-.01em;margin:0;text-shadow:0 2px 40px rgba(0,0,0,.55)}
+.msg h2 em{color:var(--peach)}
+.msg .eyebrow{margin-bottom:28px;color:var(--sage)}
+.msg .fa{font-family:var(--f-fa);font-weight:200;font-size:clamp(20px,2vw,28px);color:var(--peach);letter-spacing:0;text-transform:none}
 
-/* split text: word > mask > char. Masks are padded so Bodoni descenders don't clip. */
-.w{ display:inline-block; white-space:nowrap; }
-.m{ display:inline-block; overflow:hidden; vertical-align:top; padding:.06em .01em .16em; margin:-.06em -.01em -.16em; }
-.c{ display:inline-block; will-change:transform; }
+.name{align-content:end}
+.name h2{font-family:var(--f-d);font-weight:600;font-size:clamp(60px,14.5vw,280px);line-height:.82;letter-spacing:-.045em;margin:0;text-transform:uppercase}
+.name p{margin:22px 0 0;max-width:46ch;font-size:clamp(16px,1.3vw,19px);line-height:1.5;color:rgba(234,223,198,.82)}
 
-/* ============================================================ PRELOADER */
-#pre{
-  position:fixed; inset:0; z-index:90; background:var(--ink);
-  display:flex; align-items:flex-end; justify-content:space-between;
-  padding:var(--pad);
-}
-#pre .pct{ font-family:var(--f-m); font-size:clamp(46px,11vw,120px); line-height:.9; color:var(--bone); font-variant-numeric:tabular-nums; font-weight:400; letter-spacing:-.03em; overflow:hidden; }
-#pre .pct span{ display:block; }
-#pre .who{ text-align:right; }
-#pre .bar{ position:absolute; left:var(--pad); right:var(--pad); bottom:calc(var(--pad) - 10px); height:1px; background:var(--rule); }
-#pre .bar i{ display:block; height:100%; width:100%; background:var(--sig); transform:scaleX(0); transform-origin:0 50%; }
+.net{align-content:start;color:#141513}
+.net h2{font-family:var(--f-s);font-weight:400;font-size:clamp(46px,8vw,150px);line-height:.9;margin:0;max-width:10ch}
+.net h2 em{font-style:italic;color:#7A4A2E}
+.net p{margin:22px 0 0;max-width:40ch;font-size:clamp(16px,1.3vw,19px);line-height:1.5;color:#3E3F3A}
 
-/* ============================================================ CHROME */
-#top{
-  position:fixed; top:0; left:0; right:0; z-index:40;
-  display:flex; align-items:center; gap:18px; padding:var(--pad);
-  pointer-events:none;
-}
-#top > *{ pointer-events:auto; }
-#top .sig{ font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); letter-spacing:.2em; text-transform:uppercase; font-weight:500; color:var(--bone); }
-#top .mid{ margin-left:auto; display:flex; gap:26px; align-items:center; }
-#top .mid button{ font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); transition:color .3s ease; padding:8px 0; }
-#top .mid button:hover, #top .mid button[aria-expanded="true"]{ color:var(--sig); }
-#top .clock{ margin-left:0; }
-@media (max-width:640px){ #top .clock{ display:none; } #top .mid{ gap:20px; } }
+.proj{align-content:center}
+.proj .big{font-family:var(--f-d);font-weight:100;font-size:clamp(90px,24vw,440px);line-height:.8;letter-spacing:-.04em;margin:0;color:transparent;-webkit-text-stroke:1px rgba(234,223,198,.3);text-transform:uppercase;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 1.4s}
+.act.on .big{opacity:1}
+.card{position:relative;max-width:min(430px,100%);justify-self:start;align-self:end}
+.proj.r .card{justify-self:end;margin-right:clamp(0px,7vw,110px)}
+.net::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(216,215,210,.92) 0%,rgba(216,215,210,.6) 38%,rgba(216,215,210,0) 60%)}
+.card .k{color:var(--peach);display:flex;gap:12px;align-items:baseline}
+.card .k b{font-family:var(--f-fa);font-weight:400;font-size:18px;letter-spacing:0}
+.card h3{font-family:var(--f-s);font-weight:400;font-size:clamp(40px,4.4vw,72px);line-height:1;margin:10px 0 12px}
+.card p{margin:0 0 18px;font-size:15.5px;line-height:1.55;color:rgba(234,223,198,.84)}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0;border-top:1px solid rgba(234,223,198,.22);padding-top:14px}
+.facts div{min-width:0}
+.facts dt{font-family:var(--f-s);font-size:clamp(26px,2.4vw,36px);line-height:1;font-variant-numeric:tabular-nums}
+.facts dd{margin:4px 0 0;font-size:12px;line-height:1.35;color:rgba(234,223,198,.65)}
 
-/* ============================================================ STAGE */
-#stage{ position:fixed; inset:0; z-index:10; transform-origin:50% 50%; }
+.end{align-content:center;justify-items:center;text-align:center}
+.end h2{font-family:var(--f-s);font-weight:400;font-size:clamp(44px,7.6vw,140px);line-height:.92;margin:0 0 34px;max-width:13ch;text-shadow:0 2px 40px rgba(0,0,0,.6)}
+.end h2 em{color:var(--peach)}
+.mail{font-family:var(--f-d);font-weight:200;font-size:clamp(20px,3.2vw,46px);text-decoration:none;border-bottom:1px solid var(--peach);word-break:break-all}
+.end .row{display:flex;flex-wrap:wrap;justify-content:center;gap:16px 28px;margin-top:26px;color:rgba(234,223,198,.75)}
+.end .row a{text-decoration:none}
+.also{margin-top:28px;color:rgba(234,223,198,.6);max-width:60ch;font-size:14px;line-height:1.5}
 
-#plate{
-  position:absolute; inset:0; transform-origin:50% 50%;
-  will-change:transform; overflow:hidden; background:var(--ink);
-}
-#art, #gl{ position:absolute; inset:0; display:block; width:100%; height:100%; }
-#gl{ visibility:hidden; }
-#plate .vig{
-  position:absolute; inset:0; pointer-events:none;
-  background:
-    radial-gradient(38% 26% at 50% 50%, rgba(12,12,14,.80) 0%, rgba(12,12,14,.52) 54%, rgba(12,12,14,0) 100%),
-    radial-gradient(124% 94% at 50% 50%, rgba(12,12,14,0) 40%, rgba(12,12,14,.40) 84%, rgba(12,12,14,.76) 100%),
-    linear-gradient(180deg, rgba(12,12,14,.72) 0%, rgba(12,12,14,0) 22%, rgba(12,12,14,0) 62%, rgba(12,12,14,.8) 100%);
-}
-@media (max-width:560px){
-  #plate .vig{
-    background:
-      radial-gradient(60% 30% at 50% 50%, rgba(12,12,14,.86) 0%, rgba(12,12,14,.55) 60%, rgba(12,12,14,0) 100%),
-      linear-gradient(180deg, rgba(12,12,14,.75) 0%, rgba(12,12,14,0) 20%, rgba(12,12,14,0) 66%, rgba(12,12,14,.85) 100%);
-  }
-}
+.hint{position:fixed;z-index:20;left:50%;bottom:calc(22px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .6s}
+.hint::after{content:"";width:1px;height:36px;background:var(--cream);animation:drip 2.2s cubic-bezier(.6,0,.2,1) infinite;transform-origin:top}
+@keyframes drip{0%{transform:scaleY(0)}45%{transform:scaleY(1);transform-origin:top}55%{transform:scaleY(1);transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
 
-/* prev / next markers */
-.nav{
-  position:fixed; top:50%; z-index:35; margin-top:-22px;
-  width:44px; height:44px; display:grid; place-items:center;
-  color:var(--bone); opacity:.55; transition:opacity .3s ease;
+@media (max-width:760px){
+  .rail{display:none}
+  .pct .bar{width:60px}
+  .card{max-width:100%}
+  .proj .big{-webkit-text-stroke:1px rgba(234,223,198,.3);top:24%}
+  .proj{align-content:end}
+  .proj.r .card{margin-right:0}
+  .proj::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(0deg,rgba(8,10,11,.92) 0%,rgba(8,10,11,.75) 45%,rgba(8,10,11,0) 62%)}
+  .card p{font-size:14.5px;margin-bottom:14px}
+  .tag{bottom:auto;top:calc(54px + env(safe-area-inset-top, 0px))}
 }
-.nav:hover{ opacity:1; }
-.nav.prev{ left:clamp(8px,2.4vw,44px); }
-.nav.next{ right:clamp(8px,2.4vw,44px); }
-.nav i{ position:absolute; background:currentColor; }
-.nav i:first-child{ width:15px; height:1px; }
-.nav i:last-child{ width:1px; height:15px; }
-@media (max-width:560px){ .nav{ display:none; } }
-
-/* ============================================================ TITLES */
-#titles{
-  position:fixed; inset:0; z-index:30;
-  display:grid; place-items:center; pointer-events:none;
-  padding-inline:clamp(20px,12vw,160px);
-}
-#titles .slide{ grid-area:1/1; text-align:center; visibility:hidden; max-width:100%; }
-#titles .slide.on{ pointer-events:auto; }
-#titles .eyebrow{ display:block; margin-bottom:clamp(10px,1.6vh,18px); color:var(--sig); }
-#titles h2{
-  font-family:var(--f-d); font-weight:400; margin:0;
-  font-size:clamp(34px,5.6vw,78px); line-height:1.06; letter-spacing:-.015em;
-  text-wrap:balance; text-shadow:0 2px 40px rgba(12,12,14,.8);
-}
-#titles .sub{ display:block; margin-top:clamp(10px,1.8vh,20px); color:var(--dim); }
-#titles .open{
-  margin-top:clamp(16px,2.6vh,30px); display:inline-flex; align-items:center; gap:10px;
-  font-family:var(--f-m); font-size:clamp(9.5px,.68rem,11.5px); letter-spacing:.14em; text-transform:uppercase;
-  border-bottom:1px solid rgba(233,160,59,.45); padding:10px 0 5px; color:var(--bone);
-  transition:color .3s ease, border-color .3s ease;
-}
-#titles .open:hover{ color:var(--sig); border-color:var(--sig); }
-#titles .open .ar{ display:inline-block; transition:transform .4s cubic-bezier(.16,1,.3,1); }
-#titles .open:hover .ar{ transform:translateX(5px); }
-
-/* ============================================================ PAGINATION */
-#pgn{
-  position:fixed; right:var(--pad); bottom:var(--pad); z-index:38;
-  display:flex; align-items:center; gap:8px;
-  font-family:var(--f-m); font-size:clamp(10px,.72rem,12px); letter-spacing:.1em;
-  font-variant-numeric:tabular-nums; color:var(--bone);
-}
-#pgn .win{ height:1.25em; overflow:hidden; }
-#pgn .col{ display:flex; flex-direction:column; }
-#pgn .col span{ height:1.25em; line-height:1.25em; }
-#pgn .sep{ color:var(--muted); display:inline-block; }
-#pgn .tot{ color:var(--muted); }
-
-/* ============================================================ FILMSTRIP */
-#strip{
-  position:fixed; left:50%; bottom:var(--pad); z-index:38;
-  transform:translateX(-50%);
-  display:flex; gap:6px;
-}
-#strip button{
-  width:clamp(44px,5.4vw,72px); aspect-ratio:16/10;
-  position:relative; overflow:hidden; opacity:.42;
-  outline:1px solid rgba(236,231,220,.12); outline-offset:-1px;
-  transition:opacity .4s ease, transform .5s cubic-bezier(.16,1,.3,1), outline-color .4s ease;
-}
-#strip button canvas{ display:block; width:100%; height:100%; }
-#strip button:hover{ opacity:.8; }
-#strip button.on{ opacity:1; transform:translateY(-4px); outline-color:var(--sig); }
-@media (max-width:560px){ #strip{ left:var(--pad); transform:none; } #strip button{ width:36px; } }
-
-/* progress hairline */
-#pline{ position:fixed; left:0; right:0; bottom:0; height:1px; background:var(--sig); z-index:39; transform-origin:0 50%; transform:scaleX(0); }
-
-/* hint */
-#hint{ position:fixed; left:var(--pad); bottom:var(--pad); z-index:38; display:flex; align-items:center; gap:10px; }
-#hint .wheel{ width:16px; height:24px; border:1px solid var(--rule); border-radius:9px; position:relative; }
-#hint .wheel::after{ content:""; position:absolute; left:50%; top:5px; width:1px; height:5px; margin-left:-.5px; background:var(--sig); animation:roll 1.9s cubic-bezier(.16,1,.3,1) infinite; }
-@keyframes roll{ 0%{ transform:translateY(0); opacity:0 } 25%{ opacity:1 } 70%{ transform:translateY(9px); opacity:0 } 100%{ opacity:0 } }
-@media (max-width:860px){ #hint{ display:none; } }
-#swipe{ display:none; }
-@media (max-width:560px){
-  #swipe{ display:block; position:fixed; left:0; right:0; bottom:calc(var(--pad) + 44px); text-align:center; z-index:38; }
-}
-
-/* ============================================================ OVERLAYS */
-.sheet{
-  position:fixed; inset:0; z-index:50; background:var(--ink);
-  overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y;
-  visibility:hidden; clip-path:inset(100% 0 0 0);
-}
-.sheet .inner{ max-width:1180px; margin:0 auto; padding:clamp(70px,11vh,120px) var(--pad) clamp(60px,10vh,110px); }
-.sheet .close{
-  position:fixed; top:var(--pad); right:var(--pad); z-index:2;
-  font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); letter-spacing:.14em; text-transform:uppercase; color:var(--dim);
-  display:flex; align-items:center; gap:9px; transition:color .3s ease; padding:8px 0 8px 8px;
-  background:linear-gradient(90deg, rgba(12,12,14,0), var(--ink) 30%);
-}
-.sheet .close:hover{ color:var(--sig); }
-
-.d-plate{ position:relative; height:clamp(180px,34vh,380px); margin-bottom:clamp(26px,4vh,44px); overflow:hidden; outline:1px solid var(--rule-soft); outline-offset:-1px; }
-.d-plate canvas{ display:block; width:100%; height:100%; }
-.d-plate::after{ content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg, rgba(12,12,14,0) 55%, rgba(12,12,14,.85) 100%); }
-.d-head{ display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; padding-bottom:20px; border-bottom:1px solid var(--rule); }
-.d-head .n{ font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); color:var(--sig-dim); letter-spacing:.1em; }
-.d-head h3{ font-family:var(--f-d); font-weight:400; font-size:clamp(30px,4.6vw,62px); margin:0; line-height:1.06; letter-spacing:-.015em; }
-.d-head .ey{ margin-left:auto; }
-@media (max-width:560px){ .d-head .ey{ margin-left:0; flex-basis:100%; } }
-.d-grid{ display:grid; grid-template-columns:1.25fr .75fr; gap:clamp(26px,4.4vw,72px); margin-top:clamp(28px,4.6vh,54px); align-items:start; }
-@media (max-width:900px){ .d-grid{ grid-template-columns:1fr; } }
-.d-grid p.body{ margin:0; font-size:clamp(15px,1.02rem,18.5px); line-height:1.62; color:var(--dim); max-width:60ch; }
-.d-side{ display:grid; gap:22px; }
-.kv{ display:grid; gap:5px; padding-bottom:16px; border-bottom:1px solid var(--rule-soft); }
-.kv .v{ font-family:var(--f-m); font-size:clamp(17px,1.35rem,24px); color:var(--bone); font-variant-numeric:tabular-nums; font-weight:500; letter-spacing:-.01em; }
-.chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:26px; }
-.chips span{ font-family:var(--f-m); font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); border:1px solid var(--rule-soft); padding:5px 9px; }
-.d-links{ display:flex; gap:20px; flex-wrap:wrap; margin-top:28px; }
-.d-links a{ font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); border-bottom:1px solid var(--rule); padding-bottom:4px; transition:color .3s ease, border-color .3s ease; }
-.d-links a:hover{ color:var(--sig); border-color:var(--sig); }
-.d-foot{ display:flex; gap:24px; margin-top:clamp(40px,7vh,80px); padding-top:22px; border-top:1px solid var(--rule); }
-.d-foot button{ font-family:var(--f-m); font-size:clamp(10px,.7rem,12px); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); transition:color .3s ease; padding:8px 0; }
-.d-foot button:hover{ color:var(--sig); }
-.d-foot .r{ margin-left:auto; text-align:right; }
-
-/* about sheet */
-.a-lede{ font-family:var(--f-d); font-weight:400; font-size:clamp(28px,3.6vw,50px); line-height:1.12; letter-spacing:-.015em; margin:0 0 clamp(28px,4.4vh,52px); max-width:19ch; }
-.a-lede em{ color:var(--sig); }
-.a-two{ display:grid; grid-template-columns:1.1fr .9fr; gap:clamp(28px,5vw,80px); }
-@media (max-width:900px){ .a-two{ grid-template-columns:1fr; } }
-.a-two p{ margin:0 0 18px; color:var(--dim); font-size:clamp(15px,1rem,18px); line-height:1.62; max-width:58ch; }
-.sec{ margin-top:clamp(44px,7.5vh,90px); }
-.sec > .hd{ display:flex; align-items:baseline; gap:16px; padding-bottom:16px; border-bottom:1px solid var(--rule); margin-bottom:8px; }
-.row{ display:grid; grid-template-columns:190px 1fr auto; gap:6px clamp(16px,3vw,40px); padding-block:17px; border-bottom:1px solid var(--rule-soft); align-items:baseline; }
-.row .org{ font-family:var(--f-d); font-size:clamp(17px,1.3rem,23px); transition:color .3s ease; }
-.row:hover .org{ color:var(--sig); }
-@media (max-width:760px){ .row{ grid-template-columns:1fr; } }
-.srow{ display:grid; grid-template-columns:210px 1fr; gap:8px clamp(16px,3vw,40px); padding-block:17px; border-bottom:1px solid var(--rule-soft); }
-.srow p{ margin:0; color:var(--dim); font-size:clamp(14.5px,.97rem,17px); line-height:1.6; }
-@media (max-width:700px){ .srow{ grid-template-columns:1fr; } }
-.paper{ display:grid; grid-template-columns:1fr auto; gap:clamp(24px,4vw,60px); align-items:end; padding-block:22px; }
-@media (max-width:760px){ .paper{ grid-template-columns:1fr; align-items:start; } .paper > div:last-child{ text-align:left !important; } }
-.paper h4{ font-family:var(--f-d); font-style:italic; font-weight:400; font-size:clamp(21px,2.4vw,34px); margin:0 0 12px; line-height:1.14; max-width:22ch; }
-.big{ font-family:var(--f-d); font-size:clamp(50px,7.6vw,110px); line-height:.88; color:var(--sig); font-variant-numeric:tabular-nums; }
-.mail{ display:inline-block; font-family:var(--f-d); font-size:clamp(20px,3.2vw,46px); color:var(--sig); border-bottom:1px solid var(--sig-dim); padding-bottom:6px; margin-top:8px; word-break:break-word; transition:color .3s ease, border-color .3s ease; }
-.mail:hover{ color:var(--bone); border-color:var(--bone); }
-.reach{ display:flex; flex-wrap:wrap; gap:14px 38px; margin-top:clamp(26px,4vh,48px); }
-.reach a{ transition:color .3s ease; } .reach a:hover{ color:var(--sig); }
-
-/* cursor */
-.cur{
-  position:fixed; z-index:70; pointer-events:none; left:0; top:0;
-  width:26px; height:26px; margin:-13px 0 0 -13px;
-  opacity:0; transition:opacity .3s ease;
-}
-.cur i{ position:absolute; inset:0; border:1px solid var(--sig); border-radius:50%; transition:transform .35s cubic-bezier(.16,1,.3,1); }
-.cur::after{ content:""; position:absolute; inset:calc(50% - 1px); width:2px; height:2px; background:var(--sig); }
-.cur.on{ opacity:1; }
-.cur.big i{ transform:scale(2); }
-@media (pointer:coarse){ .cur{ display:none; } }
-
-@media (prefers-reduced-motion:reduce){
-  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.06s !important; }
-}
+@media (prefers-reduced-motion:reduce){.ln > span,.fade{transition:none}.hint::after{animation:none}}
 </style>
 
 <!-- body -->
-<div class="grain" aria-hidden="true"></div>
-<div class="cur" id="cur" aria-hidden="true"><i></i></div>
 
-<!-- ======================= PRELOADER ======================= -->
-<div id="pre" aria-hidden="true">
-  <div class="pct tnum"><span id="pct">000</span></div>
-  <div class="who">
-    <div class="mono" style="color:var(--bone)">Farhad Maleki</div>
-    <div class="mono" style="margin-top:6px">AI &amp; Agentic Systems Engineer</div>
-    <div class="mono" style="margin-top:6px">Dubai, UAE</div>
-  </div>
-  <div class="bar"><i id="pbar"></i></div>
-</div>
+<canvas id="stage" aria-hidden="true"></canvas>
+<div class="vig"></div>
+<div class="grain"></div>
 
-<!-- ======================= CHROME ======================= -->
-<header id="top">
-  <button class="sig" id="home">Farhad Maleki</button>
-  <div class="mid">
-    <button id="btn-work" aria-expanded="false">Work</button>
-    <button id="btn-about" aria-expanded="false" aria-controls="about">About</button>
-    <span class="mono clock tnum" id="clock">—:—:— GST</span>
-  </div>
+<header>
+  <span class="brand"><b>فرهاد</b><span class="mono">Farhad Maleki</span></span>
+  <span class="mono" id="clock">Dubai --:--</span>
 </header>
 
-<!-- ======================= STAGE ======================= -->
-<main id="stage">
-  <h1 class="sr">Farhad Maleki — AI &amp; Agentic Systems Engineer, Dubai. Selected work.</h1>
-  <div id="plate">
-    <canvas id="art" aria-hidden="true"></canvas>
-    <canvas id="gl" aria-hidden="true"></canvas>
-    <div class="vig"></div>
-  </div>
+<nav class="rail mono" id="rail" aria-label="Chapters">
+  <button data-p="0.02">Thesis<i></i></button>
+  <button data-p="0.2">Farhad<i></i></button>
+  <button data-p="0.35">Network<i></i></button>
+  <button data-p="0.52">Cyrus<i></i></button>
+  <button data-p="0.69">Zagros<i></i></button>
+  <button data-p="0.83">Falah<i></i></button>
+  <button data-p="0.97">Contact<i></i></button>
+</nav>
 
-  <button class="nav prev" id="prev" aria-label="Previous project"><i></i><i></i></button>
-  <button class="nav next" id="next" aria-label="Next project"><i></i><i></i></button>
+<div class="pct mono"><span id="pctn">000</span><span class="bar"><i id="pctb"></i></span></div>
+<div class="hint mono" id="hint">Scroll</div>
 
-  <div id="titles" aria-live="polite"></div>
-
-  <div id="pgn" aria-hidden="true">
-    <span class="win"><span class="col" id="pcol"></span></span>
-    <span class="sep" id="psep">—</span>
-    <span class="tot" id="ptot">06</span>
-  </div>
-
-  <div id="strip" role="tablist" aria-label="Project index"></div>
-  <div id="pline" aria-hidden="true"></div>
-
-  <div id="hint" aria-hidden="true">
-    <span class="wheel"></span>
-    <span class="mono">Scroll, drag or use ← →</span>
-  </div>
-  <div id="swipe" class="mono" aria-hidden="true">Swipe to browse</div>
-</main>
-
-<!-- ======================= DETAIL SHEET ======================= -->
-<section class="sheet" id="detail" aria-hidden="true" aria-label="Project detail">
-  <button class="close" id="d-close">Close <span aria-hidden="true">✕</span></button>
-  <div class="inner">
-    <div class="d-plate rv"><canvas id="d-art" aria-hidden="true"></canvas></div>
-    <div id="d-body"></div>
-  </div>
-</section>
-
-<!-- ======================= ABOUT SHEET ======================= -->
-<section class="sheet" id="about" aria-hidden="true" aria-label="About Farhad Maleki">
-  <button class="close" id="a-close">Close <span aria-hidden="true">✕</span></button>
-  <div class="inner">
-    <h2 class="a-lede rv">Most systems remember. <em>I build systems that understand.</em></h2>
-
-    <div class="a-two rv">
-      <div>
-        <p>An ontology and a graph beneath the surface, so an AI reasons across relations rather
-        than retrieving rows. A governance layer above, holding every system to what it is permitted
-        to know. I take the hardest problems on purpose.</p>
-        <p>I am Chief Technology Officer at OnePharma in Dubai, where I designed the healthcare domain
-        ontology and the data pipelines built on it — the semantic layer every service and agent reads
-        from. I built the agentic AI layer: autonomous services that plan, call tools, and act against
-        the platform's own APIs. I own the governance layer covering policy, permissions and audit, so
-        agents and users act inside boundaries the system enforces rather than assumes.</p>
-        <p>Before that: full-stack for fintech and fitness clients, a patient management platform built
-        from scratch for a Dubai clinic, and a CNN-based intrusion detection system that became a
-        peer-reviewed paper. Extraordinary is the only standard worth keeping, and I build so the next
-        generation can build on top.</p>
-      </div>
-      <div>
-        <div class="kv"><span class="mono">Based</span><span class="v">Dubai, UAE</span></div>
-        <div class="kv"><span class="mono">Current</span><span class="v">CTO, OnePharma</span></div>
-        <div class="kv"><span class="mono">Available for</span><span class="v">Contract &amp; full-time</span></div>
-        <div class="kv" style="border:0"><span class="mono">Since</span><span class="v">2018</span></div>
-      </div>
+<div class="acts">
+  <section class="act msg" data-a="-1" data-b="0.085">
+    <div class="eyebrow mono fade"><span class="fa">فرهاد ملکی</span> &nbsp;·&nbsp; AI &amp; agentic systems</div>
+    <h2><span class="ln"><span>Most systems</span></span><span class="ln"><span>remember.</span></span></h2>
+  </section>
+  <section class="act msg" data-a="0.095" data-b="0.15">
+    <h2><span class="ln"><span>I build systems</span></span><span class="ln"><span>that <em>understand.</em></span></span></h2>
+  </section>
+  <section class="act name" data-a="0.17" data-b="0.265">
+    <div>
+      <h2><span class="ln"><span>Farhad</span></span><span class="ln"><span>Maleki</span></span></h2>
+      <p class="fade">AI and agentic systems engineer. CTO at OnePharma, Dubai. I build ontologies, knowledge graphs, and the identity and governance that make AI safe to put in front of a business.</p>
     </div>
-
-    <div class="sec rv">
-      <div class="hd"><span class="mono" style="color:var(--sig-dim)">01</span><span class="mono">Track</span><span class="mono" style="margin-left:auto">2018 — present</span></div>
-      <div class="row"><span class="mono tnum">Oct 2025 — Present</span><span class="org">OnePharma</span><span class="mono">Chief Technology Officer · Dubai</span></div>
-      <div class="row"><span class="mono tnum">Nov 2024 — Dec 2025</span><span class="org">FYI</span><span class="mono">Software Developer</span></div>
-      <div class="row"><span class="mono tnum">Feb 2023 — Present</span><span class="org">Freelance</span><span class="mono">Full-stack · Fintech &amp; fitness</span></div>
-      <div class="row"><span class="mono tnum">2020 — 2023</span><span class="org">American Spine Center</span><span class="mono">Junior iOS Developer</span></div>
-      <div class="row"><span class="mono tnum">2018 — 2020</span><span class="org">AMAL Counseling</span><span class="mono">IT Support</span></div>
-      <div class="row"><span class="mono tnum">2018</span><span class="org">STEMA</span><span class="mono">Engineering Instructor</span></div>
-      <div class="row"><span class="mono tnum">2023</span><span class="org">Canadian University Dubai</span><span class="mono">B.Sc. Computer Network Engineering</span></div>
+  </section>
+  <section class="act net" data-a="0.3" data-b="0.415" data-light="1">
+    <div>
+      <h2><span class="ln"><span>Meaning is</span></span><span class="ln"><span>a <em>network.</em></span></span></h2>
+      <p class="fade">A carpet is thousands of knots that only make sense together. Data is the same. I connect it into one model a business can question, and agents can act on.</p>
     </div>
-
-    <div class="sec rv">
-      <div class="hd"><span class="mono" style="color:var(--sig-dim)">02</span><span class="mono">Research</span><span class="mono" style="margin-left:auto">Peer reviewed</span></div>
-      <div class="paper">
-        <div>
-          <h4>Deep Learning for Preventing Botnet Attacks on IoT</h4>
-          <p class="mono">Co-author · 2023 · 23rd International Conference on Next Generation Networks</p>
-        </div>
-        <div style="text-align:right">
-          <div class="big">97<span style="font-size:.4em">%</span></div>
-          <div class="mono" style="margin-top:8px">Detection accuracy</div>
-        </div>
-      </div>
+  </section>
+  <section class="act proj" data-a="0.45" data-b="0.6">
+    <p class="big" aria-hidden="true">Cyrus</p>
+    <div class="card fade">
+      <div class="k mono"><b>کوروش</b> Ontology platform · in development</div>
+      <h3>Cyrus</h3>
+      <p>Cyrus wrote his charter on a clay cylinder. Companies write theirs across hundreds of systems that disagree on what a customer, a batch or a contract is. Cyrus gives that data one shared meaning: an ontology of the objects a business runs on, so people and AI agents can ask in business terms and trace every answer to its source. Built for any industry, first modelled on pharma.</p>
+      <dl class="facts"><div><dt>95%</dt><dd>Bilingual document accuracy</dd></div><div><dt>13</dt><dd>Security layers</dd></div><div><dt>AR / EN</dt><dd>One model</dd></div></dl>
     </div>
-
-    <div class="sec rv">
-      <div class="hd"><span class="mono" style="color:var(--sig-dim)">03</span><span class="mono">Stack</span><span class="mono" style="margin-left:auto">What I reach for</span></div>
-      <div class="srow"><span class="mono">AI &amp; Data</span><p>LLM integration and provider routing, agent orchestration, ontology and graph modeling in Neo4j, semantic search and vector indexing, medallion data pipelines, ClickHouse OLAP, PyTorch, CNNs</p></div>
-      <div class="srow"><span class="mono">Backend &amp; Platform</span><p>Python and FastAPI, Node.js, Rust and Go on performance paths, GraphQL and REST design, PostgreSQL, Kafka, Redis, Firebase</p></div>
-      <div class="srow"><span class="mono">Identity &amp; Governance</span><p>Passkeys and WebAuthn, OTP, JWT, Cerbos policy-based authorization, attribute-based access control, hash-chained audit trails, 21 CFR Part 11 and SOC 2 alignment</p></div>
-      <div class="srow"><span class="mono">Client</span><p>Next.js, React, TypeScript, Swift, SwiftUI, Combine</p></div>
-      <div class="srow"><span class="mono">Infrastructure</span><p>AWS with Lambda, ECS Fargate, Step Functions, S3 and DynamoDB, Kubernetes, Terraform, Docker, CI/CD with GitHub Actions</p></div>
+  </section>
+  <section class="act proj r" data-a="0.635" data-b="0.75">
+    <p class="big" aria-hidden="true">Zagros</p>
+    <div class="card fade">
+      <div class="k mono"><b>زاگرس</b> Governance &amp; identity · private</div>
+      <h3>Zagros</h3>
+      <p>Authentication, authorization and governance in one self-hosted system, with no outside identity provider. An instance is founded in a sealed ceremony that needs three of five constitutional keys, and every decision after that runs through policy.</p>
+      <dl class="facts"><div><dt>3 / 5</dt><dd>Key quorum</dd></div><div><dt>0</dt><dd>External identity providers</dd></div><div><dt>4</dt><dd>Deployment modes</dd></div></dl>
     </div>
-
-    <div class="sec rv">
-      <div class="hd"><span class="mono" style="color:var(--sig-dim)">04</span><span class="mono">Contact</span><span class="mono" style="margin-left:auto">Open to hard problems</span></div>
-      <a class="mail" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a>
-      <div class="reach mono">
-        <a href="tel:+971585581618">+971 58 558 1618</a>
-        <a href="https://github.com/Farhad1618" target="_blank" rel="noopener">GitHub ↗</a>
-        <a href="https://linkedin.com/in/farhad-maleki" target="_blank" rel="noopener">LinkedIn ↗</a>
-        <span>Dubai, United Arab Emirates</span>
-      </div>
+  </section>
+  <section class="act proj" data-a="0.775" data-b="0.885">
+    <p class="big" aria-hidden="true">Falah</p>
+    <div class="card fade">
+      <div class="k mono"><b>فلاح</b> iPhone app · pre-launch</div>
+      <h3>Falah</h3>
+      <p>A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. February went over budget; Falah noticed first.</p>
+      <dl class="facts"><div><dt>2</dt><dd>Automatic sources: bank, email</dd></div><div><dt>9</dt><dd>Supabase edge functions</dd></div><div><dt>iOS</dt><dd>Swift, SwiftUI</dd></div></dl>
     </div>
-  </div>
-</section>
+  </section>
+  <section class="act end" data-a="0.915" data-b="1.01">
+    <h2><span class="ln"><span>Let's weave something</span></span><span class="ln"><span>that <em>understands.</em></span></span></h2>
+    <div class="fade"><a class="mail" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a></div>
+    <div class="row mono fade"><a href="https://github.com/Farhad1618">GitHub</a><a href="https://linkedin.com/in/farhad-maleki">LinkedIn</a><span>+971 58 558 1618</span></div>
+    <p class="also fade">Also: OnePharma, as CTO · Black Pearl, CNC machine telemetry · network intrusion detection research, ICNGN 2023</p>
+  </section>
+</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<div id="spacer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
 <script>
 (function(){
-"use strict";
-if(!window.gsap){ document.getElementById("pre").remove(); return; }
-var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-var TAU = Math.PI * 2;
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MOBILE=innerWidth<760;
+const cv=document.getElementById('stage');
+if(!window.THREE){document.body.classList.add('nogl');return}
 
-/* ============================================================
-   PALETTE
-   ============================================================ */
-var C = { ink:"#0C0C0E", ink2:"#18181C", bone:"#ECE7DC", dim:"#A8A49C",
-          muted:"#716E68", sig:"#E9A03B", trace:"#5FA8B8" };
-function rgba(hex,a){
-  var h=hex.replace("#",""); var n=parseInt(h,16);
-  return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")";
-}
-/* deterministic pseudo-random so every visitor sees the same composition */
-function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
-
-/* ============================================================
-   PROJECT DATA
-   ============================================================ */
-var PROJECTS = [
-{
-  id:"cyrus", n:"01", title:"Cyrus", eyebrow:"Ontology &amp; decision platform",
-  sub:"One trusted model of scattered data · first deployed in pharma",
-  body:"Connects spreadsheets, PDFs and legacy exports, in Arabic and English, to a single ontology of the objects a business runs on. A governed pipeline secures, cleans and resolves the data before it reaches analytics, and every figure traces back to its source file. Built industry-agnostic; the first deployment models pharmaceuticals, at 95% bilingual document accuracy and 100% on UAE Ministry of Health price lists. Rust, Go and C++ hold the performance path while Python carries business logic; PostgreSQL and ClickHouse for analytics, Neo4j for the graph. Thirteen security layers and a hash-chained audit trail hold it to 21 CFR Part 11, SOC 2 Type II and ISO 27001.",
-  kv:[["95%","Bilingual doc accuracy"],["100%","MoH price lists"],["13","Security layers"]],
-  chips:["Rust","Go","C++","Python","Kubernetes","PostgreSQL","ClickHouse","Neo4j","EmbeddingGemma","21 CFR Part 11","SOC 2 Type II","ISO 27001"],
-  links:[]
-},
-{
-  id:"zagros", n:"02", title:"Zagros", eyebrow:"Enterprise governance &amp; identity",
-  sub:"Self-hosted · no external identity provider",
-  body:"Governance, authentication and authorization for enterprise software, in one self-hosted system. Multi-tenant, with no external identity provider in the loop. Passkeys, email OTP and passwords are all verified in-instance. Authorization runs on Cerbos policies, and the instance is brought up through a sealed Genesis ceremony with K-of-N constitutional keys and a catastrophe policy. FastAPI, Next.js and PostgreSQL, with TypeScript and Python SDKs — the same code runs local, on-premise, air-gapped or managed.",
-  kv:[["3 / 5","Constitutional key quorum"],["0","External IdPs required"],["4","Deployment modes"]],
-  chips:["FastAPI","Next.js","PostgreSQL","Cerbos","WebAuthn","Passkeys","JWT","TypeScript SDK","Python SDK","Air-gapped"],
-  links:[]
-},
-{
-  id:"onepharma", n:"03", title:"OnePharma", eyebrow:"Pharmaceutical intelligence",
-  sub:"The product surface · built as CTO",
-  body:"The surface the whole platform is judged on. Next.js 16, React 19 and strict TypeScript, with passwordless email and passkey sign-in. A GraphQL decision service sits between the product and a Neo4j activity graph, and a pluggable LLM layer runs against a hosted gateway or a self-hosted model without the product knowing the difference.",
-  kv:[["0","Passwords stored"],["2","Interchangeable LLM backends"],["1","Semantic layer, shared"]],
-  chips:["Next.js 16","React 19","TypeScript","GraphQL","Neo4j","Passkeys","LLM gateway","Agentic AI"],
-  links:[]
-},
-{
-  id:"pearl", n:"04", title:"Black Pearl", eyebrow:"Machine control &amp; visualization",
-  sub:"Steel-framing CNC · live telemetry",
-  body:"Live telemetry over WebSocket with configuration over REST, behind a single connection interface with swappable simulated and real machine implementations. The consequence is the good part: the whole rig demonstrates in a browser with no hardware attached, and the same build drives the actual machine on the factory floor.",
-  kv:[["1","Interface, two implementations"],["0","Hardware needed to demo"],["WS","Live telemetry transport"]],
-  chips:["WebSocket","REST","Telemetry","CNC","Simulation","TypeScript"],
-  links:[]
-},
-{
-  id:"falah", n:"05", title:"Falah", eyebrow:"iOS budgeting app",
-  sub:"Pre-launch · iOS, built end to end",
-  body:"A budgeting app that fills itself in. Bank accounts link through Lean open banking, and with consent it reads Gmail or Outlook receipts to find subscriptions. Budgets, limits, shared household finances, a themes marketplace and an AI finance chat sit on top. Swift and SwiftUI on a Supabase backend, owned end to end.",
-  kv:[["2","Automatic data sources: bank and email"],["9","Supabase edge functions"],["E2E","Owned, schema to store"]],
-  chips:["Swift","SwiftUI","Combine","Core Data","Supabase","PostgreSQL","Edge Functions","Lean open banking","Claude API","StoreKit"],
-  links:[]
-},
-{
-  id:"nids", n:"06", title:"Network Intrusion Detection", eyebrow:"Applied research",
-  sub:"CNN threat detection at 97% · ICNGN 2023",
-  body:"A convolutional network trained to separate intrusion traffic from ordinary traffic at 97% detection accuracy in Python. The work became the foundation of a co-authored paper presented at the 23rd International Conference on Next Generation Networks.",
-  kv:[["97%","Detection accuracy"],["2023","Published — ICNGN"],["CNN","Architecture"]],
-  chips:["Python","PyTorch","CNN","IoT / Botnet","Research"],
-  links:[]
-}];
-
-/* ============================================================
-   SCENE 1 — CYRUS : document classification field
-   ============================================================ */
-var docsCache = null;
-function sceneCyrus(g,w,h,t,e){
-  if(!docsCache || docsCache.w!==w){
-    var r=mk(7717), arr=[], cols=Math.max(7,Math.round(w/132)), rows=Math.max(4,Math.round(h/150));
-    for(var i=0;i<cols;i++) for(var j=0;j<rows;j++){
-      arr.push({ x:(i+.5)/cols, y:(j+.5)/rows, rtl:r()>.5, lines:3+Math.floor(r()*4),
-                 band:Math.floor(r()*3), wob:r()*TAU, len:.5+r()*.5 });
-    }
-    docsCache={w:w,arr:arr};
-  }
-  var docs=docsCache.arr;
-  var sweep=((t*0.17)%1.35)-0.175;             /* scan line position 0..1 */
-  var dw=Math.min(74, w/13), dh=dw*0.62;
-
-  for(var k=0;k<docs.length;k++){
-    var d=docs[k];
-    var px=d.x*w, py=d.y*h + Math.sin(t*0.5+d.wob)*3;
-    var done=d.x < sweep;
-    /* classified documents drift toward their band */
-    var target=(0.26+d.band*0.24)*h;
-    if(done) py += (target-py)*0.16;
-    var a=(0.18+0.66*e)*(done?1:0.5);
-    g.save(); g.translate(px-dw/2, py-dh/2);
-    g.fillStyle=rgba(C.ink2, .92*e); g.fillRect(0,0,dw,dh);
-    g.strokeStyle=done?rgba(C.sig,.34*a*2):rgba(C.dim,.34);
-    g.lineWidth=1; g.strokeRect(.5,.5,dw-1,dh-1);
-    var ly=dh*0.24;
-    for(var L=0; L<d.lines; L++){
-      var lw=dw*(0.30+((L*37+k*11)%50)/100*d.len*0.9);
-      g.fillStyle = done ? rgba(L===0?C.sig:C.trace, a*0.85) : rgba(C.dim, a*0.7);
-      g.fillRect(d.rtl? dw-6-lw : 6, ly, lw, 1.5);
-      ly += dh*0.16;
-      if(ly>dh-5) break;
-    }
-    g.restore();
-  }
-  /* scan line */
-  if(sweep>0 && sweep<1){
-    var sx=sweep*w;
-    var grd=g.createLinearGradient(sx-120,0,sx+8,0);
-    grd.addColorStop(0,rgba(C.sig,0)); grd.addColorStop(1,rgba(C.sig,.20*e));
-    g.fillStyle=grd; g.fillRect(sx-120,0,128,h);
-    g.strokeStyle=rgba(C.sig,.75*e); g.lineWidth=1;
-    g.beginPath(); g.moveTo(sx,0); g.lineTo(sx,h); g.stroke();
-  }
-  /* hash chain along the base */
-  var by=h-58, off=(t*16)%54;
-  g.strokeStyle=rgba(C.trace,.3*e); g.lineWidth=1;
-  g.beginPath(); g.moveTo(0,by); g.lineTo(w,by); g.stroke();
-  for(var x=-54+off; x<w+54; x+=54){
-    g.fillStyle=rgba(C.ink,1); g.fillRect(x,by-7,14,14);
-    g.strokeStyle=rgba(C.trace,.55*e); g.strokeRect(x+.5,by-6.5,13,13);
-  }
-}
-
-/* ============================================================
-   SCENE 2 — ZAGROS : K-of-N key ceremony
-   ============================================================ */
-function sceneZagros(g,w,h,t,e){
-  var cx=w/2, cy=h/2, R=Math.min(w,h)*0.27;
-  /* dashed range rings */
-  g.setLineDash([2,7]);
-  for(var i=1;i<=4;i++){
-    g.strokeStyle=rgba(C.dim,.10*e); g.lineWidth=1;
-    g.beginPath(); g.arc(cx,cy,R*(0.5+i*0.32),0,TAU); g.stroke();
-  }
-  g.setLineDash([]);
-  /* radar sweep */
-  var sa=t*0.55;
-  g.save(); g.translate(cx,cy); g.rotate(sa);
-  var lg=g.createLinearGradient(0,0,R*2.1,0);
-  lg.addColorStop(0,rgba(C.trace,.16*e)); lg.addColorStop(1,rgba(C.trace,0));
-  g.fillStyle=lg; g.beginPath(); g.moveTo(0,0); g.arc(0,0,R*2.1,-0.22,0.02); g.closePath(); g.fill();
-  g.restore();
-
-  /* five keys, three turned */
-  var turned=[1,1,1,0,0];
-  var rot=t*0.09;
-  for(var k=0;k<5;k++){
-    var ang=rot + k*(TAU/5) - Math.PI/2;
-    var kx=cx+Math.cos(ang)*R, ky=cy+Math.sin(ang)*R;
-    if(turned[k]){
-      var pulse=.45+.3*Math.sin(t*1.5+k);
-      g.strokeStyle=rgba(C.sig,pulse*e); g.lineWidth=1;
-      g.beginPath(); g.moveTo(kx,ky); g.lineTo(cx,cy); g.stroke();
-      /* travelling charge */
-      var p=((t*0.42+k*0.2)%1);
-      g.fillStyle=rgba(C.sig,.9*e);
-      g.beginPath(); g.arc(kx+(cx-kx)*p, ky+(cy-ky)*p, 2.2, 0, TAU); g.fill();
-    }
-    g.beginPath(); g.arc(kx,ky, turned[k]?9:7, 0, TAU);
-    if(turned[k]){ g.fillStyle=rgba(C.sig,.92*e); g.fill(); }
-    else { g.fillStyle=rgba(C.ink,1); g.fill(); g.strokeStyle=rgba(C.dim,.45*e); g.lineWidth=1; g.stroke(); }
-    g.font="400 10px 'IBM Plex Mono', monospace"; g.textAlign="center"; g.textBaseline="middle";
-    g.fillStyle=rgba(turned[k]?C.sig:C.muted,.8*e);
-    g.fillText("K"+(k+1), kx+Math.cos(ang)*24, ky+Math.sin(ang)*24);
-  }
-  g.textAlign="left";
-
-  /* sealed core */
-  function hex(rr,rotr){ g.beginPath(); for(var i=0;i<6;i++){ var a=rotr+i*TAU/6; var fx=cx+Math.cos(a)*rr, fy=cy+Math.sin(a)*rr; i?g.lineTo(fx,fy):g.moveTo(fx,fy);} g.closePath(); }
-  var br=.5+.18*Math.sin(t*1.1);
-  g.fillStyle=rgba(C.ink,.94); hex(34,t*0.05); g.fill();
-  g.strokeStyle=rgba(C.dim,.5*e); g.lineWidth=1; hex(34,t*0.05); g.stroke();
-  g.strokeStyle=rgba(C.sig,br*e); g.lineWidth=1.2; hex(19,-t*0.11); g.stroke();
-  /* expanding seal pulse */
-  var sp=(t*0.35)%1;
-  g.strokeStyle=rgba(C.sig,(1-sp)*0.35*e); g.lineWidth=1;
-  g.beginPath(); g.arc(cx,cy, 34+sp*R*1.5, 0, TAU); g.stroke();
-
-  g.font="400 10px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.sig,.85*e);
-  g.textAlign="center"; g.fillText("SEALED", cx, cy+54); g.textAlign="left";
-}
-
-/* ============================================================
-   SCENE 3 — ONEPHARMA : the knowledge graph
-   ============================================================ */
-var GN=[
- {id:"onyxs",l:"Cyrus",k:2},{id:"sr71",l:"Zagros",k:2},{id:"onepharma",l:"OnePharma",k:2},
- {id:"pearl",l:"Black Pearl",k:2},{id:"purple",l:"Falah",k:2},{id:"nids",l:"NIDS",k:2},
- {id:"ontology",l:"Ontology",k:1},{id:"graphdb",l:"Knowledge Graph",k:1},{id:"agentic",l:"Agentic AI",k:1},
- {id:"gov",l:"Governance",k:1},{id:"audit",l:"Audit Trail",k:1},{id:"semantic",l:"Semantic Search",k:1},
- {id:"tenancy",l:"Multi-tenancy",k:1},{id:"cfr",l:"21 CFR Part 11",k:1},
- {id:"neo4j",l:"Neo4j",k:0},{id:"pg",l:"PostgreSQL",k:0},{id:"click",l:"ClickHouse",k:0},
- {id:"rust",l:"Rust",k:0},{id:"go",l:"Go",k:0},{id:"cpp",l:"C++",k:0},{id:"py",l:"Python",k:0},
- {id:"fastapi",l:"FastAPI",k:0},{id:"next",l:"Next.js",k:0},{id:"react",l:"React",k:0},
- {id:"ts",l:"TypeScript",k:0},{id:"swift",l:"Swift",k:0},{id:"k8s",l:"Kubernetes",k:0},
- {id:"aws",l:"AWS",k:0},{id:"kafka",l:"Kafka",k:0},{id:"gql",l:"GraphQL",k:0},{id:"ws",l:"WebSocket",k:0},
- {id:"cerbos",l:"Cerbos",k:0},{id:"passkey",l:"Passkeys",k:0},{id:"torch",l:"PyTorch",k:0},
- {id:"llm",l:"LLM Gateway",k:0},{id:"embed",l:"EmbeddingGemma",k:0}];
-var GE=[["onyxs","neo4j"],["onyxs","pg"],["onyxs","click"],["onyxs","rust"],["onyxs","go"],["onyxs","cpp"],
- ["onyxs","py"],["onyxs","k8s"],["onyxs","embed"],["onyxs","ontology"],["onyxs","audit"],["onyxs","cfr"],
- ["onyxs","tenancy"],["onyxs","semantic"],["sr71","fastapi"],["sr71","next"],["sr71","pg"],["sr71","cerbos"],
- ["sr71","passkey"],["sr71","ts"],["sr71","py"],["sr71","gov"],["sr71","audit"],["sr71","tenancy"],
- ["onepharma","next"],["onepharma","react"],["onepharma","ts"],["onepharma","gql"],["onepharma","neo4j"],
- ["onepharma","passkey"],["onepharma","llm"],["onepharma","agentic"],["onepharma","ontology"],["onepharma","gov"],
- ["pearl","ws"],["pearl","ts"],["pearl","react"],["purple","swift"],["purple","ts"],["nids","py"],["nids","torch"],
- ["ontology","graphdb"],["graphdb","neo4j"],["semantic","embed"],["semantic","graphdb"],["agentic","llm"],
- ["agentic","ontology"],["gov","cerbos"],["gov","audit"],["gov","cfr"],["gov","tenancy"],["k8s","aws"],
- ["fastapi","py"],["next","react"],["react","ts"],["pg","kafka"],["click","kafka"],["llm","py"],["torch","py"]];
-var gmap={}, gnodes=[], glinks=[], gSized=0, pulses=[];
-GN.forEach(function(n,i){ var o={id:n.id,l:n.l,k:n.k,i:i}; gmap[n.id]=o; gnodes.push(o); });
-GE.forEach(function(e){ if(gmap[e[0]]&&gmap[e[1]]) glinks.push({a:gmap[e[0]],b:gmap[e[1]]}); });
-
-function graphLayout(w,h){
-  var r=mk(20231618);
-  gnodes.forEach(function(n,i){
-    var ang=(i/gnodes.length)*TAU;
-    var rad=(n.k===2?0.16:n.k===1?0.27:0.38)*Math.min(w,h);
-    n.x=w/2+Math.cos(ang)*rad*1.35+(r()-.5)*60;
-    n.y=h/2+Math.sin(ang)*rad+(r()-.5)*60;
-    n.vx=0; n.vy=0;
-  });
-  for(var s=0;s<320;s++) graphStep(w,h,1);
-  gSized=w;
-}
-function graphStep(w,h,al){
-  var i,j,a,b,dx,dy,d2,d,f;
-  for(i=0;i<gnodes.length;i++){ a=gnodes[i];
-    for(j=i+1;j<gnodes.length;j++){ b=gnodes[j];
-      dx=b.x-a.x; dy=b.y-a.y; d2=dx*dx+dy*dy||.01; if(d2>140000) continue;
-      f=3200/d2; d=Math.sqrt(d2);
-      a.vx-=dx/d*f; a.vy-=dy/d*f; b.vx+=dx/d*f; b.vy+=dy/d*f;
-    }
-  }
-  for(i=0;i<glinks.length;i++){ var L=glinks[i]; a=L.a; b=L.b;
-    dx=b.x-a.x; dy=b.y-a.y; d=Math.sqrt(dx*dx+dy*dy)||.01;
-    var rest=(a.k===2||b.k===2)?128:92;
-    f=(d-rest)*0.012;
-    a.vx+=dx/d*f; a.vy+=dy/d*f; b.vx-=dx/d*f; b.vy-=dy/d*f;
-  }
-  for(i=0;i<gnodes.length;i++){ var n=gnodes[i];
-    n.vx+=(w/2-n.x)*0.0024; n.vy+=(h/2-n.y)*0.0032;
-    n.vx*=0.855; n.vy*=0.855;
-    n.x+=n.vx*al; n.y+=n.vy*al;
-    n.x=Math.max(30,Math.min(w-30,n.x)); n.y=Math.max(36,Math.min(h-36,n.y));
-  }
-}
-function sceneGraph(g,w,h,t,e){
-  if(gSized!==w) graphLayout(w,h);
-  graphStep(w,h,0.04);                        /* gentle perpetual drift */
-
-  /* query pulses travelling along edges */
-  if(pulses.length<7 && Math.random()<0.035){
-    pulses.push({ l:glinks[(Math.random()*glinks.length)|0], p:0, sp:0.006+Math.random()*0.01, dir:Math.random()<.5 });
-  }
-  for(var i=0;i<glinks.length;i++){
-    var L=glinks[i];
-    g.strokeStyle=rgba(C.trace,.17*e); g.lineWidth=.8;
-    g.beginPath(); g.moveTo(L.a.x,L.a.y); g.lineTo(L.b.x,L.b.y); g.stroke();
-  }
-  for(var p=pulses.length-1;p>=0;p--){
-    var q=pulses[p]; q.p+=q.sp; if(q.p>1){ pulses.splice(p,1); continue; }
-    var f=q.dir?q.p:1-q.p;
-    var px=q.l.a.x+(q.l.b.x-q.l.a.x)*f, py=q.l.a.y+(q.l.b.y-q.l.a.y)*f;
-    g.strokeStyle=rgba(C.sig,(1-Math.abs(q.p-.5)*2)*.55*e); g.lineWidth=1.2;
-    g.beginPath(); g.moveTo(q.l.a.x,q.l.a.y); g.lineTo(q.l.b.x,q.l.b.y); g.stroke();
-    g.fillStyle=rgba(C.sig,.95*e); g.beginPath(); g.arc(px,py,2.4,0,TAU); g.fill();
-  }
-  for(var k=0;k<gnodes.length;k++){
-    var n=gnodes[k], isP=n.k===2, r=isP?6.5:(n.k===1?4.2:3);
-    g.beginPath(); g.arc(n.x,n.y,r,0,TAU);
-    if(isP){ g.fillStyle=rgba(C.sig,.92*e); g.fill(); }
-    else { g.fillStyle=rgba(C.ink,1); g.fill(); g.strokeStyle=rgba(C.dim,.45*e); g.lineWidth=1; g.stroke(); }
-    if(n.k>=1){
-      g.font=(isP?"500 11px":"400 10px")+" 'IBM Plex Mono', monospace";
-      g.fillStyle=rgba(isP?C.dim:C.muted,(isP?.72:.5)*e);
-      g.textBaseline="middle";
-      var lw=g.measureText(n.l).width, lx=n.x+r+8;
-      if(lx+lw>w-12) lx=Math.max(12,n.x-r-8-lw);
-      g.fillText(n.l,lx,n.y);
-    }
-  }
-}
-
-/* ============================================================
-   SCENE 4 — BLACK PEARL : telemetry + toolpath
-   ============================================================ */
-function scenePearl(g,w,h,t,e){
-  /* three scrolling oscilloscope traces */
-  var lanes=[{y:h*0.2,amp:26,f:2.1,c:C.trace},{y:h*0.34,amp:18,f:3.4,c:C.dim},{y:h*0.48,amp:32,f:1.3,c:C.sig}];
-  for(var L=0;L<lanes.length;L++){
-    var ln=lanes[L];
-    g.strokeStyle=rgba(C.dim,.08*e); g.lineWidth=1;
-    g.beginPath(); g.moveTo(0,ln.y); g.lineTo(w,ln.y); g.stroke();
-    g.strokeStyle=rgba(ln.c,(L===2?.8:.42)*e); g.lineWidth=L===2?1.4:1;
-    g.beginPath();
-    for(var x=0;x<=w;x+=3){
-      var u=(x/w)*9 + t*ln.f;
-      var v=Math.sin(u)*0.6+Math.sin(u*2.7+L)*0.28+Math.sin(u*6.1)*0.12;
-      var y=ln.y+v*ln.amp;
-      x?g.lineTo(x,y):g.moveTo(x,y);
-    }
-    g.stroke();
-  }
-  /* CNC toolpath drawing itself — a steel frame profile */
-  var pw=Math.min(w*0.5,460), ph=pw*0.42, ox=(w-pw)/2, oy=h*0.62;
-  var pts=[[0,ph],[0,0],[pw,0],[pw,ph],[pw*0.78,ph],[pw*0.78,ph*0.3],[pw*0.22,ph*0.3],[pw*0.22,ph],[0,ph]];
-  var segs=[], total=0, s;
-  for(s=1;s<pts.length;s++){
-    var dx=pts[s][0]-pts[s-1][0], dy=pts[s][1]-pts[s-1][1];
-    var len=Math.hypot(dx,dy); segs.push(len); total+=len;
-  }
-  var trav=((t*0.24)%1.25)*total;
-  g.strokeStyle=rgba(C.dim,.16*e); g.lineWidth=1;
-  g.beginPath(); g.moveTo(ox+pts[0][0],oy+pts[0][1]);
-  for(s=1;s<pts.length;s++) g.lineTo(ox+pts[s][0],oy+pts[s][1]);
-  g.stroke();
-  /* drawn portion */
-  var acc=0, hx=null, hy=null;
-  g.strokeStyle=rgba(C.sig,.85*e); g.lineWidth=1.6;
-  g.beginPath(); g.moveTo(ox+pts[0][0],oy+pts[0][1]);
-  for(s=1;s<pts.length;s++){
-    var segLen=segs[s-1];
-    if(trav>=acc+segLen){ g.lineTo(ox+pts[s][0],oy+pts[s][1]); hx=ox+pts[s][0]; hy=oy+pts[s][1]; }
-    else if(trav>acc){
-      var f=(trav-acc)/segLen;
-      hx=ox+pts[s-1][0]+(pts[s][0]-pts[s-1][0])*f;
-      hy=oy+pts[s-1][1]+(pts[s][1]-pts[s-1][1])*f;
-      g.lineTo(hx,hy); break;
-    } else break;
-    acc+=segLen;
-  }
-  g.stroke();
-  if(hx!==null){
-    g.fillStyle=rgba(C.sig,e); g.beginPath(); g.arc(hx,hy,3.4,0,TAU); g.fill();
-    g.strokeStyle=rgba(C.sig,.4*e); g.lineWidth=1;
-    g.beginPath(); g.arc(hx,hy,3.4+8*((t*2)%1),0,TAU); g.stroke();
-  }
-  /* axis readouts */
-  var ax=["X","Y","Z"], base=h-96;
-  for(var a=0;a<3;a++){
-    var val=0.5+0.42*Math.sin(t*(0.7+a*0.35)+a);
-    var bx=40, bw=Math.min(240,w*0.22), by=base+a*20;
-    g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.muted,.8*e);
-    g.textBaseline="middle"; g.fillText(ax[a],bx-14,by);
-    g.strokeStyle=rgba(C.dim,.18*e); g.lineWidth=1; g.strokeRect(bx+.5,by-4.5,bw,9);
-    g.fillStyle=rgba(a===2?C.sig:C.dim,.55*e); g.fillRect(bx+1,by-3.5,(bw-2)*val,7);
-    g.fillStyle=rgba(C.muted,.8*e); g.fillText((val*1000).toFixed(1)+" mm", bx+bw+12, by);
-  }
-}
-
-/* ============================================================
-   SCENE 5 — FALAH : budget against target
-   ============================================================ */
-function sceneFalah(g,w,h,t,e){
-  var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"];
-  var n=months.length;
-  var bw=Math.min(52,w/(n*2.1)), gap=bw*0.85;
-  var totalW=n*bw+(n-1)*gap, ox=(w-totalW)/2, base=h*0.72, maxH=h*0.4;
-  var target=base-maxH*0.66;
-
-  /* target line */
-  g.setLineDash([4,5]); g.strokeStyle=rgba(C.sig,.5*e); g.lineWidth=1;
-  g.beginPath(); g.moveTo(ox-40,target); g.lineTo(ox+totalW+40,target); g.stroke();
-  g.setLineDash([]);
-  g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.sig,.85*e);
-  g.textBaseline="bottom"; g.fillText("BUDGET TARGET", ox-40, target-8);
-
-  for(var i=0;i<n;i++){
-    var seed=Math.sin(i*12.9898)*43758.5453; seed=seed-Math.floor(seed);
-    var v=0.35+seed*0.55+Math.sin(t*0.5+i*0.7)*0.05;
-    var bh=maxH*v*e, bx=ox+i*(bw+gap), by=base-bh;
-    var over=by<target;
-    g.fillStyle=over?rgba(C.sig,.88*e):rgba(C.dim,.32*e);
-    g.fillRect(bx,by,bw,bh);
-    if(over){
-      g.fillStyle=rgba(C.ink,.9);
-      g.fillRect(bx,target,bw,base-target);
-      g.fillStyle=rgba(C.sig,.88*e); g.fillRect(bx,by,bw,target-by);
-      g.fillStyle=rgba(C.sig,.30*e); g.fillRect(bx,target,bw,base-target);
-    }
-    g.fillStyle=rgba(C.muted,.8*e); g.textBaseline="top";
-    g.textAlign="center"; g.fillText(months[i],bx+bw/2,base+10); g.textAlign="left";
-  }
-  g.strokeStyle=rgba(C.dim,.25*e); g.lineWidth=1;
-  g.beginPath(); g.moveTo(ox-40,base); g.lineTo(ox+totalW+40,base); g.stroke();
-
-  /* income particles falling into the bars */
-  for(var p=0;p<26;p++){
-    var ph=((t*0.35+p*0.13)%1);
-    var col=(p*7)%n;
-    var px=ox+col*(bw+gap)+bw/2+Math.sin(p*3.1)*bw*0.3;
-    var py=h*0.16+ph*(base-h*0.16);
-    g.fillStyle=rgba(C.trace,(1-ph)*0.5*e);
-    g.fillRect(px,py,1.5,5);
-  }
-}
-
-/* ============================================================
-   SCENE 6 — NIDS : packet stream through conv gates
-   ============================================================ */
-var pkts=null;
-function sceneNids(g,w,h,t,e){
-  if(!pkts){ var r=mk(9731); pkts=[]; for(var i=0;i<130;i++) pkts.push({ y:r(), o:r(), sp:.1+r()*.12, bad:r()<0.09 }); }
-  var gates=[0.3,0.48,0.66].map(function(f){ return f*w; });
-  var top=h*0.2, bot=h*0.74;
-
-  /* conv gates */
-  for(var q=0;q<gates.length;q++){
-    var gx=gates[q], cells=9-q*2, ch=(bot-top)/cells;
-    for(var c=0;c<cells;c++){
-      var yy=top+c*ch+ch*0.18, hh=ch*0.64;
-      g.strokeStyle=rgba(C.dim,.22*e); g.lineWidth=1;
-      g.strokeRect(gx-7.5, yy+.5, 15, hh);
-      var act=0.5+0.5*Math.sin(t*2+c*0.8+q);
-      g.fillStyle=rgba(C.trace,act*0.18*e); g.fillRect(gx-6.5,yy+1,13,hh-1);
-    }
-    g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.muted,.75*e);
-    g.textAlign="center"; g.textBaseline="bottom";
-    g.fillText(q===2?"DENSE":"CONV "+(q+1), gx, top-12); g.textAlign="left";
-  }
-  /* verdict trays */
-  /* trays keep a readable width on narrow screens instead of running off the edge */
-  var tw=Math.min(140,Math.max(96,w*0.11)), vx=Math.min(w*0.84, w-tw-16);
-  g.fillStyle=rgba(C.sig,.85*e); g.fillRect(vx,h*0.36,tw,26);
-  g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.ink,1);
-  g.textBaseline="middle"; g.fillText("DETECTED 97%", vx+8, h*0.36+13);
-  g.strokeStyle=rgba(C.dim,.3*e); g.lineWidth=1; g.strokeRect(vx+.5,h*0.46+.5,tw,26);
-  g.fillStyle=rgba(C.muted,.85*e); g.fillText("MISSED 3%", vx+8, h*0.46+13);
-
-  /* packets */
-  for(var k=0;k<pkts.length;k++){
-    var p=pkts[k];
-    var f=((t*p.sp+p.o)%1);
-    var px=f*w, py=top+p.y*(bot-top);
-    /* bend toward its verdict tray after the last gate */
-    if(px>gates[2]){
-      var g2=(px-gates[2])/(w-gates[2]);
-      var ty=p.bad? h*0.36+13 : h*0.46+13;
-      py=py+(ty-py)*Math.min(1,g2*1.6);
-    }
-    g.fillStyle=p.bad?rgba(C.sig,.9*e):rgba(C.trace,.45*e);
-    g.fillRect(px,py,p.bad?7:5,1.6);
-  }
-  g.strokeStyle=rgba(C.dim,.1*e); g.lineWidth=1;
-  g.beginPath(); g.moveTo(0,top-1); g.lineTo(w,top-1); g.moveTo(0,bot+1); g.lineTo(w,bot+1); g.stroke();
-}
-
-var SCENES=[sceneCyrus,sceneZagros,sceneGraph,scenePearl,sceneFalah,sceneNids];
-
-/* ============================================================
-   STAGE MACHINERY
-   One GSAP timeline per transition. A new request while one is
-   running is queued and the running timeline is sped up, so fast
-   scrolling chains smoothly instead of being dropped by a lock.
-   ============================================================ */
-var N=PROJECTS.length;
-var plate=document.getElementById("plate"), stage=document.getElementById("stage");
-var art=document.getElementById("art"), ag=art.getContext("2d");
-var glc=document.getElementById("gl");
-var W=0,H=0,DPR=1;
-var cur=0, t0=performance.now();
-var enterT=[]; for(var z=0;z<N;z++) enterT[z]=0;
-
-/* transition state, driven by GSAP */
-var T={ on:false, from:0, to:0, mix:0, dir:1 };
-var tl=null, queued=null;
-
-/* offscreen buffers: each scene renders here during a transition and is
-   uploaded as a texture. CSS-pixel resolution keeps uploads cheap; the
-   frames are in motion and displaced anyway. */
-var bufA=document.createElement("canvas"), bufB=document.createElement("canvas");
-var ga=bufA.getContext("2d"), gb=bufB.getContext("2d");
-
-/* ---------- WebGL displacement blend (only runs during transitions) ---------- */
-var GL=null;
-function initGL(){
-  if(reduced) return null;
-  var gl=glc.getContext("webgl",{alpha:false,antialias:false,premultipliedAlpha:false,preserveDrawingBuffer:false});
-  if(!gl) return null;
-  var vs="attribute vec2 p;varying vec2 v;void main(){v=p*.5+.5;gl_Position=vec4(p,0.,1.);}";
-  var fs=[
-  "precision mediump float;",
-  "uniform sampler2D uA,uB;uniform float uP,uDir,uT;uniform vec2 uR;varying vec2 v;",
-  "float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}",
-  "float n(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);",
-  " return mix(mix(h(i),h(i+vec2(1.,0.)),f.x),mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x),f.y);}",
-  "float fbm(vec2 p){return n(p)*.6+n(p*2.1+7.)*.3+n(p*4.3+3.)*.1;}",
-  "void main(){",
-  " vec2 q=vec2(v.x*uR.x/uR.y,v.y);",
-  " float s=sin(uP*3.14159265);",
-  " float nz=fbm(q*2.6+vec2(uT*.15,0.))-.5;",
-  /* wavefront travels from the side the next project enters from */
-  " float wv=uDir>0.?1.-v.x:v.x;",
-  " float th=uP*1.7-.35;",
-  " float f=wv+nz*.35;",
-  " float rv=smoothstep(th+.15,th-.15,f);",
-  " vec2 wp=vec2(nz*.10,nz*.06)*s;",
-  " vec2 ua=v+vec2(-uDir*uP*.10,0.)+wp*(1.-rv);",
-  " vec2 ub=v+vec2(uDir*(1.-uP)*.10,0.)-wp*rv;",
-  " float sh=.012*s*uDir;",
-  " vec3 a=texture2D(uA,ua).rgb;",
-  " vec3 b=vec3(texture2D(uB,ub+vec2(sh,0.)).r,texture2D(uB,ub).g,texture2D(uB,ub-vec2(sh,0.)).b);",
-  " vec3 col=mix(a,b,rv);",
-  /* sodium-amber seam on the wavefront */
-  " float e=1.-smoothstep(0.,.045,abs(f-th));",
-  " col+=vec3(.914,.627,.231)*e*s*.42;",
-  " gl_FragColor=vec4(col,1.);",
-  "}"].join("\n");
-  function sh(type,src){ var s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s);
-    if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
-  try{
-    var pr=gl.createProgram();
-    gl.attachShader(pr,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,fs));
-    gl.linkProgram(pr); if(!gl.getProgramParameter(pr,gl.LINK_STATUS)) throw new Error("link");
-  }catch(err){ return null; }
-  gl.useProgram(pr);
-  var b=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,b);
-  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
-  var loc=gl.getAttribLocation(pr,"p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-  function tex(unit){ var t=gl.createTexture(); gl.activeTexture(gl.TEXTURE0+unit); gl.bindTexture(gl.TEXTURE_2D,t);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    return t; }
-  var tA=tex(0), tB=tex(1);
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
-  gl.uniform1i(gl.getUniformLocation(pr,"uA"),0); gl.uniform1i(gl.getUniformLocation(pr,"uB"),1);
-  return { gl:gl, tA:tA, tB:tB,
-    uP:gl.getUniformLocation(pr,"uP"), uDir:gl.getUniformLocation(pr,"uDir"),
-    uT:gl.getUniformLocation(pr,"uT"), uR:gl.getUniformLocation(pr,"uR") };
-}
-GL=initGL();
-
-function glDraw(t){
-  var gl=GL.gl;
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,GL.tA);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bufA);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,GL.tB);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bufB);
-  gl.uniform1f(GL.uP,T.mix); gl.uniform1f(GL.uDir,T.dir); gl.uniform1f(GL.uT,t);
-  gl.uniform2f(GL.uR,glc.width,glc.height);
-  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
-}
-
-function size(){
-  DPR=Math.min(devicePixelRatio||1,2);
-  var r=plate.getBoundingClientRect();
-  W=r.width; H=r.height;
-  art.width=Math.round(W*DPR); art.height=Math.round(H*DPR);
-  ag.setTransform(DPR,0,0,DPR,0,0);
-  bufA.width=bufB.width=glc.width=Math.round(W);
-  bufA.height=bufB.height=glc.height=Math.round(H);
-  if(GL) GL.gl.viewport(0,0,glc.width,glc.height);
-  docsCache=null; gSized=0;
-}
-function sizeDetail(){
-  var r=dart.getBoundingClientRect(), d=Math.min(devicePixelRatio||1,2);
-  dart.width=Math.round(r.width*d); dart.height=Math.round(r.height*d);
-  dg.setTransform(d,0,0,d,0,0); DW=r.width; DH=r.height;
-}
-
-function ease(i,now){ if(reduced) return 1; var e=Math.min(1,(now-enterT[i])/900); return 1-Math.pow(1-e,3); }
-function draw(ctx,i,w,h,t,e){ ctx.fillStyle=C.ink; ctx.fillRect(0,0,w,h); SCENES[i](ctx,w,h,t,e); }
-
-/* ---------- render loop, on GSAP's ticker so it runs after tweens each frame ---------- */
-var glShown=false, running=false;
-function loop(){
-  var now=performance.now(), t=(now-t0)/1000;
-  if(view==="about") return;                          /* stage fully covered: draw nothing */
-  if(view==="detail"){ draw(dg,cur,DW,DH,t,ease(cur,now)); return; }
-  if(T.on && GL){
-    draw(ga,T.from,W,H,t,1);
-    draw(gb,T.to,W,H,t,ease(T.to,now));
-    glDraw(t);
-    if(!glShown){ glc.style.visibility="visible"; glShown=true; }
-    return;
-  }
-  /* no WebGL: swap scenes at the midpoint while the plate is dipped */
-  var i=T.on ? (T.mix<.5?T.from:T.to) : cur;
-  draw(ag,i,W,H,t,ease(i,now));
-  if(glShown){ glc.style.visibility="hidden"; glShown=false; }   /* hide only after art holds the new frame */
-}
-function start(){ if(!running){ gsap.ticker.add(loop); running=true; } }
-function stop(){ if(running){ gsap.ticker.remove(loop); running=false; } }
-/* nothing to animate in a hidden tab */
-document.addEventListener("visibilitychange",function(){ document.hidden?stop():start(); });
-
-/* ---------- split text: word > mask > char ---------- */
-function split(el){
-  var text=el.textContent.trim(), chars=[];
-  el.textContent=""; el.setAttribute("aria-label",text);
-  text.split(/\s+/).forEach(function(word,wi,all){
-    var ws=document.createElement("span"); ws.className="w"; ws.setAttribute("aria-hidden","true");
-    Array.from(word).forEach(function(ch){
-      var m=document.createElement("span"); m.className="m";
-      var c=document.createElement("span"); c.className="c"; c.textContent=ch;
-      m.appendChild(c); ws.appendChild(m); chars.push(c);
-    });
-    el.appendChild(ws);
-    if(wi<all.length-1) el.appendChild(document.createTextNode(" "));
-  });
-  return chars;
-}
-
-/* ---------- titles ---------- */
-var titlesEl=document.getElementById("titles");
-var slides=PROJECTS.map(function(p,i){
-  var d=document.createElement("div");
-  d.className="slide";
-  d.innerHTML='<span class="eyebrow mono">'+p.eyebrow+'</span>'+
-              '<h2>'+p.title+'</h2>'+
-              '<span class="sub mono">'+p.sub+'</span>'+
-              '<button class="open" data-i="'+i+'">Open project <span class="ar" aria-hidden="true">→</span></button>';
-  titlesEl.appendChild(d);
-  return { el:d, chars:split(d.querySelector("h2")), meta:[d.querySelector(".eyebrow"),d.querySelector(".sub"),d.querySelector(".open")] };
-});
-
-/* ---------- pagination ---------- */
-var pcol=document.getElementById("pcol"), psep=document.getElementById("psep");
-PROJECTS.forEach(function(p){ var s=document.createElement("span"); s.textContent=p.n; pcol.appendChild(s); });
-document.getElementById("ptot").textContent=(N<10?"0":"")+N;
-var pline=document.getElementById("pline");
-
-/* ---------- filmstrip (real miniatures of each scene) ---------- */
-var stripEl=document.getElementById("strip");
-var stripBtns=PROJECTS.map(function(p,i){
-  var b=document.createElement("button");
-  b.setAttribute("role","tab"); b.setAttribute("aria-label",p.title);
-  var c=document.createElement("canvas");
-  b.appendChild(c); stripEl.appendChild(b);
-  b.addEventListener("click",function(){ go(i); });
-  return b;
-});
-function drawThumbs(){
-  stripBtns.forEach(function(b,i){
-    var c=b.firstChild, r=c.getBoundingClientRect(), d=Math.min(devicePixelRatio||1,2);
-    if(!r.width) return;
-    c.width=Math.round(r.width*d); c.height=Math.round(r.height*d);
-    var cg=c.getContext("2d"); cg.setTransform(d,0,0,d,0,0);
-    /* the real scene at miniature scale; labels are smears at 70px, so silence text */
-    cg.fillText=function(){}; cg.strokeText=function(){};
-    try{ draw(cg,i,r.width,r.height,3.2,1); }catch(err){}
-  });
-  docsCache=null; gSized=0;   /* thumbnails share scene caches; let the stage rebuild at its own size */
-}
-
-function paint(i){
-  var D=reduced?0:.8;
-  gsap.to(pcol,{yPercent:-i*(100/N),duration:D,ease:"expo.out",overwrite:true});
-  gsap.to(pline,{scaleX:(i+1)/N,duration:D,ease:"expo.out",overwrite:true});
-  stripBtns.forEach(function(b,k){ b.classList.toggle("on",k===i); b.setAttribute("aria-selected",String(k===i)); });
-}
-function showSlide(i){
-  slides.forEach(function(s,k){
-    gsap.set(s.el,{autoAlpha:k===i?1:0,x:0}); s.el.classList.toggle("on",k===i);
-    gsap.set(s.chars,{yPercent:0}); gsap.set(s.meta,{autoAlpha:1,y:0});
-  });
-}
-
-/* ---------- transition: shrink → liquid swap → grow ---------- */
-function go(to,dir,instant){
-  to=((to%N)+N)%N;
-  if(tl && tl.isActive()){
-    if(instant){ queued=null; tl.progress(1); }
-    else{
-      /* chain instead of dropping: remember the newest target, hurry the current one */
-      if(to!==T.to){ queued={to:to,dir:dir}; tl.timeScale(2.4); }
-      return;
-    }
-  }
-  if(to===cur) return;
-  if(dir===undefined) dir=to>cur?1:-1;
-  var from=cur; cur=to; paint(to);
-
-  if(instant){
-    enterT[to]=performance.now(); showSlide(to); return;
-  }
-
-  var A=slides[from], B=slides[to];
-  T.on=true; T.from=from; T.to=to; T.dir=dir; T.mix=0;
-  enterT[to]=performance.now();
-  B.el.classList.add("on"); A.el.classList.remove("on");
-
-  if(reduced){
-    tl=gsap.timeline({onComplete:done})
-      .to(T,{mix:1,duration:.3,ease:"none"},0)
-      .to(A.el,{autoAlpha:0,duration:.2},0)
-      .fromTo(B.el,{autoAlpha:0,x:0},{autoAlpha:1,duration:.25},.1);
-    gsap.set(B.chars,{yPercent:0}); gsap.set(B.meta,{autoAlpha:1,y:0});
-    return;
-  }
-
-  tl=gsap.timeline({onComplete:done, defaults:{overwrite:"auto"}});
-  /* plate: inset card, then back to full-bleed */
-  tl.to(plate,{scale:.86,xPercent:-dir*2.5,duration:.55,ease:"power3.inOut"},0)
-    .to(plate,{scale:1,xPercent:0,duration:.8,ease:"expo.out"},.55)
-    .to(T,{mix:1,duration:1.05,ease:"power2.inOut"},.08);
-  if(!GL) tl.to(plate,{autoAlpha:.15,duration:.5,ease:"power2.in",yoyo:true,repeat:1},0);
-  /* outgoing title: chars drop out of their masks in travel order, block drifts away */
-  tl.to(A.chars,{yPercent:dir>0?-112:112,duration:.5,ease:"power3.in",stagger:{each:.018,from:dir>0?"start":"end"}},0)
-    .to(A.meta,{autoAlpha:0,y:-10,duration:.3,ease:"power2.in",stagger:.04},0)
-    .to(A.el,{x:-dir*70,duration:.6,ease:"power2.in"},0)
-    .set(A.el,{autoAlpha:0},.62);
-  /* incoming title: enters from the other side, chars rise in */
-  tl.set(B.el,{autoAlpha:1,x:dir*70},.5)
-    .set(B.chars,{yPercent:dir>0?112:-112},.5)
-    .set(B.meta,{autoAlpha:0,y:12},.5)
-    .to(B.el,{x:0,duration:1,ease:"expo.out"},.5)
-    .to(B.chars,{yPercent:0,duration:.95,ease:"expo.out",stagger:{each:.024,from:dir>0?"start":"end"}},.52)
-    .to(B.meta,{autoAlpha:1,y:0,duration:.8,ease:"expo.out",stagger:.06},.7);
-  /* pagination dash pinches while the digit rolls */
-  tl.to(psep,{scaleX:.3,duration:.4,ease:"power3.in"},0)
-    .to(psep,{scaleX:1,duration:.7,ease:"expo.out"},.45);
-}
-function done(){
-  T.on=false; T.mix=0; tl=null;
-  gsap.set(plate,{scale:1,xPercent:0,autoAlpha:1});
-  if(queued){ var q=queued; queued=null; go(q.to,q.dir); }
-}
-function next(){ go((queued?queued.to:cur)+1, 1); }
-function prev(){ go((queued?queued.to:cur)-1, -1); }
-
-/* ---------- input: wheel, drag/swipe, keys ---------- */
-/* Trackpads emit a long inertial tail after one flick. A step fires on a new
-   gesture (a gap, or a delta that jumps up again); a continuous stream only
-   steps again after 750ms and only while it is still strong. */
-var acc=0, lastWheel=0, lastStep=0, prevAbs=0;
-addEventListener("wheel",function(ev){
-  if(view!=="stage") return;
-  ev.preventDefault();
-  var now=performance.now();
-  var d=Math.abs(ev.deltaX)>Math.abs(ev.deltaY)?ev.deltaX:ev.deltaY;
-  if(ev.deltaMode===1) d*=33;
-  var abs=Math.abs(d);
-  var fresh=(now-lastWheel>180) || (abs>prevAbs*1.6+4);
-  lastWheel=now; prevAbs=abs;
-  if(fresh) acc=0;
-  acc+=d;
-  if(Math.abs(acc)<40) return;
-  if(!fresh && !(now-lastStep>750 && abs>=20)) { acc=0; return; }
-  (acc>0?next:prev)(); acc=0; lastStep=now;
-},{passive:false});
-
-var dragX=null, dragY=null;
-addEventListener("pointerdown",function(ev){ if(view!=="stage")return; dragX=ev.clientX; dragY=ev.clientY; });
-addEventListener("pointercancel",function(){ dragX=null; });
-addEventListener("pointerup",function(ev){
-  if(dragX===null||view!=="stage"){ dragX=null; return; }
-  var dx=ev.clientX-dragX, dy=ev.clientY-dragY;
-  if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)) (dx<0?next:prev)();
-  else if(Math.abs(dy)>50 && Math.abs(dy)>Math.abs(dx)) (dy<0?next:prev)();
-  dragX=null;
-});
-addEventListener("keydown",function(ev){
-  if(ev.key==="Escape"){ closeSheets(); return; }
-  if(view!=="stage") return;
-  if(ev.target.closest && ev.target.closest("button") && (ev.key===" "||ev.key==="Enter")) return;
-  if(ev.key==="ArrowRight"||ev.key==="ArrowDown"||ev.key===" "||ev.key==="PageDown"){ ev.preventDefault(); next(); }
-  if(ev.key==="ArrowLeft"||ev.key==="ArrowUp"||ev.key==="PageUp"){ ev.preventDefault(); prev(); }
-  if(ev.key==="Enter"){ openDetail(cur); }
-});
-document.getElementById("next").addEventListener("click",next);
-document.getElementById("prev").addEventListener("click",prev);
-
-/* ---------- sheets ---------- */
-var view="stage";              /* "stage" | "detail" | "about" */
-var detail=document.getElementById("detail"), dbody=document.getElementById("d-body");
-var about=document.getElementById("about"), btnAbout=document.getElementById("btn-about");
-var dart=document.getElementById("d-art"), dg=dart.getContext("2d"), DW=0, DH=0;
-var lastFocus=null;
-
-function openSheet(el){
-  var other=el===detail?about:detail;
-  if(other.classList.contains("on")) hideSheet(other,true);
-  if(!el.classList.contains("on")) lastFocus=document.activeElement;
-  el.classList.add("on"); el.setAttribute("aria-hidden","false"); el.scrollTop=0;
-  var D=reduced?.01:1;
-  gsap.killTweensOf(el);
-  gsap.set(el,{visibility:"visible"});
-  gsap.fromTo(el,{clipPath:"inset(100% 0% 0% 0%)"},{clipPath:"inset(0% 0% 0% 0%)",duration:.9*D,ease:"expo.inOut",
-    onComplete:function(){ view=el===detail?"detail":"about"; }});
-  gsap.fromTo(el.querySelectorAll(".rv"),{y:46,autoAlpha:0},{y:0,autoAlpha:1,duration:1*D,ease:"expo.out",stagger:.06,delay:.4*D});
-  gsap.to(stage,{scale:.94,duration:.9*D,ease:"expo.inOut"});
-  if(el===detail){ view="detail"; }        /* banner starts drawing immediately */
-  setTimeout(function(){ el.querySelector(".close").focus({preventScroll:true}); },50);
-}
-function hideSheet(el,swap){
-  if(!el.classList.contains("on")) return;
-  el.classList.remove("on"); el.setAttribute("aria-hidden","true");
-  if(el===about) btnAbout.setAttribute("aria-expanded","false");
-  gsap.killTweensOf(el);
-  if(swap){ gsap.set(el,{visibility:"hidden"}); return; }
-  var D=reduced?.01:1;
-  view="stage"; start();
-  gsap.to(el,{clipPath:"inset(0% 0% 100% 0%)",duration:.75*D,ease:"expo.inOut",onComplete:function(){ gsap.set(el,{visibility:"hidden"}); }});
-  gsap.to(stage,{scale:1,duration:.9*D,ease:"expo.inOut"});
-  if(lastFocus&&lastFocus.focus) lastFocus.focus({preventScroll:true});
-}
-function closeSheets(){ hideSheet(detail); hideSheet(about); }
-
-function fillDetail(i){
-  var p=PROJECTS[i];
-  dbody.innerHTML=
-    '<div class="d-head rv"><span class="n">'+p.n+'</span><h3>'+p.title+'</h3>'+
-      '<span class="mono ey">'+p.eyebrow+'</span></div>'+
-    '<div class="d-grid rv"><div><p class="body">'+p.body+'</p>'+
-      '<div class="chips">'+p.chips.map(function(c){return '<span>'+c+'</span>';}).join('')+'</div>'+
-      (p.links.length?'<div class="d-links">'+p.links.map(function(l){return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+l[0]+'</a>';}).join('')+'</div>':'')+
-    '</div><div class="d-side">'+
-      p.kv.map(function(k){ return '<div class="kv"><span class="mono">'+k[1]+'</span><span class="v">'+k[0]+'</span></div>'; }).join('')+
-    '</div></div>'+
-    '<div class="d-foot rv"><button id="d-prev">← '+PROJECTS[(i-1+N)%N].title+'</button>'+
-      '<button class="r" id="d-next">'+PROJECTS[(i+1)%N].title+' →</button></div>';
-  document.getElementById("d-prev").onclick=function(){ stepDetail(-1); };
-  document.getElementById("d-next").onclick=function(){ stepDetail(1); };
-}
-function openDetail(i){
-  if(i!==cur) go(i,undefined,true);
-  fillDetail(i);
-  openSheet(detail);
-  requestAnimationFrame(function(){ sizeDetail(); docsCache=null; gSized=0; });
-}
-/* inside the sheet: swap content in place, stage switches instantly underneath */
-function stepDetail(d){
-  var D=reduced?.01:1;
-  var parts=detail.querySelectorAll(".rv");
-  gsap.to(parts,{autoAlpha:0,y:d>0?-24:24,duration:.35*D,ease:"power2.in",stagger:.03});
-  gsap.delayedCall(.45*D,function(){
-    go(cur+d,d,true); fillDetail(cur); detail.scrollTo({top:0});
-    docsCache=null; gSized=0;
-    gsap.fromTo(detail.querySelectorAll(".rv"),{autoAlpha:0,y:d>0?30:-30},{autoAlpha:1,y:0,duration:.8*D,ease:"expo.out",stagger:.05});
-  });
-}
-titlesEl.addEventListener("click",function(ev){
-  var b=ev.target.closest(".open"); if(b) openDetail(+b.dataset.i);
-});
-document.getElementById("d-close").onclick=function(){ hideSheet(detail); docsCache=null; gSized=0; };
-btnAbout.onclick=function(){
-  if(about.classList.contains("on")){ hideSheet(about); return; }
-  openSheet(about); btnAbout.setAttribute("aria-expanded","true");
+/* ================= palette, from Persian tile glazes ================= */
+const P={
+  line:'#120D0B', cream:'#CFC09E', peach:'#C98A5F', clay:'#9E5A3A', sage:'#7F927A', sage2:'#4E675B',
+  teal:'#2A5359', teal2:'#183236', lapis:'#2A3E5C', plum:'#3E2B36', umber:'#2F1F1A', sand:'#A88C66', ink:'#0E1416'
 };
-document.getElementById("a-close").onclick=function(){ hideSheet(about); };
-document.getElementById("btn-work").onclick=function(){ closeSheets(); docsCache=null; gSized=0; };
-document.getElementById("home").onclick=function(){ closeSheets(); docsCache=null; gSized=0; go(0,-1); };
+const GROUNDS=[P.teal,P.teal2,P.umber,P.plum,P.sage2,P.lapis,P.teal2,P.sand,P.teal];
+const FILLS=[P.cream,P.peach,P.sage,P.teal,P.clay,P.sand,P.plum,P.lapis,P.sage2];
 
-/* ---------- cursor ---------- */
-var curEl=document.getElementById("cur");
-var cx=gsap.quickTo(curEl,"x",{duration:.35,ease:"power3.out"}), cy=gsap.quickTo(curEl,"y",{duration:.35,ease:"power3.out"});
-addEventListener("pointermove",function(ev){
-  if(ev.pointerType!=="mouse") return;
-  cx(ev.clientX); cy(ev.clientY);
-  curEl.classList.add("on");
-  curEl.classList.toggle("big", !!(ev.target.closest&&ev.target.closest("button,a")));
-});
-document.documentElement.addEventListener("pointerleave",function(){ curEl.classList.remove("on"); });
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
-/* ---------- Dubai clock ---------- */
-var clock=document.getElementById("clock");
-function tick(){
-  var d=new Date(Date.now()+(new Date().getTimezoneOffset()*60000)+4*3600000);
-  var p=function(x){ return String(x).padStart(2,"0"); };
-  clock.textContent=p(d.getHours())+":"+p(d.getMinutes())+":"+p(d.getSeconds())+" GST";
+/* ================= procedural tile: one rosette per canvas ================= */
+function tile(seed,S){
+  const c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d');const R=rng(seed*977+13);
+  const pick=a=>a[Math.floor(R()*a.length)];
+  const ground=GROUNDS[seed%GROUNDS.length];
+  let fills=FILLS.filter(f=>f!==ground).sort(()=>R()-.5);
+  g.fillStyle=ground;g.fillRect(0,0,S,S);
+  // glaze wear
+  for(let i=0;i<900;i++){g.fillStyle=`rgba(${R()<.5?'0,0,0':'255,240,210'},${R()*.05})`;g.fillRect(R()*S,R()*S,R()*3+1,R()*3+1)}
+  const LW=S*.011;g.lineJoin='round';g.lineCap='round';g.strokeStyle=P.line;g.lineWidth=LW;
+  const fs=(f)=>{g.fillStyle=f;g.fill();g.stroke()};
+  g.save();g.translate(S/2,S/2);
+  const n=pick([4,6,8,8,8,12,16]);const step=Math.PI*2/n;
+  // corner quarter-rosettes, which join up with the neighbours once tiled
+  for(let k=0;k<4;k++){g.save();g.rotate(k*Math.PI/2);g.translate(S/2,S/2);
+    g.beginPath();g.arc(0,0,S*.2,Math.PI,Math.PI*1.5);g.lineTo(0,0);g.closePath();fs(fills[5]);
+    g.beginPath();g.arc(0,0,S*.12,Math.PI,Math.PI*1.5);g.lineTo(0,0);g.closePath();fs(fills[2]);
+    g.restore()}
+  // outer petals
+  const r1=S*(.34+R()*.1), r0=S*(.1+R()*.06), w=step*(.35+R()*.25);
+  const kind=Math.floor(R()*4);
+  for(let k=0;k<n;k++){g.save();g.rotate(k*step);petal(g,r0,r1,w*r1*.9,kind);fs(fills[0]);g.restore()}
+  // inner petals, offset half a step
+  if(R()<.8){const q0=S*.06,q1=r1*(.55+R()*.15);for(let k=0;k<n;k++){g.save();g.rotate(k*step+step/2);petal(g,q0,q1,step*.3*q1,(kind+1)%4);fs(fills[1]);g.restore()}}
+  // arabesque curls
+  if(R()<.55){g.lineWidth=LW*1.2;for(let k=0;k<n;k++){g.save();g.rotate(k*step+step/2);g.beginPath();g.moveTo(0,-r1*.62);g.bezierCurveTo(r1*.25,-r1*.72,r1*.22,-r1*.98,0,-r1*1.02);g.strokeStyle=P.line;g.stroke();
+    g.beginPath();g.arc(0,-r1*1.02,S*.018,0,7);g.fillStyle=fills[3];g.fill();g.stroke();g.restore()}g.lineWidth=LW}
+  // ring of dots
+  if(R()<.7){const rr=r1*(.42+R()*.1),m=n*2;for(let k=0;k<m;k++){const a=k*Math.PI*2/m;g.beginPath();g.arc(Math.cos(a)*rr,Math.sin(a)*rr,S*.016,0,7);fs(fills[4])}}
+  // central star
+  const sr=S*(.075+R()*.04),sp=Math.max(6,n);g.beginPath();for(let k=0;k<sp*2;k++){const a=k*Math.PI/sp,r=k%2?sr*.5:sr;g.lineTo(Math.cos(a)*r,Math.sin(a)*r)}g.closePath();fs(fills[2]);
+  g.beginPath();g.arc(0,0,sr*.32,0,7);fs(fills[6]);
+  g.restore();
+  // bevel: dark rim and a light top edge
+  g.strokeStyle='rgba(0,0,0,.55)';g.lineWidth=S*.03;g.strokeRect(0,0,S,S);
+  g.strokeStyle='rgba(255,235,200,.12)';g.lineWidth=S*.008;g.beginPath();g.moveTo(S*.02,S*.98);g.lineTo(S*.02,S*.02);g.lineTo(S*.98,S*.02);g.stroke();
+  return c;
 }
-tick(); setInterval(tick,1000);
+function petal(g,r0,r1,w,kind){
+  g.beginPath();
+  if(kind===0){g.moveTo(0,-r0);g.quadraticCurveTo(w,-(r0+r1)/2,0,-r1);g.quadraticCurveTo(-w,-(r0+r1)/2,0,-r0)}           // almond
+  else if(kind===1){g.moveTo(0,-r0);g.bezierCurveTo(w*1.3,-r0-(r1-r0)*.6,w*.4,-r1,0,-r1);g.bezierCurveTo(-w*.4,-r1,-w*1.3,-r0-(r1-r0)*.6,0,-r0)} // teardrop
+  else if(kind===2){const m=r0+(r1-r0)*.55;g.moveTo(0,-r0);g.quadraticCurveTo(w,-m,w*.5,-r1*.92);g.quadraticCurveTo(0,-r1*.8,0,-r1);g.quadraticCurveTo(0,-r1*.8,-w*.5,-r1*.92);g.quadraticCurveTo(-w,-m,0,-r0)} // tulip
+  else{g.moveTo(0,-r0);g.lineTo(w*.7,-(r0+r1)*.5);g.lineTo(0,-r1);g.lineTo(-w*.7,-(r0+r1)*.5);g.closePath()} // lozenge
+}
 
-/* ---------- boot ---------- */
-addEventListener("resize",function(){ clearTimeout(window.__rz); window.__rz=setTimeout(function(){
-  size(); drawThumbs(); if(view==="detail"){ sizeDetail(); docsCache=null; gSized=0; }
-},160); });
-size(); paint(0); showSlide(0); gsap.set(slides[0].el,{autoAlpha:0});
-requestAnimationFrame(drawThumbs);
-start();
+/* ================= three.js scene ================= */
+const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,MOBILE?1.5:2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.82;
+renderer.shadowMap.enabled=!MOBILE;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();
+const BG=new THREE.Color('#0D1315');scene.background=BG;scene.fog=new THREE.Fog(BG,18,46);
+const camera=new THREE.PerspectiveCamera(35,innerWidth/innerHeight,.1,200);
 
-(function preload(){
-  var pre=document.getElementById("pre"), pct=document.getElementById("pct"), bar=document.getElementById("pbar");
-  var chrome=["#top","#strip","#pgn","#hint","#swipe",".nav"];
-  var S=slides[0], D=reduced?.01:1;
-  var fonts=(document.fonts&&document.fonts.ready)?document.fonts.ready:Promise.resolve();
-  var cnt={v:0};
-  gsap.set(chrome,{autoAlpha:0,y:10});
-  gsap.set(plate,{clipPath:"inset(22% 26% 22% 26%)",scale:1.08});
-  var intro=gsap.timeline({paused:true});
-  intro.to(pct.parentNode,{yPercent:-100,autoAlpha:0,duration:.6*D,ease:"power3.in"},0)
-       .to(pre,{clipPath:"inset(0% 0% 100% 0%)",duration:.9*D,ease:"expo.inOut"},.25*D)
-       .set(pre,{display:"none"})
-       .to(plate,{clipPath:"inset(0% 0% 0% 0%)",scale:1,duration:1.4*D,ease:"expo.inOut",
-          onStart:function(){ enterT[0]=performance.now(); }},.35*D)
-       .set(S.el,{autoAlpha:1},.9*D)
-       .fromTo(S.chars,{yPercent:112},{yPercent:0,duration:1.1*D,ease:"expo.out",stagger:.035},.9*D)
-       .fromTo(S.meta,{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:.9*D,ease:"expo.out",stagger:.08},1.1*D)
-       .to(chrome,{autoAlpha:1,y:0,duration:.9*D,ease:"expo.out",stagger:.05},1.2*D)
-       .add(function(){ gsap.set(plate,{clearProps:"clipPath"}); S.el.classList.add("on"); });
-  var load=gsap.to(cnt,{v:100,duration:1.1*D,ease:"power2.out",
-    onUpdate:function(){ var v=Math.round(cnt.v); pct.textContent=String(v).padStart(3,"0"); bar.style.transform="scaleX("+v/100+")"; },
-    onComplete:function(){ fonts.then(function(){ intro.play(); }); }});
-  /* fonts never block for more than 2.5s */
-  fonts=Promise.race([fonts,new Promise(function(r){ setTimeout(r,2500); })]);
-  /* any input skips the count; the reveal itself still plays, fast */
-  function skip(){ load.progress(1); intro.timeScale(1.8);
-    ["pointerdown","keydown","wheel"].forEach(function(e){ removeEventListener(e,skip); }); }
-  ["pointerdown","keydown","wheel"].forEach(function(e){ addEventListener(e,skip,{passive:true}); });
+const hemi=new THREE.HemisphereLight(0xfff1dc,0x1a2a2e,.55);scene.add(hemi);
+const key=new THREE.DirectionalLight(0xffe7c4,1.5);key.position.set(-6,9,12);key.castShadow=true;
+key.shadow.mapSize.set(2048,2048);Object.assign(key.shadow.camera,{left:-16,right:16,top:16,bottom:-16,near:1,far:50});key.shadow.bias=-.0008;scene.add(key);
+const lamp=new THREE.PointLight(0xffb27a,0,14,1.6);lamp.position.set(0,0,4);scene.add(lamp);
+
+// tile designs
+const DESIGNS=MOBILE?10:16, TS=MOBILE?256:512;
+const sideMat=new THREE.MeshStandardMaterial({color:0x0b0f10,roughness:.8});
+const mats=[];for(let d=0;d<DESIGNS;d++){const tx=new THREE.CanvasTexture(tile(d+1,TS));tx.encoding=THREE.sRGBEncoding;tx.anisotropy=4;
+  mats.push([sideMat,sideMat,sideMat,sideMat,new THREE.MeshStandardMaterial({map:tx,roughness:.55,metalness:.05}),sideMat])}
+const geo=new THREE.BoxGeometry(1,1,.09);
+
+// layout of the carpet: diamonds on a staggered lattice
+const SIDE=.98, D=SIDE*Math.SQRT2, COLS=MOBILE?13:21, ROWS=MOBILE?40:44;
+const T=[];
+for(let j=0;j<ROWS;j++)for(let i=0;i<COLS;i++){
+  const x=(i-(COLS-1)/2+(j%2?.5:0))*D*.5*2/2*1.0, y=(j-(ROWS-1)/2)*D*.5;
+  T.push({gx:(i-(COLS-1)/2+(j%2?.5:0))*D, gy:y});
+}
+T.forEach(t=>{t.d=Math.hypot(t.gx,t.gy)});
+T.sort((a,b)=>a.d-b.d);
+const NT=T.length, MAXD=T[NT-1].d;
+const R0=rng(1618);
+// a medallion: designs are chosen by ring, so the carpet reads as concentric bands around a centre
+T.forEach((t,i)=>{
+  t.r=R0();t.zo=R0()*.22;
+  const ring=Math.floor(Math.hypot(t.gx*.8,t.gy)/1.4);
+  t.design=i===0?0:(ring*3+(Math.abs(Math.round(t.gx*3))%3))%DESIGNS;
+  // network position: a loose sphere of nodes around a centre
+  const a=R0()*Math.PI*2,rr=i===0?0:1.2+Math.pow(R0(),.75)*9;
+  t.net=[Math.cos(a)*rr*1.25,Math.sin(a)*rr*.72,(R0()-.5)*5];
+});
+// zagros: a sealed ring of 5 sectors; falah: six bars
+const RINGS=[[0,1],[2.1,10],[3.2,16],[4.3,22],[5.4,28]];let ri=0;
+RINGS.forEach(([rad,cnt])=>{for(let k=0;k<cnt;k++){const a=k/cnt*Math.PI*2-Math.PI/2;const t=T[ri++];t.ring=[Math.cos(a)*rad,Math.sin(a)*rad];t.sector=Math.floor(((a+Math.PI/2+Math.PI*2)%(Math.PI*2))/(Math.PI*2/5));t.ringRad=rad}});
+const BARS=[5,9,6,4,7,5];let bi=0;const BAR_IDX=[];
+for(let b=0;b<6;b++)for(let l=0;l<BARS[b];l++)BAR_IDX.push([b,l]);
+// pick bar tiles from the middle of the order so they come from the carpet's centre
+for(let k=0;k<BAR_IDX.length;k++){const t=T[k];t.bar=BAR_IDX[k]}
+
+const meshes=[],slot=new Array(NT);
+const counts=new Array(DESIGNS).fill(0);T.forEach((t,i)=>{slot[i]=counts[t.design]++});
+for(let d=0;d<DESIGNS;d++){const m=new THREE.InstancedMesh(geo,mats[d],Math.max(1,counts[d]));m.castShadow=!MOBILE;m.receiveShadow=!MOBILE;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);m.frustumCulled=false;m.count=counts[d];scene.add(m);meshes.push(m)}
+
+// network lines
+const NL=Math.min(NT-1,MOBILE?160:260);
+const lgeo=new THREE.BufferGeometry();const lpos=new Float32Array(NL*6);lgeo.setAttribute('position',new THREE.BufferAttribute(lpos,3));
+const lmat=new THREE.LineBasicMaterial({color:0x2a2a28,transparent:true,opacity:0,depthWrite:false});
+const lines=new THREE.LineSegments(lgeo,lmat);lines.frustumCulled=false;scene.add(lines);
+
+// falah budget line
+const bgeo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-4,0,0.3),new THREE.Vector3(4,0,0.3)]);
+const bmat=new THREE.LineDashedMaterial({color:0xD9956A,dashSize:.22,gapSize:.16,transparent:true,opacity:0});
+const budget=new THREE.Line(bgeo,bmat);budget.computeLineDistances();scene.add(budget);budget.position.set(MOBILE?0:2.4,-3.4+6.5*.7+(MOBILE?2.2*.6:0),0);
+
+/* ---------- the Cyrus Cylinder: barrel-shaped clay, wrapped in cuneiform ---------- */
+function clay(){
+  const W=640,H=2048,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');const R=rng(539);
+  const grd=g.createLinearGradient(0,0,0,H);grd.addColorStop(0,'#a58e6c');grd.addColorStop(.5,'#c2aa84');grd.addColorStop(1,'#9a8261');g.fillStyle=grd;g.fillRect(0,0,W,H);
+  for(let i=0;i<9000;i++){g.fillStyle=`rgba(${R()<.5?'60,40,20':'240,225,195'},${R()*.08})`;g.beginPath();g.arc(R()*W,R()*H,R()*3,0,7);g.fill()}
+  // 32 lines of wedge-shaped signs
+  for(let row=0;row<64;row++){const y=18+row*31.6;g.strokeStyle='rgba(70,48,28,.25)';g.lineWidth=1;g.beginPath();g.moveTo(0,y+15);g.lineTo(W,y+15);g.stroke();
+    let x=10;while(x<W-10){const kind=R();g.fillStyle='rgba(55,36,20,.78)';
+      const wedge=(wx,wy,dx,dy)=>{g.beginPath();g.moveTo(wx,wy);g.lineTo(wx+dx,wy+dy-3.6);g.lineTo(wx+dx,wy+dy+3.6);g.closePath();g.fill()};
+      if(kind<.45)wedge(x,y,15,0);else if(kind<.75){wedge(x,y-7,0,20);g.fillRect(x-1.5,y-7,3,22)}else{wedge(x,y-3,11,10);wedge(x,y+7,11,-10)}
+      x+=10+R()*14;if(R()<.06)x+=22}}
+  // broken, missing area
+  g.globalCompositeOperation='multiply';g.fillStyle='rgba(80,60,40,.65)';g.beginPath();g.moveTo(0,1500);for(let k=0;k<14;k++)g.lineTo(k*16+R()*10,1500+R()*70+k*20);g.lineTo(260,2048);g.lineTo(0,2048);g.closePath();g.fill();g.globalCompositeOperation='source-over';
+  const o=document.createElement('canvas');o.width=2048;o.height=640;const og=o.getContext('2d');og.translate(2048,0);og.rotate(Math.PI/2);og.drawImage(c,0,0);return o;
+}
+const cyl=(()=>{
+  const pts=[new THREE.Vector2(0,-2.2)];for(let k=0;k<=40;k++){const v=k/40,y=(v-.5)*4.4;const r=1.18*Math.pow(Math.cos((v-.5)*Math.PI*.82),.42);pts.push(new THREE.Vector2(Math.max(.05,r),y))}pts.push(new THREE.Vector2(0,2.2));
+  const g=new THREE.LatheGeometry(pts,96);const tx=new THREE.CanvasTexture(clay());tx.encoding=THREE.sRGBEncoding;tx.anisotropy=8;
+  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:tx,bumpMap:tx,bumpScale:.035,roughness:.92,metalness:0}));
+  m.castShadow=true;const mid=new THREE.Group();mid.rotation.z=Math.PI/2;mid.add(m);const grp=new THREE.Group();grp.add(mid);grp.userData.spin=m;grp.visible=false;scene.add(grp);return grp;
 })();
+const spot=new THREE.SpotLight(0xfff0d8,0,30,.42,.6,1.2);spot.position.set(-4,7,8);spot.target=cyl;scene.add(spot);
+
+/* ================= the film: keyframes over scroll progress ================= */
+const L={
+  carpet:(t,i,tm)=>({x:t.gx,y:t.gy,z:t.zo,rx:0,ry:0,rz:Math.PI/4,s:1}),
+  fly:(t,i,tm)=>{const w=Math.sin(t.gx*.42+t.gy*.22-tm*1.5);return{x:t.gx,y:t.gy,z:t.zo+w*.75,rx:Math.cos(t.gy*.22+t.gx*.42-tm*1.5)*.22,ry:0,rz:Math.PI/4,s:1}},
+  net:(t,i,tm)=>{const a=tm*.06,c=Math.cos(a),s=Math.sin(a),[x,y,z]=t.net;return{x:x*c+z*s*.3+OX.net,y:y+OY,z:-x*s*.3+z*c,rx:tm*.4+t.r*6,ry:tm*.3+t.r*3,rz:Math.PI/4,s:i===0?.6:.1+t.r*.12}},
+  gone:(t,i,tm)=>({x:t.gx*2.2,y:t.gy*2.2,z:-26-t.r*10,rx:t.r*4,ry:t.r*5,rz:0,s:0}),
+  ring:(t,i,tm)=>{if(!t.ring)return{x:t.gx*2.4,y:t.gy*2.4,z:-28,rx:0,ry:0,rz:0,s:0};
+    const turned=t.sector<3&&i>0,pulse=turned?.35+Math.sin(tm*2+t.sector)*.06:0;
+    return{x:t.ring[0]*.78*(1+pulse*.08)+OX.ring,y:t.ring[1]*.78*(1+pulse*.08)+OY,z:turned?.55:0,rx:0,ry:0,rz:Math.atan2(t.ring[1],t.ring[0])+Math.PI/4+(turned?Math.PI/4:0),s:(i===0?2.2:(turned?1.04:.8))*.8}},
+  bars:(t,i,tm)=>{if(!t.bar)return{x:t.gx*2.4,y:t.gy*2.4,z:-28,rx:0,ry:0,rz:0,s:0};const[b,l]=t.bar;const over=b===1&&l>=7;
+    return{x:(b-2.5)*1.3+OX.bars,y:-3.4+l*.7+OY*.6,z:over?.25+Math.sin(tm*3+l)*.12:0,rx:0,ry:0,rz:0,s:over?.78:.66}},
+};
+// [progress, layout, camera {x,y,z, lx,ly,lz}, background]
+const K=[
+  [0.00,'carpet',[0,0,15,0,0,0],'#0D1315'],
+  [0.15,'carpet',[0,-1,14,0,0,0],'#0D1315'],
+  [0.21,'fly',[0,-12,6.5,0,1.5,0],'#0D1315'],
+  [0.27,'fly',[2,-11,5.5,0,2,0],'#0D1315'],
+  [0.33,'net',[0,0,19,0,0,0],'#D8D7D2'],
+  [0.42,'net',[0,0,15,0,0,0],'#D8D7D2'],
+  [0.47,'gone',[0,0,9,0,0,0],'#141413'],
+  [0.60,'gone',[0,0,8.5,0,0,0],'#141413'],
+  [0.66,'ring',[0,0,16,0,0,0],'#10262A'],
+  [0.75,'ring',[0,0,15,0,0,0],'#10262A'],
+  [0.80,'bars',[0,0,15,0,0,0],'#22161A'],
+  [0.885,'bars',[0,0,14,0,0,0],'#22161A'],
+  [0.94,'carpet',[0,0,19,0,0,0],'#0D1315'],
+  [1.00,'carpet',[0,0,21,0,0,0],'#0D1315'],
+];
+const OX=MOBILE?{net:0,ring:0,bars:0}:{net:2.6,ring:-3.4,bars:2.4},OY=MOBILE?3.4:0;
+const sm=x=>x*x*(3-2*x), cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)), lerp=(a,b,k)=>a+(b-a)*k;
+function seg(p){for(let k=0;k<K.length-1;k++)if(p<=K[k+1][0])return[k,(p-K[k][0])/(K[k+1][0]-K[k][0])];return[K.length-2,1]}
+
+const M=new THREE.Matrix4(),Q=new THREE.Quaternion(),E=new THREE.Euler(),V=new THREE.Vector3(),S3=new THREE.Vector3();
+const cA=new THREE.Color(),cB=new THREE.Color(),look=new THREE.Vector3();
+let p=0,tp=0,mx=0,my=0,smx=0,smy=0;
+const ASPK=()=>innerWidth/innerHeight<1?1.75:(innerWidth/innerHeight<1.3?1.25:1);
+
+function frame(now){
+  const tm=now/1000;
+  const maxS=document.documentElement.scrollHeight-innerHeight;tp=maxS>0?scrollY/maxS:0;p+=(tp-p)*(RM?1:.075);if(window.__P!==undefined)p=window.__P;
+  smx+=(mx-smx)*.05;smy+=(my-smy)*.05;
+  const[k,u0]=seg(p);const A=K[k],B=K[k+1];const u=cl(u0);
+  const la=L[A[1]],lb=L[B[1]];const same=A[1]===B[1];
+  const intro=RM?99:tm-.3;
+  for(let i=0;i<NT;i++){const t=T[i];
+    const a=la(t,i,tm);let s=a;
+    if(!same){const st=sm(cl(u*1.7-(t.r*.45+t.d/MAXD*.25)));const b=lb(t,i,tm);
+      s={x:lerp(a.x,b.x,st),y:lerp(a.y,b.y,st),z:lerp(a.z,b.z,st),rx:lerp(a.rx,b.rx,st),ry:lerp(a.ry,b.ry,st),rz:lerp(a.rz,b.rz,st),s:lerp(a.s,b.s,st)}}
+    // weaving intro: tiles flip in from the centre outward
+    const e=cl((intro-t.d*.14-t.r*.25)/1.1);const ee=1-Math.pow(1-e,3);
+    if(e<1){s.ry+=(1-ee)*Math.PI;s.z+=(1-ee)*4;s.s*=ee}
+    V.set(s.x,s.y,s.z);E.set(s.rx,s.ry,s.rz);Q.setFromEuler(E);S3.setScalar(Math.max(1e-4,s.s));M.compose(V,Q,S3);
+    meshes[t.design].setMatrixAt(slot[i],M);
+    if(i>0&&i<=NL){const o=(i-1)*6;const hub=i<=150?0:1+(i%12);const h=T[hub];
+      lpos[o]=s.x;lpos[o+1]=s.y;lpos[o+2]=s.z;h._x!==undefined&&(lpos[o+3]=h._x,lpos[o+4]=h._y,lpos[o+5]=h._z)}
+    t._x=s.x;t._y=s.y;t._z=s.z;
+  }
+  meshes.forEach(m=>m.instanceMatrix.needsUpdate=true);lgeo.attributes.position.needsUpdate=true;
+  // weights for act-specific objects
+  const wNet=cl(1-Math.abs(p-.375)/.06), wCyl=cl(1-Math.abs(p-.535)/.085), wBud=cl(1-Math.abs(p-.84)/.05);
+  lmat.opacity=sm(wNet)*.32;bmat.opacity=sm(wBud);
+  // cylinder rises into a spotlight
+  cyl.visible=wCyl>0;if(cyl.visible){const e=sm(wCyl);cyl.position.set(MOBILE?0:1.6,lerp(-5,MOBILE?3:.1,e),0);cyl.userData.spin.rotation.y=(p-.45)*9+tm*.08;cyl.rotation.y=-.32+smx*.12;cyl.rotation.x=.12+smy*.08;cyl.scale.setScalar(MOBILE?.5:.62)}
+  spot.intensity=sm(wCyl)*3.2;
+  key.intensity=1.5*(1-sm(wCyl)*.85);hemi.intensity=.55*(1-sm(wCyl)*.7)+(p>.3&&p<.44?.5:0);
+  // camera
+  const ka=K[k][2],kb=K[k+1][2],cu=sm(u),f=ASPK();
+  camera.position.set(lerp(ka[0],kb[0],cu)+smx*.8,lerp(ka[1],kb[1],cu)+smy*.5,lerp(ka[2],kb[2],cu)*f);
+  look.set(lerp(ka[3],kb[3],cu),lerp(ka[4],kb[4],cu),lerp(ka[5],kb[5],cu));camera.lookAt(look);
+  // background and fog
+  cA.set(A[3]);cB.set(B[3]);BG.copy(cA).lerp(cB,sm(cl(u*1.3)));scene.fog.color.copy(BG);
+  // a warm lamp follows the pointer over the carpet
+  lamp.intensity=(p<.16||p>.9)?1.6:0;lamp.position.set(smx*8,smy*5,3.5);
+  renderer.render(scene,camera);
+  ui(p);
+  requestAnimationFrame(frame);
+}
+
+function resize(){renderer.setSize(innerWidth,innerHeight,false);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();
+addEventListener('pointermove',e=>{mx=e.clientX/innerWidth*2-1;my=-(e.clientY/innerHeight*2-1)});
+
+/* ================= text acts, rail, counter ================= */
+const acts=[...document.querySelectorAll('.act')],rail=[...document.querySelectorAll('#rail button')];
+const pn=document.getElementById('pctn'),pb=document.getElementById('pctb'),hint=document.getElementById('hint');
+let lastLight=null;
+function ui(p){
+  let light=false;
+  acts.forEach(a=>{const on=p>=+a.dataset.a&&p<+a.dataset.b;a.classList.toggle('on',on);if(on&&a.dataset.light)light=true});
+  if(light!==lastLight){document.body.classList.toggle('light',light);lastLight=light}
+  const marks=rail.map(b=>+b.dataset.p);let cur=0;marks.forEach((m,i)=>{if(p>=m-.06)cur=i});rail.forEach((b,i)=>b.classList.toggle('on',i===cur));
+  pn.textContent=String(Math.round(p*100)).padStart(3,'0');pb.style.transform=`scaleX(${p})`;
+  hint.style.opacity=p>.02?0:1;
+}
+rail.forEach(b=>b.addEventListener('click',()=>{const maxS=document.documentElement.scrollHeight-innerHeight;scrollTo({top:+b.dataset.p*maxS,behavior:RM?'auto':'smooth'})}));
+
+requestAnimationFrame(frame);
+
+const ck=document.getElementById('clock');
+function tick(){try{ck.textContent='Dubai '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}).format(new Date())}catch(e){}}
+tick();setInterval(tick,15000);
 })();
 </script>
