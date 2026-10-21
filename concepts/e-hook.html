@@ -1,0 +1,472 @@
+<title>Farsh Hook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Vazirmatn:wght@200;400&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Hook for Farsh. Glazed Persian tiles are the loading screen: they surface out of a blur, hold while a
+   storm sea compiles behind them, then lift away tile by tile to reveal it. Three tile systems to choose from. */
+:root{
+  color-scheme: dark;
+  --ink:#0B0F12;
+  --sea:#1A2329;
+  --bone:#E4DDCF;
+  --mist:#9AA3A8;
+  --glaze:#D7A98A;   /* peach glaze, the accent */
+  --f-s:"Instrument Serif","Times New Roman",serif;
+  --f-fa:"Vazirmatn",Tahoma,sans-serif;
+  --f-m:"Geist Mono",ui-monospace,Menlo,monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--bone);font-family:var(--f-s);overflow:hidden;-webkit-font-smoothing:antialiased;touch-action:none}
+a{color:inherit}
+button{font:inherit;color:inherit}
+:focus-visible{outline:1px solid var(--glaze);outline-offset:3px}
+.mono{font-family:var(--f-m);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+
+#sea{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0;background:var(--sea)}
+.film{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(120% 90% at 50% 45%,transparent 50%,rgba(5,8,10,.55))}
+#tiles{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:3;will-change:filter,opacity}
+
+.ui{position:fixed;inset:0;z-index:5;pointer-events:none}
+.top{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:calc(18px + env(safe-area-inset-top, 0px));padding-left:max(clamp(16px,2.6vw,36px), env(safe-area-inset-left, 0px));padding-right:max(clamp(16px,2.6vw,36px), env(safe-area-inset-right, 0px));opacity:0;transition:opacity 1.2s .6s}
+.top b{font-family:var(--f-fa);font-weight:400;font-size:18px;color:var(--glaze);margin-right:10px;letter-spacing:0}
+body.open .top{opacity:1}
+
+.hero{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;text-align:center;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.hero .eyebrow{color:var(--mist);margin-bottom:26px;opacity:0;transform:translateY(10px);transition:opacity 1s .2s,transform 1s .2s}
+.hero .eyebrow span{font-family:var(--f-fa);font-size:18px;letter-spacing:0;text-transform:none;color:var(--glaze)}
+.hero h1{margin:0;font-weight:400;font-size:clamp(46px,9.4vw,170px);line-height:.92;letter-spacing:-.01em;text-shadow:0 4px 60px rgba(0,0,0,.45)}
+.hero h1 em{color:var(--glaze)}
+.ln{display:block;overflow:hidden;padding-bottom:.1em;margin-bottom:-.1em}
+.ln > span{display:block;transform:translateY(112%);transition:transform 1.4s cubic-bezier(.16,.84,.24,1)}
+.ln:nth-child(2) > span{transition-delay:.12s}
+body.open .ln > span{transform:none}
+body.open .hero .eyebrow{opacity:1;transform:none}
+.hero .sub{margin-top:30px;color:var(--mist);max-width:44ch;font-family:var(--f-m);font-size:12px;line-height:1.8;letter-spacing:.06em;opacity:0;transition:opacity 1.2s 1s}
+body.open .hero .sub{opacity:1}
+
+.load{position:absolute;left:50%;bottom:calc(30px + env(safe-area-inset-bottom, 0px));transform:translateX(-50%);display:flex;align-items:center;gap:14px;color:var(--bone);transition:opacity .6s;text-shadow:0 1px 8px rgba(0,0,0,.8)}
+.load .bar{width:120px;height:1px;background:rgba(228,221,207,.25);position:relative;overflow:hidden}
+.load .bar i{position:absolute;inset:0;background:var(--glaze);transform-origin:left;transform:scaleX(0)}
+body.open .load{opacity:0}
+
+.ctl{position:fixed;z-index:6;right:max(16px, env(safe-area-inset-right, 0px));bottom:calc(16px + env(safe-area-inset-bottom, 0px));display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:calc(100% - 32px)}
+.ctl button{all:unset;cursor:pointer;font-family:var(--f-m);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:8px 11px;background:rgba(11,15,18,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(228,221,207,.18);color:var(--bone)}
+.ctl button[aria-pressed="true"]{background:var(--glaze);color:var(--ink);border-color:var(--glaze)}
+.ctl .lab{align-self:center;color:var(--mist);margin-right:4px}
+.stats{position:fixed;z-index:6;left:max(16px, env(safe-area-inset-left, 0px));bottom:calc(18px + env(safe-area-inset-bottom, 0px));color:var(--mist);opacity:.7}
+@media (max-width:640px){ .ctl .lab{display:none} .stats{bottom:auto;top:calc(52px + env(safe-area-inset-top, 0px))} .load{bottom:calc(72px + env(safe-area-inset-bottom, 0px))} }
+@media (prefers-reduced-motion:reduce){ .ln > span{transition:none} }
+</style>
+
+<canvas id="sea" aria-hidden="true"></canvas>
+<div class="film"></div>
+<canvas id="tiles" aria-hidden="true"></canvas>
+
+<div class="ui">
+  <div class="top mono"><span><b>فرهاد</b>Farhad Maleki</span><span id="clock">Dubai --:--</span></div>
+  <div class="hero">
+    <div class="eyebrow mono"><span>فرهاد ملکی</span> &nbsp;·&nbsp; AI &amp; agentic systems · Dubai</div>
+    <h1><span class="ln"><span>Most systems remember.</span></span><span class="ln"><span>Mine <em>understand.</em></span></span></h1>
+    <p class="sub">Ontologies, knowledge graphs and agentic AI, with the governance that makes them safe to trust.</p>
+  </div>
+  <div class="load mono" id="load"><span id="ltxt">Glazing tiles</span><span class="bar"><i id="lbar"></i></span><span id="lpct">000</span></div>
+</div>
+
+<div class="ctl" role="group" aria-label="Tile system">
+  <span class="lab mono">Tile system</span>
+  <button data-sys="isfahan" aria-pressed="true">Isfahan</button>
+  <button data-sys="kashan" aria-pressed="false">Kashan</button>
+  <button data-sys="yazd" aria-pressed="false">Yazd</button>
+  <button data-act="replay">Replay</button>
+</div>
+<span class="stats mono" id="stats"></span>
+
+<script>
+(function(){
+const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MOBILE=Math.min(innerWidth,innerHeight)<700||/Mobi|Android/i.test(navigator.userAgent);
+const now=()=>performance.now()/1000;
+
+/* =====================================================================
+   OCEAN: one fragment shader. Wave field of sharp-crested directional
+   waves with domain drag, height-field march, overcast sky, mountains,
+   mist. Rendered at a dynamic resolution that adapts to frame time.
+   ===================================================================== */
+const sea=document.getElementById('sea');
+const gl=sea.getContext('webgl',{antialias:false,alpha:false,depth:false,powerPreference:'high-performance',preserveDrawingBuffer:false});
+let seaReady=false, scale=window.__SCALE||(MOBILE?.5:.62), frameMs=16;
+const VS='attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+const FS=`precision highp float;
+uniform vec2 uRes;uniform float uT;uniform vec2 uLook;
+#define WAVES_MARCH ${MOBILE?9:12}
+#define WAVES_NORMAL ${MOBILE?24:38}
+#define STEPS ${MOBILE?48:72}
+const float DEPTH=.55;
+float h21(vec2 p){p=fract(p*vec2(123.34,456.21));p+=dot(p,p+45.32);return fract(p.x*p.y);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*vnoise(p);p=p*2.03+vec2(17.1,9.2);a*=.5;}return s;}
+// sharp-crested wave: exp(sin)-1 peaks narrow and troughs widen; returns height and its derivative
+vec2 wave(vec2 p,vec2 d,float k,float ph){float x=dot(d,p)*k+ph;float w=exp(sin(x)-1.);return vec2(w,-w*cos(x));}
+float seaH(vec2 p,int n){
+  float it=0.,k=1.,spd=2.,w=1.,sumV=0.,sumW=0.;
+  for(int i=0;i<64;i++){if(i>=n)break;
+    vec2 d=vec2(sin(it),cos(it));
+    vec2 r=wave(p,d,k,uT*spd);
+    p+=d*r.y*w*.46;          // drag: crests pull water, giving choppy storm shapes
+    sumV+=r.x*w;sumW+=w;
+    w=mix(w,0.,.18);k*=1.18;spd*=1.07;it+=1232.399963;}
+  return sumV/sumW;
+}
+float H(vec2 p,int n){return seaH(p*1.45,n)*DEPTH-DEPTH;}
+vec3 nrm(vec2 p,float e,float dist){ e*=.6;
+  float c=H(p,WAVES_NORMAL);
+  vec3 n=normalize(cross(vec3(e,H(p+vec2(e,0.),WAVES_NORMAL)-c,0.),vec3(0.,H(p+vec2(0.,e),WAVES_NORMAL)-c,-e)));
+  n=-n;
+  float fade=exp(-dist*.08);
+  vec2 q=p*3.2+vec2(uT*.35,uT*.2);
+  float ra=fbm(q),rb=fbm(q+vec2(.07,0.)),rc=fbm(q+vec2(0.,.07));
+  n=normalize(n+vec3(ra-rb,0.,ra-rc)*1.1*fade);
+  return normalize(mix(n,vec3(0,1,0),.85*min(1.,sqrt(dist*.006)+.02)));
+}
+float march(vec3 ro,vec3 rd){
+  // between the top (y=0) and bottom (y=-DEPTH) planes of the wave volume
+  float tTop=-ro.y/rd.y, tBot=(-DEPTH-ro.y)/rd.y;
+  float t=tTop; vec3 p=ro+rd*t;
+  for(int i=0;i<STEPS;i++){
+    float h=H(p.xz,WAVES_MARCH);
+    if(p.y-h<.012*t*.06+.002) return t;
+    t+=(p.y-h)*.85; p=ro+rd*t;
+    if(t>tBot) return tBot;
+  }
+  return t;
+}
+vec3 SUN=normalize(vec3(-.35,.32,-1.));
+vec3 sky(vec3 rd,bool full){
+  float y=max(rd.y,0.);
+  vec3 top=vec3(.50,.53,.55), hor=vec3(.36,.40,.43);
+  vec3 c=mix(hor,top,pow(y,.55));
+  // diffuse glow where the sun hides behind the overcast
+  c+=vec3(.20,.20,.19)*pow(max(dot(rd,SUN),0.),6.)*.6;
+  if(full){
+    // two cloud decks drifting; the low one is dark and heavy
+    vec2 uv=rd.xz/(rd.y+.12);
+    float hi=fbm(uv*.55+vec2(uT*.006,0.));
+    float lo=fbm(uv*1.1+vec2(uT*.014,uT*.003)+hi*1.2);
+    c=mix(c,vec3(.62,.64,.65),smoothstep(.45,.85,hi)*.55*smoothstep(0.,.25,y));
+    c=mix(c,vec3(.17,.19,.21),smoothstep(.42,.78,lo)*(.75-y*.4));
+  }
+  return c;
+}
+vec3 mountains(vec3 rd,vec3 c){
+  float az=atan(rd.x,-rd.z);
+  float ridge=.02+.085*fbm(vec2(az*2.1+1.3,.5))+.03*fbm(vec2(az*7.,3.1));
+  ridge*=smoothstep(-.9,-.2,az)*smoothstep(.95,.1,az)*1.25+.12;
+  float m=smoothstep(ridge+.002,ridge-.002,rd.y);
+  float snow=smoothstep(.55,.85,fbm(vec2(az*28.,rd.y*90.)))*smoothstep(ridge-.05,ridge-.005,rd.y);
+  vec3 rock=vec3(.18,.21,.24)+snow*.18;
+  // haze grows toward the waterline; the peaks fade into the low cloud
+  float haze=smoothstep(ridge,0.,rd.y)*.0+.55-rd.y*3.;
+  rock=mix(rock,vec3(.33,.37,.40),clamp(1.-rd.y/ridge*.6,0.,1.)*.55);
+  vec3 o=mix(c,rock,m*.92);
+  float cloudCap=smoothstep(.06,.11,rd.y)*fbm(vec2(az*3.,rd.y*20.-uT*.01));
+  return mix(o,vec3(.28,.31,.33),cloudCap*m*.8);
+}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y;
+  float camH=1.9+.05*sin(uT*.35);
+  vec3 ro=vec3(uT*.6,camH,uT*-1.1);
+  float yaw=uLook.x*.12, pit=-.035+uLook.y*.03;
+  vec3 fw=normalize(vec3(sin(yaw),pit,-cos(yaw)));
+  vec3 rt=normalize(cross(fw,vec3(0,1,0))),up=cross(rt,fw);
+  vec3 rd=normalize(fw*1.55+uv.x*rt+uv.y*up);
+  vec3 col;
+  vec3 fogC=vec3(.25,.28,.31);
+  if(rd.y>=0.){
+    col=sky(rd,true);
+    col=mountains(rd,col);
+    col=mix(col,fogC*1.05,exp(-rd.y*38.)*.85);       // mist sitting on the water
+  }else{
+    float t=march(ro,rd);
+    vec3 p=ro+rd*t;
+    float dist=length(p-ro);
+    vec3 n=nrm(p.xz,.012+dist*.0018,dist);
+    float fres=.02+.98*pow(1.-max(dot(n,-rd),0.),5.);
+    vec3 r=reflect(rd,n); r.y=abs(r.y);
+    vec3 refl=sky(r,false)*.5;
+    float hgt=(p.y+DEPTH)/DEPTH;                          // 0 trough .. 1 crest
+    vec3 deep=vec3(.012,.02,.027), body=vec3(.04,.06,.075);
+    vec3 water=mix(deep,body,pow(hgt,2.)*.9);
+    water+=vec3(.05,.08,.08)*pow(hgt,5.)*max(dot(n,SUN)*.5+.5,0.);   // light through crests
+    col=mix(water,refl,clamp(fres,0.,1.));
+    col+=vec3(.25)*pow(max(dot(r,SUN),0.),60.)*.25;
+    // whitecaps: only on the steepest, highest crests, broken up by noise
+    float caps=smoothstep(.80,.97,hgt)*smoothstep(.45,.75,fbm(p.xz*2.6+uT*.5));
+    caps*=smoothstep(45.,4.,dist);
+    col=mix(col,vec3(.55,.59,.61),caps*.7);
+    col*=.86;
+    float fog=1.-exp(-dist*.011);
+    col=mix(col,fogC,fog);
+    col=mix(col,fogC*1.08,exp(rd.y*90.)*.55);
+  }
+  // grade: cold, desaturated, gentle contrast
+  float l=dot(col,vec3(.3,.59,.11));
+  col=mix(vec3(l),col,.78)*vec3(.96,1.,1.03);
+  col=pow(col,vec3(.92));
+  vec2 q=gl_FragCoord.xy/uRes;
+  col*=.55+.45*pow(16.*q.x*q.y*(1.-q.x)*(1.-q.y),.18);
+  col+=(h21(gl_FragCoord.xy+fract(uT)*91.)-.5)*.022;   // film grain, hides banding
+  gl_FragColor=vec4(col,1.);
+}`;
+let prog,uRes,uT,uLook;
+function sh(t,s){const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)){console.error(gl.getShaderInfoLog(o));return null}return o}
+function initSea(){
+  if(!gl)return false;
+  const v=sh(gl.VERTEX_SHADER,VS),f=sh(gl.FRAGMENT_SHADER,FS);if(!v||!f)return false;
+  prog=gl.createProgram();gl.attachShader(prog,v);gl.attachShader(prog,f);gl.linkProgram(prog);
+  if(!gl.getProgramParameter(prog,gl.LINK_STATUS)){console.error(gl.getProgramInfoLog(prog));return false}
+  gl.useProgram(prog);
+  const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const l=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);
+  uRes=gl.getUniformLocation(prog,'uRes');uT=gl.getUniformLocation(prog,'uT');uLook=gl.getUniformLocation(prog,'uLook');
+  return true;
+}
+function sizeSea(){const w=Math.max(160,Math.round(innerWidth*scale)),h=Math.max(100,Math.round(innerHeight*scale));if(sea.width!==w||sea.height!==h){sea.width=w;sea.height=h;gl&&gl.viewport(0,0,w,h)}}
+let lx=0,ly=0,tx=0,ty=0;
+addEventListener('pointermove',e=>{tx=e.clientX/innerWidth*2-1;ty=-(e.clientY/innerHeight*2-1)});
+const t0=now();let seaFrames=0,lastF=performance.now(),acc=0,accN=0;
+function drawSea(){
+  if(!prog)return;
+  const t=performance.now();frameMs=frameMs*.9+(t-lastF)*.1;lastF=t;
+  // dynamic resolution: steer toward ~55fps, re-size at most twice a second
+  acc+=frameMs;accN++;
+  if(accN>=30&&seaReady&&!RM&&!window.__SCALE){const m=acc/accN;acc=accN=0;
+    if(m>21&&scale>.3)scale=Math.max(.3,scale-.08);else if(m<14&&scale<(MOBILE?.75:.85))scale=Math.min(MOBILE?.75:.85,scale+.05);}
+  sizeSea();
+  lx+=(tx-lx)*.03;ly+=(ty-ly)*.03;
+  gl.uniform2f(uRes,sea.width,sea.height);gl.uniform1f(uT,RM?12:(now()-t0)+12);gl.uniform2f(uLook,lx,ly);
+  gl.drawArrays(gl.TRIANGLES,0,3);seaFrames++;
+}
+
+/* =====================================================================
+   TILES: painted once into sprites (with their own raised bevel and
+   cast shadow), then laid as a field on a 2D canvas and animated.
+   ===================================================================== */
+const tc=document.getElementById('tiles'),g=tc.getContext('2d');
+let DPR=Math.min(devicePixelRatio||1,2);
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+// glaze palettes, sampled by eye from the reference panels
+const PAL={
+  isfahan:{ground:['#1F3F49','#2A2230','#33261F','#2C4A55','#C9A487','#7D8C7A','#22303A','#5A4656'],
+           fill:['#D9C7A8','#D7A98A','#6F93A3','#3E6573','#8A9A80','#5E4B5C','#B8C4B6','#2B5361','#A7836A','#1B2A33'],line:'#13110F'},
+  kashan:{ground:['#E7DCC3','#1E6E86','#2F4E8C','#E2D2B0'],fill:['#A9682B','#2E8FA6','#284B8F','#5DB3B9','#7B3E1D','#D9B36A','#1A3550'],line:'#2A1A10'},
+  yazd:{ground:['#21434B','#3B2B2E','#2D3B4D','#C6A27F','#556B61','#1A2A30'],fill:['#E0CFAF','#D7A98A','#7FA3AD','#3F6E79','#9AAA8A','#6E5068','#C88B62','#28414A'],line:'#14110E'}
+};
+
+// ---- motif library: each traces a path; the caller fills and strokes ----
+function lobe(c,r0,r1,w){c.moveTo(r0,0);c.bezierCurveTo(r0+(r1-r0)*.25,w,r0+(r1-r0)*.8,w*.9,r1,0);c.bezierCurveTo(r0+(r1-r0)*.8,-w*.9,r0+(r1-r0)*.25,-w,r0,0);}
+function tear(c,r0,r1,w){c.moveTo(r0,0);c.bezierCurveTo(r0,w*1.5,r1-(r1-r0)*.35,w,r1,0);c.bezierCurveTo(r1-(r1-r0)*.35,-w,r0,-w*1.5,r0,0);}
+function spade(c,r0,r1,w){const m=r0+(r1-r0)*.55;c.moveTo(r0,0);c.quadraticCurveTo(m,w*1.25,r1-(r1-r0)*.12,w*.55);c.quadraticCurveTo(r1-(r1-r0)*.05,w*.15,r1,0);c.quadraticCurveTo(r1-(r1-r0)*.05,-w*.15,r1-(r1-r0)*.12,-w*.55);c.quadraticCurveTo(m,-w*1.25,r0,0);}
+function crescent(c,x,y,r,th,ang){c.moveTo(x+Math.cos(ang-1.9)*r,y+Math.sin(ang-1.9)*r);c.arc(x,y,r,ang-1.9,ang+1.9);c.arc(x+Math.cos(ang)*-th,y+Math.sin(ang)*-th,r*.92,ang+1.75,ang-1.75,true);c.closePath();}
+function star(c,n,R,r,rot){for(let k=0;k<n*2;k++){const a=rot+k*Math.PI/n,rr=k%2?r:R;k?c.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):c.moveTo(Math.cos(a)*rr,Math.sin(a)*rr)}c.closePath();}
+function lobedRing(c,n,R,depth,rot){const m=n*24;for(let k=0;k<=m;k++){const a=rot+k/m*Math.PI*2,r=R*(1-depth*.5+depth*.5*Math.cos(a*n));k?c.lineTo(Math.cos(a)*r,Math.sin(a)*r):c.moveTo(Math.cos(a)*r,Math.sin(a)*r)}c.closePath();}
+
+// paint fn into every copy of an n-fold dihedral group (rotations + mirror)
+function dihedral(c,n,fn){for(let k=0;k<n;k++){c.save();c.rotate(k*Math.PI*2/n);fn();c.scale(1,-1);fn();c.restore()}}
+function radial(c,n,rot,fn){for(let k=0;k<n;k++){c.save();c.rotate(rot+k*Math.PI*2/n);fn();c.restore()}}
+
+function shapePath(c,shape,h){
+  c.beginPath();
+  if(shape==='square'){c.rect(-h,-h,2*h,2*h)}
+  else if(shape==='hex'){for(let k=0;k<6;k++){const a=Math.PI/6+k*Math.PI/3;k?c.lineTo(Math.cos(a)*h,Math.sin(a)*h):c.moveTo(Math.cos(a)*h,Math.sin(a)*h)}c.closePath()}
+  else if(shape==='star'){star(c,8,h,h*.765,0)}
+  else if(shape==='cross'){const q=[[0,-1],[.293,-.707],[.293,-.293],[.707,-.293]];let f=1;for(let k=0;k<4;k++){const c0=Math.cos(k*Math.PI/2),s0=Math.sin(k*Math.PI/2);for(const[u,v]of q){const X=(u*c0-v*s0)*h,Y=(u*s0+v*c0)*h;f?(c.moveTo(X,Y),f=0):c.lineTo(X,Y)}}c.closePath()} // fills the gap between four stars exactly
+}
+
+/* One tile, painted at size S. shape: square|hex|star|cross. sym: rotational order of the design. */
+function paintTile(seed,S,shape,sym,pal){
+  const pad=Math.round(S*.16), c=document.createElement('canvas');c.width=c.height=S+pad*2;
+  const x=c.getContext('2d'),R=rng(seed*7919+311),pick=a=>a[Math.floor(R()*a.length)];
+  const h=S/2, L=Math.max(1.4,S*.0115);
+  x.translate(pad+h,pad+h);
+  // cast shadow onto whatever lies below-left, then the raised body
+  x.save();x.shadowColor='rgba(0,0,0,.72)';x.shadowBlur=S*.07;x.shadowOffsetX=-S*.035;x.shadowOffsetY=S*.05;
+  shapePath(x,shape,h);x.fillStyle='#000';x.fill();x.restore();
+  const ground=pick(pal.ground);const light=parseInt(ground.slice(1,3),16)>150;
+  let F=pal.fill.filter(f=>f!==ground).sort(()=>R()-.5);
+  if(light)F=F.filter(f=>parseInt(f.slice(1,3),16)<200);
+  x.save();shapePath(x,shape,h);x.clip();
+  x.fillStyle=ground;x.fillRect(-h,-h,S,S);
+  x.lineJoin='round';x.lineCap='round';x.strokeStyle=pal.line;
+  const fs=(col,lw)=>{x.fillStyle=col;x.fill();x.lineWidth=lw||L;x.stroke()};
+  const n=sym, R0=h*(shape==='star'?.98:1.0);
+  const reach=shape==='square'?h*1.41:R0;
+
+  const V=()=>Math.floor(R()*3);
+  const half=Math.PI/n;                                  // direction of corners / star points
+  const cornerR=shape==='square'?h*Math.SQRT2:R0;
+  // 1. corner figures: large spades or flames pushing in from every corner, each with a nested inner figure
+  const cv=V();
+  dihedral(x,n,()=>{x.save();x.rotate(half);x.beginPath();
+    if(cv===0)spade(x,cornerR*.40,cornerR*1.04,h*.30);else if(cv===1)tear(x,cornerR*.44,cornerR*1.04,h*.24);else lobe(x,cornerR*.38,cornerR*1.06,h*.26);
+    x.restore()});fs(F[0]);
+  dihedral(x,n,()=>{x.save();x.rotate(half);x.beginPath();
+    if(cv===0)spade(x,cornerR*.54,cornerR*.92,h*.15);else if(cv===1)tear(x,cornerR*.56,cornerR*.92,h*.12);else lobe(x,cornerR*.52,cornerR*.94,h*.13);
+    x.restore()});fs(F[1],L*.8);
+  dihedral(x,n,()=>{x.save();x.rotate(half);x.beginPath();x.arc(cornerR*.70,0,h*.035,0,7);x.restore()});fs(F[2],L*.7);
+  // flanking leaves that curl from the corner figure toward the edges
+  dihedral(x,n,()=>{x.save();x.rotate(half*.62);x.beginPath();tear(x,cornerR*.5,cornerR*.82,h*.075);x.restore()});fs(F[3],L*.85);
+  // 2. edge figures: half-medallions on every edge midpoint, completed in the eye by the neighbour
+  const ev=V();
+  radial(x,n,0,()=>{x.save();x.translate(shape==='square'?h:R0*.80,0);x.beginPath();
+    if(ev===0){lobedRing(x,6,h*.34,.42,0)}else if(ev===1){star(x,8,h*.34,h*.2,0)}else{lobedRing(x,8,h*.3,.3,Math.PI/8)}
+    fs(F[4]);x.beginPath();lobedRing(x,ev===1?8:6,h*.19,.35,Math.PI/8);fs(F[5],L*.8);x.beginPath();x.arc(0,0,h*.07,0,7);fs(F[6],L*.7);x.restore()});
+  // 3. arabesque bands linking the centre to the corners
+  if(R()<.75){const bw=h*.05;dihedral(x,n,()=>{x.beginPath();x.moveTo(h*.42,h*.05);x.bezierCurveTo(h*.62,h*.34,h*.84,h*.1,h*.72,h*.36);
+    x.lineWidth=bw+L*2.2;x.strokeStyle=pal.line;x.stroke();x.lineWidth=bw;x.strokeStyle=F[7];x.stroke();x.strokeStyle=pal.line;
+    x.beginPath();x.arc(h*.72,h*.36,bw*.9,0,7);fs(F[2],L*.7)})}
+  // 4. central medallion: lobed outline, a ring of nested petals, a star, an eye
+  const ln=n*(R()<.55?2:1), MR=h*(.70+R()*.1);
+  x.beginPath();lobedRing(x,ln,MR,.22+R()*.18,Math.PI/ln);fs(F[8]||F[0]);
+  x.beginPath();lobedRing(x,ln,MR*.82,.18,Math.PI/ln);fs(F[2],L*.75);
+  const pk=V();
+  radial(x,ln,0,()=>{x.beginPath();(pk===0?tear:pk===1?lobe:spade)(x,MR*.30,MR*.86,MR*.16);fs(F[3])});
+  radial(x,ln,0,()=>{x.beginPath();(pk===0?tear:pk===1?lobe:spade)(x,MR*.42,MR*.74,MR*.075);fs(F[6],L*.7)});
+  radial(x,ln,Math.PI/ln,()=>{x.beginPath();x.arc(MR*.7,0,MR*.05,0,7);fs(F[1],L*.7)});
+  x.beginPath();star(x,ln,MR*.36,MR*.21,0);fs(F[5]);
+  x.beginPath();lobedRing(x,ln,MR*.18,.4,0);fs(F[1],L*.8);
+  x.beginPath();x.arc(0,0,MR*.07,0,7);fs(pal.line);
+  // glaze: wear, firing variation, a soft sheen from the upper right
+  for(let i=0;i<S*1.6;i++){x.fillStyle=`rgba(${R()<.5?'0,0,0':'255,245,225'},${R()*.06})`;x.fillRect(-h+R()*S,-h+R()*S,R()*2.2+.5,R()*2.2+.5)}
+  const sheen=x.createRadialGradient(h*.5,-h*.6,0,h*.5,-h*.6,S*.9);sheen.addColorStop(0,'rgba(255,240,220,.10)');sheen.addColorStop(1,'rgba(0,0,0,.18)');x.fillStyle=sheen;x.fillRect(-h,-h,S,S);
+  x.restore();
+  // bevel: lit top-right edge, shaded bottom-left edge, dark grout line
+  x.save();shapePath(x,shape,h);x.clip();
+  x.lineWidth=S*.05;x.strokeStyle='rgba(255,236,210,.10)';x.save();x.translate(-S*.012,S*.012);shapePath(x,shape,h);x.stroke();x.restore();
+  x.strokeStyle='rgba(0,0,0,.35)';x.save();x.translate(S*.012,-S*.012);shapePath(x,shape,h);x.stroke();x.restore();
+  x.restore();
+  shapePath(x,shape,h);x.lineWidth=Math.max(1,S*.012);x.strokeStyle='rgba(8,8,8,.85)';x.stroke();
+  c.pad=pad;return c;
+}
+
+/* ---- the three systems: tessellation + design set ---- */
+const SYSTEMS={
+  isfahan:{label:'Isfahan',build(S){ // diamonds, as in the reference panels
+    const d=[];for(let i=0;i<14;i++)d.push(paintTile(i+1,S,'square',4,PAL.isfahan));
+    const step=S*Math.SQRT2*.5*1.0, out=[];
+    for(let j=-2,row=0;j*step<innerHeight+S*2;j++,row++)for(let i=-2;i*step*2<innerWidth+S*3;i++){
+      const x=i*step*2+(row%2?step:0), y=j*step;out.push({x,y,spr:d[(((i*7+row*3+(i*row)%5)%14)+14)%14],rot:Math.PI/4})}
+    return out}},
+  kashan:{label:'Kashan',build(S){ // eight-point stars and crosses, lustreware
+    const st=[],cr=[];for(let i=0;i<8;i++)st.push(paintTile(i+101,S,'star',8,PAL.kashan));for(let i=0;i<4;i++)cr.push(paintTile(i+201,S,'cross',4,PAL.kashan));
+    const a=S*1.0,out=[];
+    for(let j=-2;j*a<innerHeight+a*2;j++)for(let i=-2;i*a<innerWidth+a*2;i++){
+      out.push({x:i*a,y:j*a,spr:st[((i+3*j)%8+8)%8],rot:0});
+      out.push({x:i*a+a/2,y:j*a+a/2,spr:cr[((i*3+j)%4+4)%4],rot:0,small:1})}
+    return out}},
+  yazd:{label:'Yazd',build(S){ // honeycomb of six-fold hexagons
+    const d=[];for(let i=0;i<12;i++)d.push(paintTile(i+301,S,'hex',6,PAL.yazd));
+    const w=S*Math.sqrt(3)/2*1.0,hh=S*.75,out=[];
+    for(let j=-2,row=0;j*hh<innerHeight+S*2;j++,row++)for(let i=-2;i*w<innerWidth+S*2;i++){
+      out.push({x:i*w+(row%2?w/2:0),y:j*hh,spr:d[((i*5+row*7)%12+12)%12],rot:0})}
+    return out}},
+};
+
+let sys='isfahan',field=[],T0=0,phase='idle',exitAt=0,FS2=0;
+function tileSize(){return Math.round((MOBILE?96:Math.max(118,Math.min(170,innerWidth/10)))*(sys==='kashan'?1.1:1))}
+function layout(){
+  DPR=Math.min(devicePixelRatio||1,2);tc.width=innerWidth*DPR;tc.height=innerHeight*DPR;
+  const S=tileSize();FS2=S;
+  const raw=SYSTEMS[sys].build(Math.round(S*DPR));
+  // the builder works in device pixels for crisp sprites; positions are in CSS px
+  const cx=innerWidth/2,cy=innerHeight/2;
+  field=raw.map(t=>{const x=t.x/DPR,y=t.y/DPR;const R=Math.random();return{...t,x,y,d:Math.hypot(x-cx,y-cy),r:R}});
+  // fix positions: builders used S in device px; rescale to CSS
+  const k=1;field.forEach(t=>{t.x*=k;t.y*=k});
+  // draw order: top-left first so each tile's shadow falls on those after it
+  field.sort((a,b)=>(a.y-b.y)||(a.x-b.x));
+  const maxD=Math.max(...field.map(t=>t.d));field.forEach(t=>t.nd=t.d/maxD);
+}
+
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2, outExpo=t=>t>=1?1:1-Math.pow(2,-10*t), cl=(x)=>Math.max(0,Math.min(1,x));
+function drawTiles(){
+  const t=now()-T0;
+  g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,tc.width,tc.height);
+  if(phase==='gone')return;
+  g.setTransform(DPR,0,0,DPR,0,0);
+  const et=phase==='exit'?now()-exitAt:-1;
+  for(const k of field){
+    // appear: each tile surfaces from the centre outward
+    const a=RM?1:outExpo(cl((t-.15-k.nd*.9-k.r*.35)/1.1));
+    if(a<=0)continue;
+    let s=.86+.14*a, al=a, rot=k.rot, lift=0, flip=1;
+    if(et>=0){ // exit: a ripple from the centre lifts each tile, turns it on edge and lets it go
+      const e=cl((et-k.nd*1.05-k.r*.25)/.9);
+      if(e>=1)continue;
+      const ee=ease(e);lift=Math.sin(ee*Math.PI)*.14;flip=Math.cos(ee*Math.PI/2);al*=1-cl((e-.45)/.55);
+      s*=1+lift;rot+=ee*.35*(k.r-.5);
+    }
+    // idle breathing: a slow wave of light and height runs across the field
+    const wv=Math.sin(t*1.2-k.x*.008-k.y*.006);
+    s*=1+wv*.008*a;
+    const spr=k.spr,sz=spr.width/DPR;
+    g.save();g.translate(k.x,k.y);g.rotate(rot);g.scale(s*flip,s);g.globalAlpha=al;
+    g.drawImage(spr,-sz/2,-sz/2,sz,sz);
+    g.restore();
+  }
+  g.globalAlpha=1;
+  // a band of sheen sweeping across the glaze while loading
+  if(phase!=='exit'){const p=((t*.22)%1.6)-.3;const gx=p*innerWidth;const gr=g.createLinearGradient(gx-260,0,gx+260,innerHeight*.4);gr.addColorStop(0,'rgba(255,240,220,0)');gr.addColorStop(.5,'rgba(255,240,220,.07)');gr.addColorStop(1,'rgba(255,240,220,0)');g.globalCompositeOperation='lighter';g.fillStyle=gr;g.fillRect(0,0,innerWidth,innerHeight);g.globalCompositeOperation='source-over'}
+  if(et>=0&&et>2.6)phase='gone';
+}
+
+/* ---- loading sequence ---- */
+const lbar=document.getElementById('lbar'),lpct=document.getElementById('lpct'),ltxt=document.getElementById('ltxt');
+let prog01=0,fontsOk=false,lastTick=0;
+(document.fonts&&document.fonts.ready?document.fonts.ready:Promise.resolve()).then(()=>fontsOk=true);
+setTimeout(()=>fontsOk=true,2500);
+function start(){
+  document.body.classList.remove('open');T0=now();phase='in';prog01=0;lastTick=0;layout();
+  tc.style.transition='none';tc.style.filter=RM?'none':'blur(22px)';tc.style.opacity='0';
+  requestAnimationFrame(()=>{tc.style.transition='filter 1.8s cubic-bezier(.2,.7,.2,1), opacity 1.2s ease';tc.style.filter='blur(0px)';tc.style.opacity='1'});
+}
+function loadingTick(){
+  if(phase!=='in')return;
+  const t=now()-T0;
+  // real stages: sprites painted (done), fonts, sea compiled, sea's first frames drawn
+  const stages=[1,fontsOk?1:0,prog?1:0,Math.min(1,seaFrames/6)];
+  const real=stages.reduce((a,b)=>a+b,0)/stages.length;
+  const target=t>7?cl(t/2.8):Math.min(real,cl(t/2.8));   // never block past 7s on a slow device            // never faster than the tiles need to be seen
+  const dt=Math.min(.5,t-(lastTick||t));lastTick=t;prog01+=(target-prog01)*Math.min(1,dt*5+.02);
+  lbar.style.transform=`scaleX(${prog01})`;lpct.textContent=String(Math.round(prog01*100)).padStart(3,'0');
+  ltxt.textContent=!prog?'Glazing tiles':seaFrames<6?'Raising the sea':'Ready';
+  if(prog01>.995&&t>3.0&&!window.__HOLD){phase='exit';exitAt=now();setTimeout(()=>document.body.classList.add('open'),700)}
+}
+
+/* ---- main loop ---- */
+let compiled=false;
+function frame(){
+  if(!compiled&&now()-T0>.35){compiled=true;seaReady=initSea();if(!seaReady){prog=1;seaFrames=99}}  // compile after first paint
+  if(seaReady)drawSea();
+  drawTiles();loadingTick();
+  stats.textContent=seaReady?`sea ${sea.width}×${sea.height} · ${Math.round(1000/frameMs)} fps`:'';
+  requestAnimationFrame(frame);
+}
+const stats=document.getElementById('stats');
+
+addEventListener('resize',()=>{if(phase==='in'||phase==='exit'){layout()}});
+document.querySelectorAll('.ctl button').forEach(b=>b.addEventListener('click',()=>{
+  if(b.dataset.sys){sys=b.dataset.sys;document.querySelectorAll('.ctl [data-sys]').forEach(o=>o.setAttribute('aria-pressed',o===b))}
+  start();
+}));
+start();requestAnimationFrame(frame);
+
+const ck=document.getElementById('clock');
+function tick(){try{ck.textContent='Dubai '+new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Dubai',hour:'2-digit',minute:'2-digit'}).format(new Date())}catch(e){}}
+tick();setInterval(tick,15000);
+})();
+</script>
