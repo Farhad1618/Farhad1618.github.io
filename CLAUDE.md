@@ -7,7 +7,18 @@ Live preview of v4 (Claude artifact, private until shared): https://claude.ai/ar
 v3 preview, kept for comparison: https://claude.ai/artifact/2TVyGhJNC1EnD3yGFmDyBP
 Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so a push to main is live.
 
-## Files
+## v5 "Farsh" (live since Oct 21, 2026)
+
+Farhad rejected v4 and three concepts (in `concepts/`), then approved **Farsh** (carpet), built from their references: Persian tiles and carpets, dark multi-colour glazes, one continuous 3D film, big message text.
+
+- `site.html` is now Farsh (body-only, `<!-- body -->` marker after the style block); `./build.sh` makes `index.html`. Source preview also at `concepts/d-farsh.html`.
+- Three.js r149 from jsdelivr (`three.min.js` UMD). No GSAP. Scroll progress over a 1300vh spacer drives keyframes `K` (tile layout, camera, background).
+- ~900 tiles as one InstancedMesh per design; each design is a rosette drawn on a canvas by `tile()`. Layouts in `L`: carpet, fly, net, gone, ring (Zagros 3-of-5), bars (Falah). Cyrus scene is a Lathe "Cyrus Cylinder" with a canvas cuneiform texture.
+- Text acts are `.act` sections with `data-a`/`data-b` progress ranges.
+- v4 is kept at `/archive/v4/` (its own `index.html` + `site.html`). The v4 notes below describe that archived build.
+- Farhad wants to work on another version later.
+
+## Files (v4, archived)
 
 | File | Role |
 |---|---|
