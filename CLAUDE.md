@@ -108,7 +108,6 @@ Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.
 - Falah: Supabase backend (follow the code), not live on the App Store yet.
 - Cyrus: Palantir Foundry-style ontology platform for any industry, first modelled on pharma, no real users yet. Describe the hard problem and how it solves it, not pipeline internals.
 - Zagros: private repo, enterprise governance/auth. No Apache 2.0, no public source link.
-- `site.html` still says "Apache 2.0" (Zagros) and "Live on the App Store" (Falah). Fix these.
 
 ## Open questions for Farhad
 

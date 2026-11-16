@@ -441,11 +441,11 @@ var PROJECTS = [
 },
 {
   id:"zagros", n:"02", title:"Zagros", eyebrow:"Identity &amp; governance platform",
-  sub:"Apache 2.0 · no external identity provider",
+  sub:"Self-hosted · no external identity provider",
   body:"Multi-tenant identity and governance with no external identity provider in the loop. Passkeys, email OTP and passwords are all verified in-instance. Authorization runs on Cerbos policies, and the instance is brought up through a sealed Genesis ceremony with K-of-N constitutional keys and a catastrophe policy. FastAPI, Next.js and PostgreSQL, with TypeScript and Python SDKs — the same code runs local, on-premise, air-gapped or managed.",
   kv:[["3 / 5","Constitutional key quorum"],["0","External IdPs required"],["4","Deployment modes"]],
   chips:["FastAPI","Next.js","PostgreSQL","Cerbos","WebAuthn","Passkeys","JWT","TypeScript SDK","Python SDK","Air-gapped"],
-  links:[["Source on GitHub ↗","https://github.com/Farhad1618"]]
+  links:[]
 },
 {
   id:"onepharma", n:"03", title:"OnePharma", eyebrow:"Pharmaceutical intelligence",
@@ -465,10 +465,10 @@ var PROJECTS = [
 },
 {
   id:"falah", n:"05", title:"Falah", eyebrow:"Full-stack budgeting app",
-  sub:"Live on the App Store",
-  body:"Expense tracking, income tracking and smart budgeting in a Swift and SwiftUI client on a full-stack backend. Shipped, reviewed and live — the whole loop from schema to store listing, owned end to end.",
-  kv:[["Live","App Store status"],["3","Core loops shipped"],["E2E","Owned, schema to store"]],
-  chips:["Swift","SwiftUI","Combine","Node.js","Firebase"],
+  sub:"iOS · Supabase backend",
+  body:"A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. A Swift and SwiftUI client on a Supabase backend of Postgres and edge functions, owned end to end from schema to screen.",
+  kv:[["2","Automatic sources: bank, email"],["9","Supabase edge functions"],["iOS","Swift, SwiftUI"]],
+  chips:["Swift","SwiftUI","Supabase","PostgreSQL","Edge Functions","TypeScript","Open banking"],
   links:[]
 },
 {
