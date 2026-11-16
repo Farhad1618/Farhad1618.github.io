@@ -4,6 +4,13 @@ Personal portfolio for Farhad Maleki, AI & Agentic Systems Engineer (CTO, OnePha
 Goal: win clients and employers. Inspired by camillemormal.com (studied it directly — see "Reference" below).
 
 Live preview (Claude artifact, private until shared): https://claude.ai/artifact/2TVyGhJNC1EnD3yGFmDyBP
+Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so a push to main is live.
+
+## History
+
+- v5 "Farsh" (Three.js Persian-tile scroll film) was live Oct 21 – Nov 16, 2026. Archived at `archive/farsh/` (its own `site.html`, `index.html` and `build.sh`, which splits at a `<!-- body -->` marker).
+- A separate v4 (GSAP + raw WebGL) is archived at `archive/v4/`. Design concepts live in `concepts/` (a-girih, b-index, c-cortex, d-farsh, e-hook).
+- Current live build (Nov 16, 2026) is the v3-derived GSAP + OGL site below, plus the research case study.
 
 ## Files
 
@@ -96,9 +103,15 @@ Stack decision: **GSAP + OGL, no framework.** Next.js was rejected: animation co
 
 Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com. GSAP and OGL are on those.
 
+## Copy facts confirmed by Farhad (Oct 20, 2026)
+
+- Falah: Supabase backend (follow the code), not live on the App Store yet.
+- Cyrus: Palantir Foundry-style ontology platform for any industry, first modelled on pharma, no real users yet. Describe the hard problem and how it solves it, not pipeline internals.
+- Zagros: private repo, enterprise governance/auth. No Apache 2.0, no public source link.
+- `site.html` still says "Apache 2.0" (Zagros) and "Live on the App Store" (Falah). Fix these.
+
 ## Open questions for Farhad
 
 - Should Black Pearl and OnePharma also get Persian-rooted display names for consistency?
 - Are any real product screenshots NDA-safe to show (Cyrus, OnePharma)?
 - Domain name for deployment.
-- Zagros/Falah sub-lines ("Apache 2.0 · no external identity provider", "Live on the App Store"): still right?
