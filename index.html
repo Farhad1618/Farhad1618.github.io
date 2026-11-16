@@ -102,6 +102,8 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
   will-change:transform,opacity; overflow:hidden;
 }
 #art{ display:block; width:100%; height:100%; }
+#fx{ position:absolute; inset:0; display:none; }
+#fx.on{ display:block; }
 #plate .vig{
   position:absolute; inset:0; pointer-events:none;
   background:
@@ -134,11 +136,10 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
 }
 #titles .slide{
   grid-area:1/1; text-align:center; pointer-events:none;
-  opacity:0; transform:translateX(90px);
-  transition:opacity .42s var(--ease), transform .62s var(--ease);
+  opacity:0; /* GSAP owns opacity + transform */
 }
-#titles .slide.on{ opacity:1; transform:none; pointer-events:auto; }
-#titles .slide.out-l{ opacity:0; transform:translateX(-90px); }
+#titles .slide.on{ pointer-events:auto; }
+#titles h2 .w{ display:inline-block; }
 #titles .eyebrow{ display:block; margin-bottom:clamp(10px,1.6vh,18px); color:var(--sig); }
 #titles h2{
   font-family:var(--f-d); font-weight:400; margin:0;
@@ -162,9 +163,9 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
   font-variant-numeric:tabular-nums; color:var(--bone);
 }
 #pgn .win{ height:1.25em; overflow:hidden; }
-#pgn .col{ display:flex; flex-direction:column; transition:transform .72s var(--ease); }
+#pgn .col{ display:flex; flex-direction:column; }
 #pgn .col span{ height:1.25em; line-height:1.25em; }
-#pgn .sep{ color:var(--muted); display:inline-block; transition:transform .5s var(--ease); }
+#pgn .sep{ color:var(--muted); display:inline-block; }
 #pgn .tot{ color:var(--muted); }
 
 /* ============================================================ FILMSTRIP */
@@ -185,7 +186,7 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
 @media (max-width:560px){ #strip{ left:var(--pad); transform:none; } #strip button{ width:34px; } }
 
 /* progress hairline */
-#pline{ position:fixed; left:0; bottom:0; height:1px; background:var(--sig); z-index:39; transition:width .72s var(--ease); }
+#pline{ position:fixed; left:0; bottom:0; height:1px; background:var(--sig); z-index:39; }
 
 /* hint */
 #hint{ position:fixed; left:var(--pad); bottom:var(--pad); z-index:38; display:flex; align-items:center; gap:10px; }
@@ -298,6 +299,7 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
 <main id="stage">
   <div id="plate">
     <canvas id="art" aria-hidden="true"></canvas>
+    <canvas id="fx" aria-hidden="true"></canvas>
     <div class="vig"></div>
   </div>
 
@@ -344,7 +346,7 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
         the platform's own APIs. I own the governance layer covering policy, permissions and audit, so
         agents and users act inside boundaries the system enforces rather than assumes.</p>
         <p>Before that: full-stack for fintech and fitness clients, a patient management platform built
-        from scratch for a Dubai clinic, and a CNN-based intrusion detection system that became a
+        from scratch for a Dubai clinic, and a deep learning study of IoT botnet detection, published as a
         peer-reviewed paper. Extraordinary is the only standard worth keeping, and I build so the next
         generation can build on top.</p>
       </div>
@@ -371,19 +373,20 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
       <div class="hd"><span class="mono" style="color:var(--sig-dim)">02</span><span class="mono">Research</span><span class="mono" style="margin-left:auto">Peer reviewed</span></div>
       <div class="paper">
         <div>
-          <h4>Deep Learning for Preventing Botnet Attacks on IoT</h4>
-          <p class="mono">Co-author · 2023 · 23rd International Conference on Next Generation Networks</p>
+          <h4><a href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Deep Learning for Preventing Botnet Attacks on IoT ↗</a></h4>
+          <p class="mono">Co-author · 2023 · NEW2AN / ruSMART, Springer LNCS</p>
+          <p class="mono" style="margin-top:14px"><a href="research.html" style="color:var(--sig);border-bottom:1px solid var(--sig-dim);padding-bottom:3px">Case study and live demo →</a></p>
         </div>
         <div style="text-align:right">
-          <div class="big">97<span style="font-size:.4em">%</span></div>
-          <div class="mono" style="margin-top:8px">Detection accuracy</div>
+          <div class="big">99.34<span style="font-size:.4em">%</span></div>
+          <div class="mono" style="margin-top:8px">N-BaIoT accuracy, TCP removed</div>
         </div>
       </div>
     </div>
 
     <div class="sec">
       <div class="hd"><span class="mono" style="color:var(--sig-dim)">03</span><span class="mono">Stack</span><span class="mono" style="margin-left:auto">What I reach for</span></div>
-      <div class="srow"><span class="mono">AI &amp; Data</span><p>LLM integration and provider routing, agent orchestration, ontology and graph modeling in Neo4j, semantic search and vector indexing, medallion data pipelines, ClickHouse OLAP, PyTorch, CNNs</p></div>
+      <div class="srow"><span class="mono">AI &amp; Data</span><p>LLM integration and provider routing, agent orchestration, ontology and graph modeling in Neo4j, semantic search and vector indexing, medallion data pipelines, ClickHouse OLAP, PyTorch, TensorFlow, Keras, CNNs</p></div>
       <div class="srow"><span class="mono">Backend &amp; Platform</span><p>Python and FastAPI, Node.js, Rust and Go on performance paths, GraphQL and REST design, PostgreSQL, Kafka, Redis, Firebase</p></div>
       <div class="srow"><span class="mono">Identity &amp; Governance</span><p>Passkeys and WebAuthn, OTP, JWT, Cerbos policy-based authorization, attribute-based access control, hash-chained audit trails, 21 CFR Part 11 and SOC 2 alignment</p></div>
       <div class="srow"><span class="mono">Client</span><p>Next.js, React, TypeScript, Swift, SwiftUI, Combine</p></div>
@@ -403,9 +406,12 @@ button{ font:inherit; color:inherit; background:none; border:0; padding:0; curso
   </div>
 </section>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js"></script>
 <script>
 (function(){
 "use strict";
+gsap.registerPlugin(SplitText);
 var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 var TAU = Math.PI * 2;
 
@@ -467,11 +473,11 @@ var PROJECTS = [
 },
 {
   id:"nids", n:"06", title:"Network Intrusion Detection", eyebrow:"Applied research",
-  sub:"CNN threat detection at 97% · ICNGN 2023",
-  body:"A convolutional network trained to separate intrusion traffic from ordinary traffic at 97% detection accuracy in Python. The work became the foundation of a co-authored paper presented at the 23rd International Conference on Next Generation Networks.",
-  kv:[["97%","Detection accuracy"],["2023","Published — ICNGN"],["CNN","Architecture"]],
-  chips:["Python","PyTorch","CNN","IoT / Botnet","Research"],
-  links:[]
+  sub:"CNN-RNN botnet detection · NEW2AN 2023",
+  body:"A comparison of CNN, 1DCNN and hybrid CNN-RNN models for detecting botnet traffic on IoT networks. The CNN-RNN performed best, reaching 99.34% accuracy on N-BaIoT with TCP traffic removed and 98.23% on NSL-KDD. Co-authored and published by Springer in the NEW2AN / ruSMART 2023 proceedings.",
+  kv:[["99.34%","N-BaIoT accuracy, TCP removed"],["98.23%","NSL-KDD accuracy"],["CNN-RNN","Best of 3 models"]],
+  chips:["Python","TensorFlow","Keras","CNN-RNN","IoT / Botnet","Research"],
+  links:[["Case study and live demo →","research.html"],["Read the paper ↗","https://doi.org/10.1007/978-3-031-60994-7_4"]]
 }];
 
 /* ============================================================
@@ -606,7 +612,7 @@ var GN=[
  {id:"fastapi",l:"FastAPI",k:0},{id:"next",l:"Next.js",k:0},{id:"react",l:"React",k:0},
  {id:"ts",l:"TypeScript",k:0},{id:"swift",l:"Swift",k:0},{id:"k8s",l:"Kubernetes",k:0},
  {id:"aws",l:"AWS",k:0},{id:"kafka",l:"Kafka",k:0},{id:"gql",l:"GraphQL",k:0},{id:"ws",l:"WebSocket",k:0},
- {id:"cerbos",l:"Cerbos",k:0},{id:"passkey",l:"Passkeys",k:0},{id:"torch",l:"PyTorch",k:0},
+ {id:"cerbos",l:"Cerbos",k:0},{id:"passkey",l:"Passkeys",k:0},{id:"torch",l:"TensorFlow",k:0},
  {id:"llm",l:"LLM Gateway",k:0},{id:"embed",l:"EmbeddingGemma",k:0}];
 var GE=[["onyxs","neo4j"],["onyxs","pg"],["onyxs","click"],["onyxs","rust"],["onyxs","go"],["onyxs","cpp"],
  ["onyxs","py"],["onyxs","k8s"],["onyxs","embed"],["onyxs","ontology"],["onyxs","audit"],["onyxs","cfr"],
@@ -808,7 +814,7 @@ function sceneFalah(g,w,h,t,e){
 }
 
 /* ============================================================
-   SCENE 6 — NIDS : packet stream through conv gates
+   SCENE 6 — NIDS : packet stream through CNN-RNN gates
    ============================================================ */
 var pkts=null;
 function sceneNids(g,w,h,t,e){
@@ -828,15 +834,15 @@ function sceneNids(g,w,h,t,e){
     }
     g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.muted,.75*e);
     g.textAlign="center"; g.textBaseline="bottom";
-    g.fillText(q===2?"DENSE":"CONV "+(q+1), gx, top-12); g.textAlign="left";
+    g.fillText(["CONV","RNN","DENSE"][q], gx, top-12); g.textAlign="left";
   }
   /* verdict trays */
   var vx=w*0.84;
   g.fillStyle=rgba(C.sig,.85*e); g.fillRect(vx,h*0.36,Math.min(140,w*0.11),26);
   g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.ink,1);
-  g.textBaseline="middle"; g.fillText("DETECTED 97%", vx+8, h*0.36+13);
+  g.textBaseline="middle"; g.fillText("BOTNET", vx+8, h*0.36+13);
   g.strokeStyle=rgba(C.dim,.3*e); g.lineWidth=1; g.strokeRect(vx+.5,h*0.46+.5,Math.min(140,w*0.11),26);
-  g.fillStyle=rgba(C.muted,.85*e); g.fillText("MISSED 3%", vx+8, h*0.46+13);
+  g.fillStyle=rgba(C.muted,.85*e); g.fillText("BENIGN", vx+8, h*0.46+13);
 
   /* packets */
   for(var k=0;k<pkts.length;k++){
@@ -864,7 +870,8 @@ var SCENES=[sceneCyrus,sceneZagros,sceneGraph,scenePearl,sceneFalah,sceneNids];
 var cv=document.getElementById("art"), g=cv.getContext("2d");
 var plate=document.getElementById("plate");
 var W=0,H=0,DPR=1;
-var cur=0, busy=false, t0=performance.now(), enterT=0;
+var fx=null, offA, offB, gA, gB;
+var cur=0, target=0, tl=null, rafId=0, t0=performance.now(), enterT=0;
 
 function size(){
   DPR=Math.min(devicePixelRatio||1,2);
@@ -873,16 +880,25 @@ function size(){
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   g.setTransform(DPR,0,0,DPR,0,0);
   docsCache=null; gSized=0;
+  if(fx) fxSize();
 }
 
 function loop(now){
   var t=(now-t0)/1000;
   var e=reduced?1:Math.min(1,(now-enterT)/900);
   e=1-Math.pow(1-e,3);
-  g.clearRect(0,0,W,H);
-  g.fillStyle=C.ink; g.fillRect(0,0,W,H);
-  SCENES[cur](g,W,H,t,e);
-  requestAnimationFrame(loop);
+  if(fx && fx.active){
+    /* shader transition: outgoing frame is a frozen texture; incoming scene renders live */
+    gB.clearRect(0,0,W,H);
+    gB.fillStyle=C.ink; gB.fillRect(0,0,W,H);
+    SCENES[target](gB,W,H,t,e);
+    fx.render(now);
+  } else {
+    g.clearRect(0,0,W,H);
+    g.fillStyle=C.ink; g.fillRect(0,0,W,H);
+    SCENES[cur](g,W,H,t,e);
+  }
+  rafId=requestAnimationFrame(loop);
 }
 
 /* ---------- titles ---------- */
@@ -897,6 +913,12 @@ PROJECTS.forEach(function(p,i){
   titlesEl.appendChild(d);
 });
 var slides=Array.prototype.slice.call(titlesEl.children);
+var parts=slides.map(function(s){
+  var h=s.querySelector("h2");
+  var sp=SplitText.create(h,{type:"chars,words",wordsClass:"w"});
+  h.setAttribute("aria-label",h.textContent);
+  return { h:h, chars:sp.chars, rest:[s.querySelector(".eyebrow"),s.querySelector(".sub"),s.querySelector(".open")] };
+});
 
 /* ---------- pagination ---------- */
 var pcol=document.getElementById("pcol");
@@ -925,48 +947,132 @@ PROJECTS.forEach(function(p,i){
 });
 var stripBtns=Array.prototype.slice.call(stripEl.children);
 
-/* ---------- transition: shrink → swap → grow ---------- */
-var pline=document.getElementById("pline");
-function paint(){
-  pcol.style.transform="translateY(-"+(cur*1.25)+"em)";
-  stripBtns.forEach(function(b,i){ b.classList.toggle("on",i===cur); });
-  pline.style.width=(((cur+1)/PROJECTS.length)*100)+"%";
+/* ---------- transition: one interruptible GSAP timeline ---------- */
+var pline=document.getElementById("pline"), psep=document.getElementById("psep");
+function paint(){ stripBtns.forEach(function(b,i){ b.classList.toggle("on",i===cur); }); }
+function pgnTo(i){ return {y:(-i*1.25)+"em"}; }
+
+gsap.set(plate,{transformOrigin:"50% 50%"});
+gsap.set(slides[0],{opacity:1,x:0});
+gsap.set(pcol,pgnTo(0));
+gsap.set(pline,{width:(100/PROJECTS.length)+"%"});
+paint();
+
+/* ---------- OGL shader transition (runs only while transitioning) ---------- */
+var FX_VS="attribute vec2 uv; attribute vec2 position; varying vec2 vUv; void main(){ vUv=uv; gl_Position=vec4(position,0.,1.); }";
+var FX_FS=[
+"precision highp float;",
+"uniform sampler2D tA; uniform sampler2D tB; uniform float uP; uniform float uDir; uniform float uTime; varying vec2 vUv;",
+"float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }",
+"float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);",
+"  return mix(mix(h(i),h(i+vec2(1.,0.)),f.x), mix(h(i+vec2(0.,1.)),h(i+vec2(1.,1.)),f.x), f.y); }",
+"vec3 samp(sampler2D t, vec2 uv, vec2 o){ return vec3(texture2D(t,uv+o).r, texture2D(t,uv).g, texture2D(t,uv-o).b); }",
+"void main(){",
+"  vec2 uv=vUv; float p=uP; float bell=sin(3.14159265*p);",
+"  float n=vn(uv*vec2(3.,5.)+uTime*.15);",
+"  float s=uDir>0. ? 1.-uv.x : uv.x;",                       /* incoming sweeps in from the travel side */
+"  float edge=p*1.6-.3+(n-.5)*.25;",
+"  float m=1.-smoothstep(edge-.12,edge+.12,s);",
+"  vec2 wob=vec2((n-.5)*.10*bell,(vn(uv*4.+7.)-.5)*.04*bell);",
+"  vec2 dA=vec2(-uDir*p*p*.14,0.)+wob;",
+"  vec2 dB=vec2(uDir*(1.-p)*(1.-p)*.14,0.)+wob;",
+"  vec2 rgb=vec2(.012*bell*uDir,0.);",
+"  vec3 c=mix(samp(tA,uv-dA,rgb), samp(tB,uv-dB,rgb), m);",
+"  float seam=1.-abs(m-.5)*2.;",
+"  c*=1.-.28*seam*bell;",
+"  gl_FragColor=vec4(c,1.);",
+"}"].join("\n");
+
+function fxSize(){
+  fx.r.dpr=DPR; fx.r.setSize(W,H);
+  offA.width=offB.width=cv.width; offA.height=offB.height=cv.height;
+  gA.setTransform(DPR,0,0,DPR,0,0); gB.setTransform(DPR,0,0,DPR,0,0);
 }
+function initFx(){
+  if(fx||reduced||!window.__OGL) return;
+  try{
+    var O=window.__OGL;
+    var r=new O.Renderer({canvas:document.getElementById("fx"),alpha:false,antialias:false,dpr:DPR,preserveDrawingBuffer:true});
+    var gl=r.gl; if(!gl) return;
+    var mk=function(){ return new O.Texture(gl,{generateMipmaps:false,minFilter:gl.LINEAR,magFilter:gl.LINEAR,wrapS:gl.CLAMP_TO_EDGE,wrapT:gl.CLAMP_TO_EDGE}); };
+    var tA=mk(), tB=mk();
+    var prog=new O.Program(gl,{vertex:FX_VS,fragment:FX_FS,uniforms:{tA:{value:tA},tB:{value:tB},uP:{value:0},uDir:{value:1},uTime:{value:0}}});
+    var mesh=new O.Mesh(gl,{geometry:new O.Triangle(gl),program:prog});
+    offA=document.createElement("canvas"); offB=document.createElement("canvas");
+    gA=offA.getContext("2d"); gB=offB.getContext("2d");
+    tA.image=offA; tB.image=offB;
+    var f={r:r,tA:tA,tB:tB,prog:prog,active:false,p:0,
+      render:function(now){ prog.uniforms.uP.value=f.p; prog.uniforms.uTime.value=now/1000; tB.needsUpdate=true; r.render({scene:mesh}); }};
+    fx=f; fxSize();
+  }catch(err){ fx=null; }
+}
+if(window.__OGL) initFx(); else addEventListener("ogl-ready",initFx);
 
-function go(to,dir){
-  if(busy||to===cur) return;
-  if(dir===undefined) dir = to>cur?1:-1;
-  busy=true;
-  var outgoing=slides[cur];
+function go(to,dir,cb){
+  if(to===target) return;
+  if(dir===undefined) dir = to>target?1:-1;
+  target=to;
+  if(tl) tl.kill();
+  slides.forEach(function(s){ s.classList.remove("on"); });
 
-  /* phase A — shrink and slide out */
-  plate.style.transition="transform .42s "+(reduced?"linear":"cubic-bezier(.7,0,.84,0)")+", opacity .42s linear";
-  plate.style.transform="scale(.84) translateX("+(-dir*7)+"%)";
-  plate.style.opacity="0";
-  outgoing.classList.remove("on");
-  outgoing.classList.toggle("out-l", dir>0);
-  document.getElementById("psep").style.transform="scaleX(.3)";
+  /* everything currently visible leaves; works from wherever a prior tween was interrupted */
+  var outs=slides.filter(function(s){ return gsap.getProperty(s,"opacity")>0.01; });
+  var pt=parts[to];
+  var useFx=!!fx;
 
-  var wait=reduced?60:400;
-  setTimeout(function(){
-    cur=to; enterT=performance.now();
-    pkts=null; pulses.length=0;
+  if(useFx){
+    /* freeze whatever is on screen right now (scene, or a half-finished transition) as the outgoing plate */
+    gA.setTransform(1,0,0,1,0,0);
+    gA.drawImage(fx.active?document.getElementById("fx"):cv,0,0,offA.width,offA.height);
+    gA.setTransform(DPR,0,0,DPR,0,0);
+    fx.tA.needsUpdate=true;
+    fx.prog.uniforms.uDir.value=dir; fx.p=0; fx.active=true;
+    document.getElementById("fx").classList.add("on");
+    enterT=performance.now(); pkts=null; pulses.length=0;
+  }
+
+  tl=gsap.timeline({ defaults:{overwrite:"auto"} });
+  if(reduced) tl.timeScale(20);
+
+  /* phase A — titles leave in the travel direction; plate either dips (fallback) or the shader runs */
+  if(useFx){
+    tl.to(fx,{p:1,duration:1.25,ease:"power2.inOut"},0)
+      .to(plate,{scale:.93,duration:.55,ease:"power2.out"},0)
+      .to(plate,{scale:1,duration:.75,ease:"expo.out"},.55);
+  } else {
+    tl.to(plate,{scale:.84,xPercent:-dir*7,opacity:0,duration:.42,ease:"power3.in"},0);
+  }
+  tl.to(outs,{opacity:0,x:-dir*70,duration:.34,ease:"power2.in"},0)
+    .to(psep,{scaleX:.3,duration:.3,ease:"power2.out"},0)
+    .to(pcol,Object.assign(pgnTo(to),{duration:.9,ease:"expo.inOut"}),.1)
+    .to(pline,{width:(((to+1)/PROJECTS.length)*100)+"%",duration:.9,ease:"expo.inOut"},.1)
+    .add("swap",.42);
+
+  /* swap — chrome catches up (filmstrip, titles); in the fallback path the scene changes here too */
+  tl.call(function(){
+    cur=to;
+    if(!useFx){ enterT=performance.now(); pkts=null; pulses.length=0; }
     paint();
-    /* phase B — enter from the other side and grow to full bleed */
-    plate.style.transition="none";
-    plate.style.transform="scale(.84) translateX("+(dir*7)+"%)";
-    void plate.offsetWidth;
-    plate.style.transition="transform .78s "+(reduced?"linear":"cubic-bezier(.16,1,.3,1)")+", opacity .5s ease";
-    plate.style.transform="none"; plate.style.opacity="1";
+    slides[to].classList.add("on");
+    if(cb) cb();
+  },null,"swap");
 
-    slides.forEach(function(s,i){ s.classList.remove("on","out-l"); if(i!==cur) s.classList.toggle("out-l", i<cur); });
-    setTimeout(function(){ slides[cur].classList.add("on"); }, reduced?0:110);
-    document.getElementById("psep").style.transform="scaleX(1)";
-    setTimeout(function(){ busy=false; }, reduced?60:520);
-  }, wait);
+  /* phase B — new title builds char by char */
+  if(!useFx){
+    tl.fromTo(plate,{scale:.84,xPercent:dir*7,opacity:0},{scale:1,xPercent:0,opacity:1,duration:.85,ease:"expo.out",immediateRender:false},"swap");
+  }
+  tl.set(slides[to],{opacity:1,x:0},"swap")
+    .fromTo(pt.chars,{opacity:0,x:dir*34,yPercent:18},{opacity:1,x:0,yPercent:0,duration:1,ease:"expo.out",stagger:{each:.032,from:dir>0?"start":"end"},immediateRender:false},"swap+=.06")
+    .fromTo(pt.rest,{opacity:0,y:12},{opacity:1,y:0,duration:.7,ease:"power3.out",stagger:.08,immediateRender:false},"swap+=.18")
+    .to(psep,{scaleX:1,duration:.6,ease:"expo.out"},"swap+=.1");
+
+  if(useFx) tl.eventCallback("onComplete",function(){
+    fx.active=false; document.getElementById("fx").classList.remove("on");
+  });
+  return tl;
 }
-function next(){ go((cur+1)%PROJECTS.length, 1); }
-function prev(){ go((cur-1+PROJECTS.length)%PROJECTS.length, -1); }
+function next(cb){ go((target+1)%PROJECTS.length, 1, typeof cb==="function"?cb:undefined); }
+function prev(cb){ go((target-1+PROJECTS.length)%PROJECTS.length, -1, typeof cb==="function"?cb:undefined); }
 
 /* ---------- input: wheel, drag, keys ---------- */
 var acc=0, lock=0;
@@ -974,9 +1080,9 @@ addEventListener("wheel",function(ev){
   if(sheetOpen()) return;
   ev.preventDefault();
   var now=Date.now();
-  if(busy||now<lock) return;
+  if(now<lock) return;
   acc+=ev.deltaY;
-  if(Math.abs(acc)>55){ (acc>0?next:prev)(); acc=0; lock=now+780; }
+  if(Math.abs(acc)>55){ (acc>0?next:prev)(); acc=0; lock=now+420; }
 },{passive:false});
 
 var dragX=null, dragY=null;
@@ -994,8 +1100,8 @@ addEventListener("keydown",function(ev){
   if(ev.key==="ArrowRight"||ev.key==="ArrowDown"||ev.key===" "){ ev.preventDefault(); next(); }
   if(ev.key==="ArrowLeft"||ev.key==="ArrowUp"){ ev.preventDefault(); prev(); }
 });
-document.getElementById("next").addEventListener("click",next);
-document.getElementById("prev").addEventListener("click",prev);
+document.getElementById("next").addEventListener("click",function(){ next(); });
+document.getElementById("prev").addEventListener("click",function(){ prev(); });
 
 /* ---------- detail sheet ---------- */
 var detail=document.getElementById("detail"), dbody=document.getElementById("d-body");
@@ -1006,15 +1112,15 @@ function openDetail(i){
       '<span class="mono" style="margin-left:auto">'+p.eyebrow+'</span></div>'+
     '<div class="d-grid"><div><p class="body">'+p.body+'</p>'+
       '<div class="chips">'+p.chips.map(function(c){return '<span>'+c+'</span>';}).join('')+'</div>'+
-      (p.links.length?'<div class="d-links">'+p.links.map(function(l){return '<a href="'+l[1]+'" target="_blank" rel="noopener">'+l[0]+'</a>';}).join('')+'</div>':'')+
+      (p.links.length?'<div class="d-links">'+p.links.map(function(l){return '<a href="'+l[1]+'"'+(/^https?:/.test(l[1])?' target="_blank" rel="noopener"':'')+'>'+l[0]+'</a>';}).join('')+'</div>':'')+
     '</div><div class="d-side">'+
       p.kv.map(function(k){ return '<div class="kv"><span class="mono">'+k[1]+'</span><span class="v">'+k[0]+'</span></div>'; }).join('')+
     '</div></div>'+
     '<div class="d-foot"><button id="d-prev">← '+PROJECTS[(i-1+PROJECTS.length)%PROJECTS.length].title+'</button>'+
       '<button class="r" id="d-next">'+PROJECTS[(i+1)%PROJECTS.length].title+' →</button></div>';
   detail.classList.add("on"); detail.setAttribute("aria-hidden","false");
-  document.getElementById("d-prev").onclick=function(){ prev(); setTimeout(function(){ openDetail(cur); }, 460); };
-  document.getElementById("d-next").onclick=function(){ next(); setTimeout(function(){ openDetail(cur); }, 460); };
+  document.getElementById("d-prev").onclick=function(){ prev(function(){ openDetail(cur); }); };
+  document.getElementById("d-next").onclick=function(){ next(function(){ openDetail(cur); }); };
 }
 titlesEl.addEventListener("click",function(ev){
   var b=ev.target.closest(".open"); if(b) openDetail(+b.dataset.i);
@@ -1060,8 +1166,13 @@ setInterval(function(){
 
 /* ---------- boot ---------- */
 addEventListener("resize",function(){ clearTimeout(window.__rz); window.__rz=setTimeout(size,160); });
-size(); paint(); enterT=performance.now();
-requestAnimationFrame(loop);
+size(); enterT=performance.now();
+rafId=requestAnimationFrame(loop);
+/* pause the scene loop when the tab is hidden */
+document.addEventListener("visibilitychange",function(){
+  if(document.hidden){ cancelAnimationFrame(rafId); rafId=0; }
+  else if(!rafId){ rafId=requestAnimationFrame(loop); }
+});
 
 (function preload(){
   var pre=document.getElementById("pre"), pct=document.getElementById("pct"), bar=document.getElementById("pbar");
@@ -1086,6 +1197,11 @@ requestAnimationFrame(loop);
   });
 })();
 })();
+</script>
+<script type="module">
+import {Renderer,Program,Mesh,Triangle,Texture} from "https://cdn.jsdelivr.net/npm/ogl@1.0.11/+esm";
+window.__OGL={Renderer:Renderer,Program:Program,Mesh:Mesh,Triangle:Triangle,Texture:Texture};
+dispatchEvent(new Event("ogl-ready"));
 </script>
 </body>
 </html>

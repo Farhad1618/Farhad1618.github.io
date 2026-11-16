@@ -12,9 +12,11 @@ Live preview (Claude artifact, private until shared): https://claude.ai/artifact
 | `site.html` | **Source of truth.** Body-only HTML (no doctype/head/body) so it can be published as a Claude artifact directly. |
 | `build.sh` | Wraps `site.html` into `index.html` with doctype, meta, OG tags, favicon. Run after every edit. |
 | `index.html` | Deployable standalone build. One file, zero dependencies. Never edit by hand. |
+| `research.html` | Standalone case study for the botnet paper (scrolling page, GSAP + ScrollTrigger). Full HTML doc; published as an artifact supporting file. Linked from project 06 and the About research row. |
+| `research-model.js` | The NSL-KDD notebook CNN-RNN retrained (seed 42, all of KDDTrain+), float16 weights + plain-JS forward pass, 48 stratified KDDTest+ samples. Verdicts match Keras on all 22,544 test rows. Lazy-loaded by `research.html`. |
 | `archive/v1-scroll.html` | v1: long scrolling page with hero knowledge graph. Superseded; kept for reference. |
 
-Workflow: edit `site.html` → `./build.sh` → republish the artifact from `site.html`.
+Workflow: edit `site.html` → `./build.sh` → republish the artifact from `site.html`, passing `research.html` and `research-model.js` as `files`. Deploy all three plus `index.html`.
 Fonts load from Google Fonts; everything else is inline.
 
 ## Concept
@@ -69,18 +71,18 @@ Farhad renamed projects for the site. Use the display names in all visible copy.
 | 03 | OnePharma | — | `Farhad1618/onepharma` | Force-directed knowledge graph of the real ontology (36 nodes, ~60 edges), query pulses on edges |
 | 04 | Black Pearl | — | `Farhad1618/black-pearl` | Three oscilloscope traces + CNC toolpath drawing itself, X/Y/Z mm readouts |
 | 05 | **Falah** | Purple Finance | `Farhad1618/Falah` | Spend vs dashed budget target; Feb breaks it and flares amber; income particles |
-| 06 | Network Intrusion Detection | — | — | Packets through conv gates; bad 3% flare amber into verdict trays (97% / ICNGN 2023) |
+| 06 | Network Intrusion Detection | — | `Farhad1618/Network-Intrusion-Detection-CNN` (NSL-KDD half only; no N-BaIoT code) | Packets through CONV / RNN / DENSE gates; bad packets flare amber into the BOTNET tray, the rest go to BENIGN |
 
-Internal graph node ids still use `onyxs` / `sr71` / `purple`. Only labels changed. Don't "fix" them without updating `GE`.
+Internal graph node ids still use `onyxs` / `sr71` / `purple`, and `torch` now carries the label TensorFlow. Only labels changed. Don't "fix" them without updating `GE`.
 
-All copy comes from Farhad's CV (`FindJob/Farhad_Maleki_CV.pdf` on his Mac, not in this repo).
+All copy comes from Farhad's CV (`FindJob/Farhad_Maleki_CV.pdf` on his Mac, not in this repo), except the paper details below, which override it.
+
+Paper: "Deep Learning for Preventing Botnet Attacks on IoT", NEW2AN / ruSMART 2023, Springer LNCS, pp. 37-46, DOI `10.1007/978-3-031-60994-7_4`. Not ICNGN. Quote 99.34% only with "N-BaIoT, TCP removed"; 98.23% is NSL-KDD. The CV's 97% has no known source, so don't use it. The notebook is Keras/TensorFlow, not PyTorch.
 Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1618 · linkedin.com/in/farhad-maleki
 
 ## Known weaknesses (why the next step matters)
 
-- Transitions are `setTimeout` + CSS with a `busy` lock. Scrolling fast feels stuck. Not interruptible.
 - Canvas 2D can't do displacement/ripple transitions; that's what makes the reference feel liquid.
-- Scene rAF runs continuously, even when the tab is hidden. Pause on `visibilitychange`.
 - Preview harness can't drive keyboard/scroll in the `data:` frame. Verify transitions by hand.
 - Mobile layout untested at depth.
 
@@ -88,8 +90,8 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 
 Stack decision: **GSAP + OGL, no framework.** Next.js was rejected: animation code fights React's render cycle, and Farhad's projects already prove React.
 
-1. **GSAP rebuild (next).** Replace setTimeout choreography with one interruptible `gsap.timeline()`; remove the `busy` lock. SplitText per-character title reveals. GSAP is free including former Club plugins (verify terms before client work).
-2. **OGL shader transitions.** Do NOT port scenes to WebGL. Render each Canvas 2D scene to an offscreen canvas → upload as texture → shader-blend outgoing/incoming (displacement / RGB shift). Shader runs only during transitions.
+1. **GSAP rebuild (DONE, GSAP 3.13.0 + SplitText from cdnjs).** `go()` builds one interruptible `gsap.timeline()` (kills the previous, no `busy` lock; `target` tracks destination, `cur` changes only at the `swap` label). SplitText per-character title reveals. Scene loop pauses on `visibilitychange`. Remaining: verify by hand with real wheel/drag, mobile. GSAP is free including former Club plugins (verify terms before client work).
+2. **OGL shader transitions (DONE).** OGL 1.0.11 has no UMD build; it loads as ESM from `cdn.jsdelivr.net/npm/ogl@1.0.11/+esm` via a trailing `<script type="module">` that sets `window.__OGL` and fires `ogl-ready`. `go()` freezes the on-screen frame (scene, or the half-finished transition canvas `#fx`) into offscreen canvas `offA`, renders only the incoming scene live into `offB`, and blends them in `FX_FS` (noise-edge wipe, displacement, RGB split). `#fx` is `display:none` outside transitions. Falls back to the plate shrink/fade if OGL fails to load, WebGL is missing, or reduced-motion is set. Tune the look in `FX_FS` and the `p` tween in `go()`.
 3. Move to **Vite + TypeScript**, static build, deploy to Vercel or Cloudflare Pages on Farhad's domain. Keep producing a single-file build for the artifact preview.
 
 Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com. GSAP and OGL are on those.

@@ -1,0 +1,1335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>IoT Botnet Detection</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Case study of 'Deep Learning for Preventing Botnet Attacks on IoT' (Springer LNCS, NEW2AN / ruSMART 2023), co-authored by Farhad Maleki: the study, the public notebook's NSL-KDD CNN-RNN model, retrained and running live in your browser, a re-examination on the official test set, and what it takes to ship.">
+<meta name="theme-color" content="#0C0C0E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script>
+/* Hide the hero headline only when we will animate it in; a 3 s failsafe here removes it even if the main script dies. */
+try{ if(!matchMedia("(prefers-reduced-motion: reduce)").matches){ document.documentElement.classList.add("will-anim"); setTimeout(function(){ document.documentElement.classList.remove("will-anim"); },3000); } }catch(e){}
+</script>
+<style>
+/* Layout: one long reading column (max 1240px) with a mono margin label per section;
+   figures break out to full column width; the demo and the layer diagram are the two loud moments. */
+:root{
+  color-scheme: dark;
+  --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
+  --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --muted-txt:#8A867F;
+  --sig:#E9A03B; --sig-dim:#8A6224; --trace:#5FA8B8;
+
+  --f-d:"Bodoni Moda","Didot","Times New Roman",serif;
+  --f-b:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-m:"IBM Plex Mono","SFMono-Regular",Menlo,monospace;
+
+  --gut-l:max(16px, env(safe-area-inset-left, 0px));
+  --gut-r:max(16px, env(safe-area-inset-right, 0px));
+  --ease:cubic-bezier(.16,1,.3,1);
+  --s-1:clamp(10px,.68rem,11.5px);
+  --s0:clamp(15px,1.02rem,18px);
+  --s1:clamp(18px,1.3rem,23px);
+  --s2:clamp(26px,3.4vw,46px);
+  --s3:clamp(38px,6.4vw,92px);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html{ background:var(--ink); scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+@media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+body{
+  margin:0; background:var(--ink); color:var(--bone);
+  font-family:var(--f-b); font-weight:300; font-size:var(--s0); line-height:1.62;
+  -webkit-font-smoothing:antialiased; overflow-x:hidden;
+}
+body::before{ content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top,0px); z-index:45; background:var(--ink); }
+a{ color:inherit; }
+button{ font:inherit; color:inherit; background:none; border:0; padding:0; cursor:pointer; }
+:focus-visible{ outline:1px solid var(--sig); outline-offset:4px; }
+::selection{ background:var(--sig); color:var(--ink); }
+p{ margin:0; }
+h1,h2,h3,h4{ margin:0; font-weight:400; text-wrap:balance; }
+
+.mono{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--muted-txt); font-weight:400; }
+.tnum{ font-variant-numeric:tabular-nums; }
+.sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+
+.wrap{ max-width:1240px; margin:0 auto; padding-left:var(--gut-l); padding-right:var(--gut-r); }
+
+/* ============================================================ TOP BAR */
+.top{
+  position:sticky; top:env(safe-area-inset-top,0px); z-index:40;
+  background:rgba(12,12,14,.86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule-soft);
+}
+.top .wrap{ display:flex; align-items:center; gap:clamp(14px,2.4vw,30px); padding-block:14px; }
+.top .who{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.2em; text-transform:uppercase; font-weight:500; color:var(--bone); text-decoration:none; white-space:nowrap; }
+.top nav{ margin-left:auto; display:flex; gap:clamp(14px,2.4vw,28px); }
+.top nav a{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); text-decoration:none; transition:color .3s ease; white-space:nowrap; }
+.top nav a:hover{ color:var(--sig); }
+
+/* ============================================================ SHARED SECTION FRAME */
+section{ padding-block:clamp(72px,12vh,150px) 0; }
+.frame{ display:grid; grid-template-columns:180px minmax(0,1fr); gap:clamp(20px,4vw,64px); }
+@media (max-width:860px){ .frame{ grid-template-columns:minmax(0,1fr); gap:14px; } }
+.frame > .lab{ padding-top:.6em; border-top:1px solid var(--rule); align-self:start; }
+.frame > .lab .mono{ color:var(--sig); display:block; padding-top:12px; }
+.frame > .body{ min-width:0; }
+.h2{ font-family:var(--f-d); font-size:var(--s2); line-height:1.08; letter-spacing:-.015em; max-width:20ch; }
+.lede{ margin-top:clamp(18px,3vh,28px); color:var(--dim); max-width:62ch; }
+.prose{ display:grid; gap:1em; align-content:start; color:var(--dim); max-width:62ch; }
+.prose strong{ color:var(--bone); font-weight:400; }
+.cols{ display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr); gap:clamp(28px,5vw,80px); margin-top:clamp(28px,5vh,52px); }
+@media (max-width:900px){ .cols{ grid-template-columns:minmax(0,1fr); } }
+.fig{ margin:clamp(32px,6vh,64px) 0 0; }
+.fig figcaption{ margin-top:14px; color:var(--muted-txt); font-size:clamp(13px,.86rem,15px); line-height:1.55; max-width:70ch; }
+.fig figcaption b{ font-weight:400; color:var(--dim); }
+.figtitle{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; padding-bottom:12px; border-bottom:1px solid var(--rule); margin-bottom:18px; }
+.figtitle h3{ font-family:var(--f-d); font-size:var(--s1); line-height:1.2; }
+
+.lnk{ display:inline-flex; align-items:center; gap:8px; font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--bone); text-decoration:none; border-bottom:1px solid var(--rule); padding-bottom:4px; transition:color .3s ease, border-color .3s ease; }
+.lnk:hover{ color:var(--sig); border-color:var(--sig); }
+.lnk.pri{ border-color:rgba(233,160,59,.5); }
+.links{ display:flex; flex-wrap:wrap; gap:14px 28px; }
+
+/* key-value ledger */
+.kv{ display:grid; gap:0; margin:0; }
+.kv > div{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:baseline; padding-block:11px; border-bottom:1px solid var(--rule-soft); }
+.kv dt{ color:var(--dim); font-size:clamp(13.5px,.92rem,16px); }
+.kv dd{ margin:0; font-family:var(--f-m); font-size:clamp(12.5px,.84rem,14.5px); color:var(--bone); font-variant-numeric:tabular-nums; text-align:right; }
+
+/* ============================================================ HERO */
+.hero{ padding-block:clamp(56px,11vh,130px) clamp(20px,4vh,40px); }
+.hero .meta{ display:block; color:var(--sig); }
+.hero h1{
+  font-family:var(--f-d); font-size:var(--s3); line-height:.98; letter-spacing:-.025em;
+  margin-top:clamp(18px,3vh,30px); max-width:15ch;
+}
+.will-anim .hero h1{ visibility:hidden; }
+.hero-grid{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,auto); gap:clamp(28px,5vw,90px); align-items:end; margin-top:clamp(32px,6vh,64px); padding-top:clamp(22px,3vh,30px); border-top:1px solid var(--rule); }
+@media (max-width:900px){ .hero-grid{ grid-template-columns:minmax(0,1fr); align-items:start; } }
+.hero .role{ color:var(--dim); max-width:56ch; display:grid; gap:14px; }
+.hero .role .who{ color:var(--bone); }
+.hero .links{ margin-top:28px; }
+.fig99{ text-align:right; }
+@media (max-width:900px){ .fig99{ text-align:left; order:-1; } }
+.fig99 .n{ font-family:var(--f-d); font-size:clamp(64px,10vw,150px); line-height:.86; color:var(--sig); font-variant-numeric:tabular-nums; letter-spacing:-.03em; display:block; }
+.fig99 .q{ display:block; margin-top:14px; color:var(--bone); }
+.fig99 .q2{ display:block; margin-top:6px; }
+.fig99 .alt{ display:flex; gap:14px; align-items:baseline; justify-content:flex-end; margin-top:18px; padding-top:14px; border-top:1px solid var(--rule-soft); }
+@media (max-width:900px){ .fig99 .alt{ justify-content:flex-start; } }
+.fig99 .alt b{ font-family:var(--f-d); font-weight:400; font-size:clamp(26px,2.6vw,38px); color:var(--bone); font-variant-numeric:tabular-nums; }
+
+/* ============================================================ PROBLEM CANVAS */
+.stage{ position:relative; background:var(--ink-2); border:1px solid var(--rule-soft); }
+.stage canvas{ display:block; width:100%; }
+#netc{ height:clamp(380px,48vw,520px); }
+.phases{ display:flex; flex-wrap:wrap; gap:6px 22px; padding:14px 16px; border-top:1px solid var(--rule-soft); }
+.phases span{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.12em; text-transform:uppercase; color:var(--muted-txt); display:inline-flex; align-items:center; gap:8px; transition:color .3s ease; }
+.phases span::before{ content:""; width:6px; height:6px; border:1px solid currentColor; }
+.phases span.on{ color:var(--bone); }
+.phases span.on::before{ background:var(--sig); border-color:var(--sig); }
+.phases .ctl{ margin-left:auto; font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+.phases .ctl:hover{ color:var(--sig); }
+
+/* ============================================================ TABLE 3 CHART */
+.legend{ display:flex; flex-wrap:wrap; gap:8px 20px; }
+.legend span{ display:inline-flex; align-items:center; gap:8px; font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.1em; color:var(--dim); }
+.legend svg{ flex:none; }
+.chartbox{ position:relative; }
+.chartbox svg{ display:block; width:100%; height:auto; overflow:visible; }
+.chartbox .hit{ cursor:default; }
+.chartbox .hit:focus{ outline:none; }
+.chartbox .hit:focus-visible, .chartbox .hit:hover{ stroke:var(--sig); stroke-width:1.5; }
+.tip{
+  position:absolute; z-index:5; pointer-events:none; min-width:150px;
+  background:var(--ink); border:1px solid var(--rule); padding:10px 12px;
+  font-family:var(--f-m); font-size:12px; line-height:1.5; color:var(--dim);
+  opacity:0; transform:translate(-50%, calc(-100% - 14px)); transition:opacity .15s ease;
+}
+.tip.on{ opacity:1; }
+.tip b{ color:var(--bone); font-weight:500; display:block; margin-bottom:2px; }
+.scale100{ margin-top:22px; }
+details.tbl{ margin-top:18px; }
+details.tbl summary{ cursor:pointer; font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); width:max-content; max-width:100%; }
+details.tbl summary:hover{ color:var(--sig); }
+.tscroll{ overflow-x:auto; margin-top:12px; }
+table{ border-collapse:collapse; width:100%; min-width:460px; font-family:var(--f-m); font-size:12.5px; font-variant-numeric:tabular-nums; }
+th,td{ padding:9px 10px; border-bottom:1px solid var(--rule-soft); text-align:right; color:var(--dim); font-weight:400; }
+th:first-child,td:first-child{ text-align:left; }
+thead th{ color:var(--muted-txt); letter-spacing:.08em; text-transform:uppercase; font-size:11px; border-bottom-color:var(--rule); }
+td.best{ color:var(--sig); }
+
+/* TCP story */
+.steps{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0; margin-top:clamp(36px,6vh,64px); border-top:1px solid var(--rule); }
+@media (max-width:860px){ .steps{ grid-template-columns:minmax(0,1fr); } }
+.steps > div{ padding:22px clamp(0px,2vw,26px) 22px 0; display:grid; gap:10px; align-content:start; }
+.steps > div + div{ border-left:1px solid var(--rule-soft); padding-left:clamp(16px,2vw,26px); }
+@media (max-width:860px){ .steps > div + div{ border-left:0; border-top:1px solid var(--rule-soft); padding-left:0; } }
+.steps .v{ font-family:var(--f-d); font-size:clamp(40px,5vw,68px); line-height:.9; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.steps .v.a{ color:var(--sig); }
+.steps p{ color:var(--dim); font-size:clamp(14px,.94rem,16.5px); }
+.steps .mono b{ color:var(--bone); font-weight:400; }
+
+/* ============================================================ ARCHITECTURE */
+.arch{ display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr); gap:clamp(24px,4vw,60px); margin-top:clamp(32px,6vh,60px); align-items:start; }
+.arch-stage{ position:sticky; top:calc(env(safe-area-inset-top,0px) + 70px); }
+#archc{ height:clamp(300px,34vw,440px); }
+.arch-cap{ padding:12px 16px; border-top:1px solid var(--rule-soft); display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.arch-cap b{ font-weight:400; color:var(--bone); }
+@media (max-width:900px){
+  .arch{ grid-template-columns:minmax(0,1fr); }
+  .arch-stage{ top:calc(env(safe-area-inset-top,0px) + 50px); z-index:3; background:var(--ink); padding-bottom:8px; }
+  #archc{ height:190px; }
+  .arch-cap{ padding:8px 12px; }
+  .arch-cap > span:last-child{ display:none; }
+}
+.layers{ list-style:none; margin:0; padding:0; border-top:1px solid var(--rule); }
+.layers li{ padding-block:clamp(16px,5vh,40px); border-bottom:1px solid var(--rule-soft); display:grid; gap:8px; transition:opacity .4s ease; }
+.js .layers li:not(.on):not(.past) h3{ color:var(--dim); }
+.js .layers li:not(.on):not(.past) p{ color:var(--muted-txt); }
+.js .layers li:not(.on):not(.past) .pbar{ opacity:.6; }
+.layers .row1{ display:flex; justify-content:space-between; gap:14px; align-items:baseline; flex-wrap:wrap; }
+.layers h3{ font-family:var(--f-d); font-size:var(--s1); line-height:1.15; }
+.layers li.on h3{ color:var(--sig); }
+.layers .shape{ font-family:var(--f-m); font-size:12.5px; color:var(--bone); font-variant-numeric:tabular-nums; }
+.layers p{ color:var(--dim); font-size:clamp(14px,.93rem,16.5px); max-width:52ch; }
+.pbar{ display:grid; grid-template-columns:minmax(0,1fr) 23ch; gap:12px; align-items:center; }
+.pbar .tr{ height:6px; background:var(--rule-soft); position:relative; }
+.pbar .tr i{ position:absolute; left:0; top:0; bottom:0; background:var(--trace); border-radius:0 3px 3px 0; min-width:1px; }
+.layers li.big .pbar .tr i{ background:var(--sig); }
+.pbar .mono{ font-variant-numeric:tabular-nums; letter-spacing:.06em; text-align:right; white-space:nowrap; }
+.total{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding-block:18px; flex-wrap:wrap; }
+.total b{ font-family:var(--f-d); font-weight:400; font-size:clamp(28px,3vw,40px); font-variant-numeric:tabular-nums; }
+
+/* ============================================================ DEMO */
+#demo{ position:relative; }
+.demo-band{ background:var(--ink-2); border-block:1px solid var(--rule-soft); margin-top:clamp(36px,6vh,60px); }
+.demo-band > .wrap{ padding-block:clamp(26px,5vh,48px); }
+.notice{ display:flex; gap:12px; align-items:flex-start; color:var(--dim); font-size:clamp(13.5px,.9rem,15.5px); max-width:80ch; padding-bottom:20px; border-bottom:1px solid var(--rule); }
+.notice::before{ content:""; flex:none; width:8px; height:8px; margin-top:.5em; background:var(--trace); }
+.picker{ display:flex; flex-wrap:wrap; gap:8px; margin-top:22px; }
+.picker button{
+  font-family:var(--f-m); font-size:12px; letter-spacing:.08em; color:var(--dim);
+  border:1px solid var(--rule); padding:9px 12px; min-height:40px; display:inline-flex; gap:8px; align-items:baseline;
+  transition:color .2s ease, border-color .2s ease, background .2s ease;
+}
+.picker button small{ font-size:10.5px; color:var(--muted-txt); font-variant-numeric:tabular-nums; }
+.picker button:hover:not(:disabled){ color:var(--bone); border-color:var(--dim); }
+.picker button[aria-pressed="true"]{ color:var(--ink); background:var(--sig); border-color:var(--sig); }
+.picker button[aria-pressed="true"] small{ color:var(--ink); }
+.picker button:disabled{ opacity:.35; cursor:not-allowed; }
+.calc-h{ font-family:var(--f-d); font-size:var(--s1); line-height:1.2; }
+.dnote{ margin-top:12px; color:var(--muted-txt); font-size:13px; line-height:1.5; max-width:80ch; }
+.runrow{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 26px; margin-top:16px; }
+.run{
+  font-family:var(--f-m); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink); background:var(--bone); padding:12px 18px; min-height:44px; transition:background .2s ease;
+}
+.run:hover:not(:disabled){ background:var(--sig); }
+.run:disabled{ opacity:.4; cursor:not-allowed; }
+.tally{ display:flex; flex-wrap:wrap; gap:6px 22px; }
+.tally span{ font-family:var(--f-m); font-size:12px; color:var(--muted-txt); letter-spacing:.06em; }
+.tally b{ color:var(--bone); font-weight:500; font-variant-numeric:tabular-nums; }
+.demo-grid{ display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:clamp(24px,4vw,60px); margin-top:clamp(24px,4vh,40px); }
+@media (max-width:900px){ .demo-grid{ grid-template-columns:minmax(0,1fr); } .demo-grid .out{ order:-1; } }
+.demo-grid h3{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--muted-txt); padding-bottom:10px; border-bottom:1px solid var(--rule); display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.demo-grid h3 span{ color:var(--dim); letter-spacing:.06em; text-transform:none; }
+.rec .kv > div{ padding-block:8px; }
+.pass{ display:grid; grid-template-columns:repeat(9,minmax(0,1fr)); gap:3px; margin-top:18px; }
+.pass span{ font-family:var(--f-m); font-size:10px; letter-spacing:.06em; color:var(--muted-txt); text-align:center; padding-top:8px; border-top:3px solid var(--rule); transition:color .15s ease, border-color .15s ease; overflow:hidden; text-overflow:clip; white-space:nowrap; }
+.pass span.lit{ border-color:var(--trace); color:var(--bone); }
+.pass span.lit.end{ border-color:var(--sig); }
+.meter{ margin-top:26px; }
+.meter .row1{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
+.meter .pv{ font-family:var(--f-m); font-size:clamp(20px,1.6rem,28px); color:var(--bone); font-variant-numeric:tabular-nums; }
+.meter .tr{ position:relative; height:12px; background:var(--rule-soft); margin-top:10px; }
+.meter .tr i{ position:absolute; left:0; top:0; bottom:0; width:0; background:var(--dim); border-radius:0 3px 3px 0; transition:width .5s var(--ease), background .3s ease; }
+.meter .tr.atk i{ background:var(--sig); }
+.meter .th{ position:absolute; left:50%; top:-6px; bottom:-6px; width:1px; background:var(--bone); }
+.meter .scale{ display:flex; justify-content:space-between; margin-top:8px; }
+.meter .scale span:nth-child(2){ color:var(--dim); }
+.verdict{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; margin-top:24px; padding-top:20px; border-top:1px solid var(--rule-soft); }
+@media (max-width:480px){ .verdict{ grid-template-columns:minmax(0,1fr); } }
+.verdict .big{ font-family:var(--f-d); font-size:clamp(40px,4.6vw,64px); line-height:.95; display:block; margin-top:6px; }
+.verdict .big.atk{ color:var(--sig); }
+.truth .lbl{ font-family:var(--f-m); font-size:15px; color:var(--bone); display:block; margin-top:10px; word-break:break-word; }
+.tag{ display:inline-block; margin-top:8px; font-family:var(--f-m); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sig); border:1px solid var(--sig-dim); padding:3px 7px; }
+.outcome{ margin-top:12px; font-family:var(--f-m); font-size:12px; letter-spacing:.1em; text-transform:uppercase; display:inline-flex; gap:8px; align-items:center; }
+.outcome.ok{ color:var(--trace); }
+.outcome.bad{ color:var(--sig); }
+.outcome::before{ content:""; width:8px; height:8px; background:currentColor; }
+.outcome.ok::before{ border-radius:50%; }
+.top3{ margin-top:22px; display:grid; gap:9px; }
+.top3 .r{ display:grid; grid-template-columns:minmax(0,9ch) minmax(0,1fr) 6ch; gap:12px; align-items:center; font-family:var(--f-m); font-size:12.5px; color:var(--dim); }
+.top3 .r span:first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--bone); }
+.top3 .r span:last-child{ text-align:right; font-variant-numeric:tabular-nums; }
+.top3 .tr{ height:6px; background:var(--rule-soft); position:relative; }
+.demo-band .meter .tr, .demo-band .top3 .tr{ background:var(--rule); }
+.top3 .tr i{ position:absolute; left:0; top:0; bottom:0; background:var(--trace); border-radius:0 3px 3px 0; transition:width .5s var(--ease); }
+.demo-state{ margin-top:22px; padding:18px; border:1px dashed var(--rule); color:var(--dim); font-size:clamp(14px,.94rem,16px); display:flex; gap:14px; align-items:center; }
+.demo-state .spin{ flex:none; width:14px; height:14px; border:1px solid var(--rule); border-top-color:var(--sig); border-radius:50%; animation:spin 1s linear infinite; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .demo-state .spin{ animation:none; } }
+[hidden]{ display:none !important; }
+
+/* ============================================================ RE-EXAMINATION */
+.bars{ display:grid; gap:0; }
+.bars .grp{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--muted-txt); padding:20px 0 8px; }
+.bars .b{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 7ch; gap:14px; align-items:center; padding-block:10px; border-bottom:1px solid var(--rule-soft); }
+@media (max-width:640px){ .bars .b{ grid-template-columns:minmax(0,1fr) 7ch; } .bars .b .tr{ grid-column:1 / -1; grid-row:2; } }
+.bars .b .t{ color:var(--dim); font-size:clamp(13.5px,.9rem,15.5px); line-height:1.4; }
+.bars .b .t small{ display:block; font-family:var(--f-m); font-size:10.5px; letter-spacing:.06em; color:var(--muted-txt); margin-top:2px; }
+.bars .b .tr{ height:10px; background:var(--rule-soft); position:relative; }
+.bars .b .tr i{ position:absolute; left:0; top:0; bottom:0; border-radius:0 3px 3px 0; background:var(--dim); }
+.bars .b.split .tr i{ background:var(--trace); }
+.bars .b.off .tr i{ background:var(--sig); }
+.bars .b .v{ font-family:var(--f-m); font-size:13px; color:var(--bone); text-align:right; font-variant-numeric:tabular-nums; }
+.bars .b.pending .v{ color:var(--muted-txt); }
+.axis100{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) 7ch; gap:14px; padding-top:8px; }
+.axis100 .ticks{ display:flex; justify-content:space-between; font-family:var(--f-m); font-size:10.5px; color:var(--muted-txt); }
+@media (max-width:640px){ .axis100{ grid-template-columns:minmax(0,1fr) 7ch; } .axis100 > span:first-child{ display:none; } }
+.stats{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:0; border-top:1px solid var(--rule); margin-top:clamp(28px,5vh,48px); }
+@media (max-width:760px){ .stats{ grid-template-columns:repeat(6,minmax(0,1fr)); } .stats > div{ grid-column:span 2; } .stats > div:nth-child(-n+2){ grid-column:span 3; } }
+.stats > div{ padding:16px 14px 16px 0; border-bottom:1px solid var(--rule-soft); display:grid; gap:4px; }
+.stats b{ font-family:var(--f-d); font-weight:400; font-size:clamp(28px,3vw,42px); font-variant-numeric:tabular-nums; line-height:1; }
+.why{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(20px,3vw,44px); margin-top:clamp(36px,6vh,60px); }
+@media (max-width:900px){ .why{ grid-template-columns:minmax(0,1fr); } }
+.why > div{ border-top:1px solid var(--rule); padding-top:16px; display:grid; gap:10px; align-content:start; }
+.why h3{ font-family:var(--f-d); font-size:var(--s1); line-height:1.2; }
+.why p{ color:var(--dim); font-size:clamp(14px,.94rem,16.5px); }
+.why .n{ font-family:var(--f-d); font-size:clamp(30px,3vw,42px); color:var(--bone); line-height:1; font-variant-numeric:tabular-nums; }
+.pull{ margin-top:clamp(36px,6vh,64px); font-family:var(--f-d); font-style:italic; font-size:clamp(22px,2.4vw,34px); line-height:1.25; max-width:34ch; color:var(--bone); }
+
+/* ============================================================ PIPELINE */
+.pipe{ list-style:none; margin:clamp(32px,6vh,60px) 0 0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:0; position:relative; }
+.pipe li{ position:relative; padding:44px 14px 0 0; display:grid; gap:8px; align-content:start; }
+.pipe li::before{ content:""; position:absolute; left:0; top:12px; width:11px; height:11px; border:1px solid var(--dim); background:var(--ink); z-index:2; }
+.pipe li.model::before{ background:var(--sig); border-color:var(--sig); }
+.pipe li::after{ content:""; position:absolute; left:11px; right:0; top:17px; height:1px; background:var(--rule); }
+.pipe li:last-child::after{ display:none; }
+.pipe li .pk{ position:absolute; top:15px; left:11px; width:6px; height:5px; background:var(--trace); z-index:1; animation:pk 2.8s linear infinite; opacity:0; }
+.pipe li.model .pk{ background:var(--sig); }
+@keyframes pk{ 0%{ transform:translateX(0); opacity:0 } 10%{ opacity:1 } 90%{ opacity:1 } 100%{ transform:translateX(var(--run,120px)); opacity:0 } }
+.pipe h3{ font-family:var(--f-d); font-size:clamp(17px,1.2rem,21px); line-height:1.2; }
+.pipe p{ color:var(--dim); font-size:clamp(13px,.86rem,15px); line-height:1.5; }
+.pipe .own{ color:var(--sig); }
+@media (max-width:980px){
+  .pipe{ grid-template-columns:minmax(0,1fr); }
+  .pipe li{ padding:0 0 26px 34px; }
+  .pipe li::before{ top:6px; }
+  .pipe li::after{ left:5px; right:auto; top:18px; bottom:0; width:1px; height:auto; }
+  .pipe li .pk{ display:none; }
+}
+@media (min-width:981px){ .pipe h3{ min-height:2.4em; } }
+@media (max-width:1180px) and (min-width:981px){ .pipe{ grid-template-columns:repeat(4,minmax(0,1fr)); row-gap:28px; } .pipe li:nth-child(4)::after{ display:none; } }
+@media (prefers-reduced-motion: reduce){ .pipe li .pk{ display:none; } }
+.oob{ margin-top:28px; color:var(--dim); max-width:70ch; font-size:clamp(14px,.94rem,16.5px); padding-left:16px; border-left:1px solid var(--sig-dim); }
+
+.calc{ display:grid; grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr); gap:clamp(24px,4vw,60px); margin-top:clamp(36px,6vh,60px); padding-top:24px; border-top:1px solid var(--rule); }
+@media (max-width:900px){ .calc{ grid-template-columns:minmax(0,1fr); } }
+.ctrl{ display:grid; gap:18px; }
+.ctrl label{ display:grid; gap:8px; }
+.ctrl .lr{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.ctrl .lr span:first-child{ color:var(--dim); font-size:clamp(13.5px,.92rem,16px); }
+.ctrl output{ font-family:var(--f-m); font-size:13px; color:var(--bone); font-variant-numeric:tabular-nums; }
+input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:24px; background:transparent; }
+input[type=range]::-webkit-slider-runnable-track{ height:2px; background:var(--rule); }
+input[type=range]::-moz-range-track{ height:2px; background:var(--rule); }
+input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; margin-top:-7px; background:var(--sig); border:2px solid var(--ink); border-radius:50%; }
+input[type=range]::-moz-range-thumb{ width:14px; height:14px; background:var(--sig); border:2px solid var(--ink); border-radius:50%; }
+input[type=range]:focus-visible{ outline:1px solid var(--sig); outline-offset:2px; }
+.res .line{ font-family:var(--f-d); font-size:clamp(24px,2.6vw,38px); line-height:1.2; max-width:22ch; }
+.res .line b{ font-weight:400; color:var(--sig); font-variant-numeric:tabular-nums; }
+.alertbar{ margin-top:22px; height:28px; display:flex; background:var(--rule-soft); }
+.alertbar i{ display:block; height:100%; }
+.alertbar .real{ background:var(--sig); min-width:2px; }
+.alertbar .fake{ background:var(--muted); opacity:.55; flex:1; margin-left:2px; }
+.res .kv{ margin-top:16px; }
+
+.next{ list-style:none; counter-reset:n; margin:clamp(36px,6vh,60px) 0 0; padding:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 clamp(24px,4vw,60px); }
+@media (max-width:760px){ .next{ grid-template-columns:minmax(0,1fr); } }
+.next li{ counter-increment:n; display:grid; grid-template-columns:3ch minmax(0,1fr); gap:12px; padding-block:16px; border-top:1px solid var(--rule-soft); color:var(--dim); font-size:clamp(14px,.94rem,16.5px); }
+.next li::before{ content:counter(n, decimal-leading-zero); font-family:var(--f-m); font-size:12px; color:var(--sig); padding-top:.25em; }
+.next li b{ color:var(--bone); font-weight:400; }
+
+/* ============================================================ CTA + FOOTER */
+.cta{ padding-block:clamp(90px,16vh,190px) clamp(60px,10vh,110px); }
+.cta .h2{ max-width:18ch; font-size:clamp(32px,4.6vw,64px); }
+.mailrow{ display:flex; flex-wrap:wrap; align-items:baseline; gap:12px 24px; margin-top:clamp(26px,4vh,40px); }
+.mail{ font-family:var(--f-d); font-size:clamp(22px,3.4vw,48px); color:var(--sig); border-bottom:1px solid var(--sig-dim); padding-bottom:6px; text-decoration:none; word-break:break-word; transition:color .3s ease, border-color .3s ease; }
+.mail:hover{ color:var(--bone); border-color:var(--bone); }
+.copy{ font-family:var(--f-m); font-size:var(--s-1); letter-spacing:.14em; text-transform:uppercase; color:var(--dim); border:1px solid var(--rule); padding:8px 12px; min-height:36px; }
+.copy:hover{ color:var(--sig); border-color:var(--sig); }
+.cta .links{ margin-top:clamp(28px,5vh,48px); }
+footer{ border-top:1px solid var(--rule); padding-block:36px 48px; }
+footer .wrap{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:24px clamp(24px,4vw,60px); }
+@media (max-width:760px){ footer .wrap{ grid-template-columns:minmax(0,1fr); } }
+footer p{ color:var(--muted-txt); font-size:13.5px; line-height:1.6; }
+footer p b{ color:var(--dim); font-weight:400; }
+footer cite{ font-style:italic; color:var(--dim); }
+footer a{ color:var(--dim); word-break:break-all; }
+footer a:hover{ color:var(--sig); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="who" href="./">Farhad Maleki</a>
+    <nav aria-label="Page">
+      <a href="./">← Work</a>
+      <a href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Paper ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ============================================================ HERO -->
+<section class="hero" aria-labelledby="title">
+  <div class="wrap">
+    <span class="mono meta">Springer · NEW2AN / ruSMART 2023 · LNCS pp. 37-46</span>
+    <h1 id="title">Deep Learning for Preventing Botnet Attacks on IoT</h1>
+    <div class="hero-grid">
+      <div class="role">
+        <p><span class="who">Farhad Maleki, co-author.</span> Third of seven authors. The work was done during my B.Sc. in Computer Network Engineering; the authors are from the School of Engineering, Applied Science and Technology at Canadian University Dubai. It was published in the proceedings of the conference held in Dubai on 21-22 December 2023.</p>
+        <p>We compared three deep learning models for telling infected IoT traffic from normal traffic. This page walks through the study, runs a retrained copy of the public notebook's NSL-KDD model in your browser, re-tests it against a harder benchmark, and sets out what it would take to put it in front of a real network.</p>
+        <div class="links">
+          <a class="lnk pri" href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Read the paper ↗</a>
+          <a class="lnk" href="https://github.com/Farhad1618/Network-Intrusion-Detection-CNN/files/13536880/m64421-F.Farhad.paper.pdf" target="_blank" rel="noopener">PDF ↗</a>
+          <a class="lnk" href="https://github.com/Farhad1618/Network-Intrusion-Detection-CNN" target="_blank" rel="noopener">Code ↗</a>
+        </div>
+      </div>
+      <div class="fig99">
+        <span class="n">99.34%</span>
+        <span class="mono q">CNN-RNN accuracy · N-BaIoT, TCP traffic removed</span>
+        <span class="mono q2">Paper Table 4 · loss 0.37%</span>
+        <div class="alt"><b>98.23%</b><span class="mono">same architecture on NSL-KDD</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PROBLEM -->
+<section id="problem" aria-labelledby="h-problem">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">The problem</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-problem">An infected camera still looks like a camera.</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>Connected devices commonly ship with default passwords and rarely get updates. Botnet malware such as <strong>Mirai</strong> and <strong>Gafgyt</strong> (also called Bashlite) logs in, installs itself, and turns the device into one node of a botnet. From then on it scans for the next victim and floods targets on command.</p>
+          <p>The owner notices nothing. The camera keeps streaming. The only visible change is in its network traffic: who it talks to, how often, and how much.</p>
+        </div>
+        <div class="prose">
+          <p>The device can't defend itself. It has too little memory and processing power to run a model, and it is the thing that has been compromised.</p>
+          <p>The one place that sees every connection is the <strong>gateway</strong>: the home router, an IoT hub, or a network tap. That is where a detector like ours would run.</p>
+        </div>
+      </div>
+      <figure class="fig">
+        <div class="stage">
+          <canvas id="netc" role="img" aria-label="Animated home network. Eight devices connect through a gateway to the internet. A command server infects the camera, the camera scans the other devices and the internet, then floods an outside target. The detector at the gateway raises an alert on the camera."></canvas>
+          <div class="phases" id="phases">
+            <span data-p="0">Normal</span><span data-p="1">Infection</span><span data-p="2">Scanning</span><span data-p="3">Flood</span>
+            <button class="ctl" id="netpause" type="button">Pause</button>
+          </div>
+        </div>
+        <figcaption><b>Illustration, not captured traffic.</b> Teal is ordinary traffic. Amber is the botnet: commands arriving, the camera probing its neighbours and random internet addresses, then a flood aimed at one outside target.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ STUDY -->
+<section id="study" aria-labelledby="h-study">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">The study</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-study">Three models, trained on traffic from real infected devices.</h2>
+      <div class="cols">
+        <div class="prose">
+          <p>We compared three supervised models: a <strong>CNN</strong>, a <strong>1D CNN</strong>, and a hybrid <strong>CNN-RNN</strong>, where convolution layers extract features and recurrent layers model them as a sequence. Each had to label a traffic record as benign or as a specific botnet attack.</p>
+          <p>The main dataset was <strong>N-BaIoT</strong> (Meidan et al., 2018): traffic from real IoT devices infected with Mirai and Gafgyt, summarised as 115 statistical features per record. A second dataset, <strong>NSL-KDD</strong>, checked that the chosen model generalises beyond it.</p>
+        </div>
+        <dl class="kv">
+          <div><dt>Features per record</dt><dd>115</dd></div>
+          <div><dt>Training rows</dt><dd>648,309</dd></div>
+          <div><dt>Validation rows</dt><dd>185,232</dd></div>
+          <div><dt>Test rows</dt><dd>92,616</dd></div>
+          <div><dt>Optimiser</dt><dd>Adam, lr 0.001</dd></div>
+          <div><dt>Epochs</dt><dd>50</dd></div>
+          <div><dt>Batch sizes tried</dt><dd>128 · 256 · 512</dd></div>
+        </dl>
+      </div>
+
+      <figure class="fig" id="t3fig">
+        <div class="figtitle">
+          <h3>Accuracy by model and batch size, N-BaIoT, all traffic</h3>
+          <div class="legend" aria-hidden="true">
+            <span><svg width="12" height="12"><circle cx="6" cy="6" r="4.5" fill="#716E68"/></svg>CNN</span>
+            <span><svg width="12" height="12"><rect x="1.5" y="1.5" width="9" height="9" fill="#5FA8B8"/></svg>1DCNN</span>
+            <span><svg width="12" height="12"><path d="M6 .8 11.2 6 6 11.2.8 6Z" fill="#E9A03B"/></svg>CNN-RNN</span>
+          </div>
+        </div>
+        <div class="chartbox" id="t3"><div class="tip" id="t3tip" role="status"></div></div>
+        <div class="chartbox scale100" id="t3full"></div>
+        <figcaption><b>Zoomed axis.</b> The y-axis runs from 89.5% to 92.0% so the differences are visible. On a full 0 to 100 scale (the strip below the chart) all nine runs sit inside a 2.21-point band. The best run, CNN-RNN at batch size 256, reached 91.89%. Source: paper Table 3.</figcaption>
+        <details class="tbl">
+          <summary>Table 3 as data</summary>
+          <div class="tscroll">
+            <table>
+              <caption class="sr">Accuracy and loss in percent by model and batch size, N-BaIoT, all traffic</caption>
+              <thead><tr><th scope="col">Model</th><th scope="col">Acc 128</th><th scope="col">Loss 128</th><th scope="col">Acc 256</th><th scope="col">Loss 256</th><th scope="col">Acc 512</th><th scope="col">Loss 512</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">CNN</th><td>90.66</td><td>14.01</td><td>90.75</td><td>14.08</td><td>89.68</td><td>14.88</td></tr>
+                <tr><th scope="row">1DCNN</th><td>90.96</td><td>13.44</td><td>90.91</td><td>13.51</td><td>90.97</td><td>13.45</td></tr>
+                <tr><th scope="row">CNN-RNN</th><td>90.99</td><td>13.40</td><td class="best">91.89</td><td class="best">13.12</td><td>90.81</td><td>13.72</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </figure>
+
+      <div class="steps" aria-label="From all traffic to TCP removed">
+        <div>
+          <span class="mono">All traffic · best run</span>
+          <span class="v tnum">91.89%</span>
+          <p>CNN-RNN, batch size 256. Overall accuracy looked fine, but it hid two failures.</p>
+        </div>
+        <div>
+          <span class="mono">Per-class report</span>
+          <span class="v a tnum">0 <span style="font-size:.45em;color:var(--dim)">recall</span></span>
+          <p>Mirai UDP was never caught: recall 0. Gafgyt TCP had a precision of 0.54, so almost half of what the model called Gafgyt TCP was something else. Mixing TCP and UDP traffic confused the model, so we removed TCP.</p>
+        </div>
+        <div>
+          <span class="mono">Final CNN-RNN · Table 4</span>
+          <span class="v a tnum">99.34%</span>
+          <p><span class="mono"><b>N-BaIoT, TCP traffic removed</b></span>, loss 0.37%. On NSL-KDD the same architecture reached <strong style="color:var(--bone);font-weight:400">98.23%</strong>, loss 3.73%.</p>
+        </div>
+      </div>
+      <p class="prose" style="margin-top:22px">The paper builds a detector. It does not block traffic, capture packets live, or deploy anything. Those are the questions the last two sections take on.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ARCHITECTURE -->
+<section id="model" aria-labelledby="h-model">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">Inside the model</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-model">How the CNN-RNN reads one connection.</h2>
+      <p class="lede">These are the real layer shapes of the public notebook, the version built for NSL-KDD's 122 inputs. Scroll through the layers to follow one record from raw features to a verdict.</p>
+      <div class="arch">
+        <div class="arch-stage">
+          <div class="stage">
+            <canvas id="archc" role="img" aria-label="Layer diagram: 122 inputs, Conv1D 122 by 64, Conv1D 122 by 32, SimpleRNN 122 by 32, SimpleRNN 122 by 16, Flatten 1,952, Dense 128, Dense 64, output 23 classes. 273,255 parameters in total."></canvas>
+            <div class="arch-cap"><span class="mono" id="archnow"><b>Input</b> · 122</span><span class="mono">Keras / TensorFlow</span></div>
+          </div>
+        </div>
+        <div>
+          <ol class="layers" id="layers"></ol>
+          <div class="total"><span class="mono">Total parameters</span><b>273,255</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ DEMO -->
+<section id="demo" aria-labelledby="h-demo">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">Run the detector</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-demo">Score real test connections in your browser.</h2>
+      <p class="lede">Pick a kind of connection from NSL-KDD's official test file, KDDTest+. The model runs here on your device, with no server involved, and you see what it decided and whether it was right.</p>
+    </div>
+  </div>
+  <div class="demo-band">
+    <div class="wrap">
+      <p class="notice">This is the NSL-KDD model from the public notebook, retrained and running in JavaScript. It is not the N-BaIoT model behind the 99.34% figure; those experiments are not in the public repository.</p>
+
+      <div class="demo-state" id="dstate" role="status"><span class="spin" aria-hidden="true"></span><span id="dstatemsg">Loading the model into your browser…</span></div>
+
+      <div class="demo-live" id="dlive" hidden>
+        <div class="picker" id="picker" role="group" aria-label="Kind of connection to score"></div>
+        <p class="dnote" id="dnote">Samples are stratified across categories, so rare attack types are over-represented. The tally is not the model's accuracy<span id="dnacc"></span>.</p>
+        <div class="runrow">
+          <button class="run" id="runbtn" type="button">Score another</button>
+          <div class="tally" aria-live="polite" id="tally">
+            <span>Runs <b id="tRuns">0</b></span><span>Correct <b id="tOk">0</b></span><span>Missed attacks <b id="tMiss">0</b></span><span>False alarms <b id="tFa">0</b></span>
+          </div>
+        </div>
+
+        <div class="demo-grid">
+          <div class="rec">
+            <h3>The connection <span id="recid"></span></h3>
+            <dl class="kv" id="reckv"></dl>
+          </div>
+          <div class="out">
+            <h3>The model <span>9 layers · threshold 0.5</span></h3>
+            <div class="pass" id="pass" aria-hidden="true"></div>
+            <div class="meter">
+              <div class="row1"><span class="mono">Probability of attack</span><span class="pv" id="pv">—</span></div>
+              <div class="tr" id="mtr" role="meter" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" aria-label="Probability of attack"><i id="mfill"></i><span class="th"></span></div>
+              <div class="scale mono"><span>0</span><span>0.5</span><span>1</span></div>
+            </div>
+            <div class="verdict" aria-live="polite">
+              <div>
+                <span class="mono">Verdict</span>
+                <span class="big" id="vbig">—</span>
+                <div class="top3" id="top3" aria-label="Top three class guesses"></div>
+              </div>
+              <div class="truth">
+                <span class="mono">True label</span>
+                <span class="lbl" id="tlbl">—</span>
+                <span class="tag" id="tunseen" hidden>Never seen in training</span>
+                <div><span class="outcome" id="outc" hidden></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ RE-EXAMINATION -->
+<section id="reexam" aria-labelledby="h-re">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">Re-examined</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-re">Re-examined, three years on.</h2>
+      <p class="lede">A result is only as good as the test behind it. In November 2026 I re-ran the public notebook and scored it on NSL-KDD's official test file, KDDTest+, instead of a random slice of its own training file. The gap between those two numbers is the most useful thing this project taught me.</p>
+
+      <figure class="fig">
+        <div class="figtitle"><h3>Same architecture, two ways of testing it</h3><span class="mono">Accuracy, full 0 to 100 scale</span></div>
+        <div class="bars" id="cmp">
+          <div class="grp">The paper, and the notebook on random splits</div>
+          <div class="b split"><span class="t">Paper, NSL-KDD<small>Table 4, the paper's own protocol</small></span><span class="tr"><i style="width:98.23%"></i></span><span class="v">98.23%</span></div>
+          <div class="b split"><span class="t">Public notebook, re-run<small>random 20% of KDDTrain+</small></span><span class="tr"><i style="width:99.49%"></i></span><span class="v">99.49%</span></div>
+          <div class="b split pending" id="bHold"><span class="t">Notebook recipe, re-trained<small>separate run, random 20% holdout of KDDTrain+, 23 classes</small></span><span class="tr"><i style="width:0"></i></span><span class="v">…</span></div>
+          <div class="grp">Official test file, KDDTest+ (attack or normal)</div>
+          <div class="b off pending" id="bTest"><span class="t">Demo model on this page<small>all 22,544 rows</small></span><span class="tr"><i style="width:0"></i></span><span class="v">…</span></div>
+          <div class="b off"><span class="t">Earlier re-run, mean of 3 seeds<small>notebook architecture</small></span><span class="tr"><i style="width:76.6%"></i></span><span class="v">76.6%</span></div>
+          <div class="b"><span class="t">Default random forest<small>baseline, no tuning</small></span><span class="tr"><i style="width:77%"></i></span><span class="v">77.0%</span></div>
+          <div class="axis100" aria-hidden="true"><span></span><span class="ticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></span><span></span></div>
+        </div>
+        <figcaption id="cmpcap"><b>Two different questions.</b> A random split asks how well the model recognises rows like the ones it trained on. KDDTest+ asks how it does on a differently mixed set of connections, including 3,750 rows from 17 attack types it never saw. The KDDTest+ numbers for the demo model are computed from the exact weights running above.</figcaption>
+      </figure>
+
+      <div class="stats" id="stats" aria-label="Demo model on KDDTest+">
+        <div><span class="mono">Recall</span><b id="sRec">…</b></div>
+        <div><span class="mono">Precision</span><b id="sPre">…</b></div>
+        <div><span class="mono">False-positive rate</span><b id="sFpr">…</b></div>
+        <div><span class="mono">F1</span><b id="sF1">…</b></div>
+        <div><span class="mono">AUC</span><b id="sAuc">…</b></div>
+      </div>
+
+      <div class="cols">
+        <figure class="fig" style="margin-top:0">
+          <div class="figtitle"><h3>Attacks caught, by category</h3><span class="mono">Recall, demo model</span></div>
+          <div class="bars" id="cat"></div>
+          <figcaption>Share of each attack category in KDDTest+ that the demo model flagged as an attack.</figcaption>
+        </figure>
+        <figure class="fig" style="margin-top:0">
+          <div class="figtitle"><h3>Seen versus unseen attack types</h3><span class="mono">Recall, demo model</span></div>
+          <div class="bars" id="seen"></div>
+          <figcaption id="seencap">Unseen means the attack's name never appears in KDDTrain+. For comparison, the earlier 3-seed re-run caught 35% of those, against 64.5% recall overall, close to the demo model's figures.</figcaption>
+        </figure>
+      </div>
+
+      <div class="why">
+        <div>
+          <span class="n tnum">99.5% → 76.6%</span>
+          <h3>Random splits flatter the model.</h3>
+          <p>The notebook scores 99.49% on a random 20% of its training file and averaged 76.6% on KDDTest+ across three seeds. NSL-KDD contains many near-identical rows. A random 20% split puts near-twins of training rows into the test set, so the score mostly measures how well the model remembers.</p>
+        </div>
+        <div>
+          <span class="n tnum">0.8% → 12.2%</span>
+          <h3>The test file has a different mix.</h3>
+          <p>R2L attacks, where an outsider gains access to a machine, are 0.8% of the training data and 12.2% of the test file. The model rarely saw them, so it rarely catches them: R2L recall was about 10% in the 3-seed re-run.</p>
+        </div>
+        <div>
+          <span class="n tnum">17</span>
+          <h3>A closed set can't name what's new.</h3>
+          <p>The softmax output must choose one of the 23 labels it trained on. Faced with one of the 17 attack types missing from training, it can only guess the nearest familiar label, or call it normal.</p>
+        </div>
+      </div>
+      <p class="pull">A random split of the training file answers an easier question than the one a deployed detector faces. Knowing that difference is the job.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ PRODUCT -->
+<section id="product" aria-labelledby="h-prod">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">From paper to product</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-prod">Where the model would sit in a real network.</h2>
+      <p class="lede">This kind of model scores a finished connection: its duration, its byte counts, how it ended. So it runs out of band, next to the traffic rather than in its path, and its output is an alert that leads to action on the device's next connections.</p>
+
+      <ol class="pipe" aria-label="Deployment pipeline, in order">
+        <li><span class="pk" aria-hidden="true"></span><h3>Gateway</h3><p>Router, IoT gateway or network tap. Sees every connection; the devices are too weak to run a model.</p></li>
+        <li><span class="pk" aria-hidden="true"></span><h3>Flow records</h3><p>One record per finished connection, for example Zeek's conn.log.</p></li>
+        <li><span class="pk" aria-hidden="true"></span><h3>Feature service</h3><p>Computes the rolling-window statistics the model expects, such as recent connections to the same host.</p></li>
+        <li class="model"><span class="pk" aria-hidden="true"></span><h3>Model service</h3><p>About 2 ms per connection on a laptop CPU, model only. <span class="own">The paper's part.</span></p></li>
+        <li><span class="pk" aria-hidden="true"></span><h3>SIEM</h3><p>Alerts land beside every other security signal.</p></li>
+        <li><span class="pk" aria-hidden="true"></span><h3>Review</h3><p>A person or a second signal confirms before anything is cut off.</p></li>
+        <li><h3>Quarantine</h3><p>Firewall rule or VLAN move for the device's next connections.</p></li>
+      </ol>
+      <p class="oob">Because the score arrives after the connection ends, the model cannot block the connection it is scoring. It can only stop the device's next ones.</p>
+
+      <div class="calc" aria-labelledby="h-calc">
+        <div class="ctrl">
+          <h3 class="calc-h" id="h-calc">The base-rate problem</h3>
+          <p class="prose" style="font-size:clamp(14px,.94rem,16.5px)">A small false-positive rate on a large number of connections still produces a flood of false alerts. Move the sliders to see it. Recall and the default false-positive rate are fixed at the 3-seed re-run's 64.5% and 7.4%, close to the demo model's figures above.</p>
+          <label for="cN"><span class="lr"><span>Connections per day</span><output id="oN" for="cN">1,000,000</output></span><input type="range" id="cN" min="0" max="3" step="1" value="2"></label>
+          <label for="cA"><span class="lr"><span>Share that are attacks</span><output id="oA" for="cA">1 in 1,000</output></span><input type="range" id="cA" min="0" max="3" step="1" value="1"></label>
+          <label for="cF"><span class="lr"><span>False-positive rate</span><output id="oF" for="cF">7.4%</output></span><input type="range" id="cF" min="0.1" max="10" step="0.1" value="7.4"></label>
+        </div>
+        <div class="res" aria-live="polite">
+          <p class="line" id="cLine">About <b>73,926</b> false alerts a day, and under <b>1 in 100</b> alerts is real.</p>
+          <div class="alertbar" aria-hidden="true"><i class="real" id="cReal"></i><i class="fake"></i></div>
+          <div class="mono" style="margin-top:8px;display:flex;justify-content:space-between;gap:10px"><span>Real alerts</span><span>False alerts</span></div>
+          <dl class="kv">
+            <div><dt>Attacks per day</dt><dd id="cAtt">1,000</dd></div>
+            <div><dt>Attacks caught</dt><dd id="cTA">645</dd></div>
+            <div><dt>False alerts</dt><dd id="cFA">73,926</dd></div>
+            <div><dt>Alerts that are real</dt><dd id="cP">0.86%</dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="figtitle" style="margin-top:clamp(48px,8vh,80px)"><h3>What would make it shippable</h3><span class="mono">In order</span></div>
+      <ol class="next">
+        <li><span><b>Split N-BaIoT by device,</b> so no device appears in both training and test.</span></li>
+        <li><span><b>Evaluate on unseen devices and unseen attacks,</b> and report those numbers first.</span></li>
+        <li><span><b>Calibrate thresholds on the target network's own benign traffic,</b> to set the false-positive rate it can afford.</span></li>
+        <li><span><b>Save the model and its preprocessing together,</b> so the scaler and category encodings can't drift apart.</span></li>
+        <li><span><b>Run in log-only shadow mode first,</b> measuring alerts against what analysts confirm.</span></li>
+        <li><span><b>Add anomaly detection</b> for attacks never seen in training, alongside the classifier.</span></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ CTA -->
+<section class="cta" aria-labelledby="h-cta">
+  <div class="wrap frame">
+    <div class="lab"><span class="mono">Work together</span></div>
+    <div class="body">
+      <h2 class="h2" id="h-cta">I build models, then test them against the question they will really face.</h2>
+      <div class="mailrow">
+        <a class="mail" href="mailto:farhad.maleki1618@outlook.com" id="mail">farhad.maleki1618@outlook.com</a>
+        <button class="copy" type="button" id="copybtn">Copy email</button>
+      </div>
+      <div class="links">
+        <a class="lnk" href="https://github.com/Farhad1618" target="_blank" rel="noopener">GitHub ↗</a>
+        <a class="lnk" href="https://linkedin.com/in/farhad-maleki" target="_blank" rel="noopener">LinkedIn ↗</a>
+        <a class="lnk pri" href="./">← Back to work</a>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>Authors.</b> J. N. Al-Jaghoub, N. M. Jibreel, F. Maleki, J. A. J. Aljohar, F. N. Fakhoury, G. B. Satrya, R. Zgheib. School of Engineering, Applied Science and Technology, Canadian University Dubai.</p>
+    <p><b>Citation.</b> Al-Jaghoub, J. N., et al. <cite>Deep Learning for Preventing Botnet Attacks on IoT.</cite> NEW2AN / ruSMART 2023, Dubai, 21-22 December 2023. Lecture Notes in Computer Science, Springer, pp. 37-46. DOI <a href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">10.1007/978-3-031-60994-7_4</a></p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/SplitText.min.js"></script>
+<script>
+(function(){
+"use strict";
+var doc=document.documentElement;
+doc.classList.add("js");
+var C={ ink:"#0C0C0E", ink2:"#18181C", rule:"#26262A", ruleSoft:"#1B1B1E", bone:"#ECE7DC", dim:"#A8A49C", muted:"#716E68", mutedTxt:"#8A867F", sig:"#E9A03B", sigDim:"#8A6224", trace:"#5FA8B8" };
+function rgba(hex,a){ var n=parseInt(hex.slice(1),16); return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")"; }
+function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+function $(id){ return document.getElementById(id); }
+function fmt(n){ return Math.round(n).toLocaleString("en-US"); }
+function pct(x,d){ return (x*100).toFixed(d==null?1:d)+"%"; }
+function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+var reduced=false; try{ reduced=matchMedia("(prefers-reduced-motion: reduce)").matches; }catch(e){}
+var hasG=!!(window.gsap);
+var hasST=hasG && !!window.ScrollTrigger;
+if(hasST) gsap.registerPlugin(ScrollTrigger);
+var MONO="'IBM Plex Mono', Menlo, monospace";
+
+/* ---------- canvas helper: DPR sizing, runs only while visible and the tab is shown ---------- */
+function Scene(canvas, draw){
+  var g=canvas.getContext("2d"), self={ w:0, h:0, g:g, vis:false, raf:0, t0:performance.now(), paused:false };
+  function size(){
+    var r=canvas.getBoundingClientRect(), d=Math.min(window.devicePixelRatio||1,2);
+    self.w=r.width; self.h=r.height;
+    canvas.width=Math.max(1,Math.round(r.width*d)); canvas.height=Math.max(1,Math.round(r.height*d));
+    g.setTransform(d,0,0,d,0,0);
+  }
+  function frame(now){
+    self.raf=0;
+    draw(self,(now-self.t0)/1000);
+    if(self.vis && !document.hidden && !reduced && !self.paused) self.raf=requestAnimationFrame(frame);
+  }
+  self.kick=function(){ if(!self.raf){ self.raf=requestAnimationFrame(frame); } };
+  self.size=size;
+  size();
+  if("ResizeObserver" in window){ new ResizeObserver(function(){ size(); self.kick(); }).observe(canvas); }
+  else addEventListener("resize",function(){ size(); self.kick(); });
+  if("IntersectionObserver" in window){
+    new IntersectionObserver(function(es){ self.vis=es[0].isIntersecting; if(self.vis) self.kick(); },{rootMargin:"60px"}).observe(canvas);
+  } else { self.vis=true; }
+  document.addEventListener("visibilitychange",function(){ if(!document.hidden) self.kick(); });
+  self.kick();
+  return self;
+}
+
+/* ============================================================
+   1. HOME NETWORK — infection, scanning, flood, detection
+   ============================================================ */
+(function(){
+  var cv=$("netc"); if(!cv) return;
+  var DEV=[
+    {n:"Camera",ip:23},{n:"Doorbell",ip:31},{n:"Thermostat",ip:44},{n:"Smart plug",ip:52},
+    {n:"Speaker",ip:61},{n:"Baby monitor",ip:72},{n:"TV",ip:85},{n:"Laptop",ip:90}
+  ];
+  var CYCLE=18, R=mk(4021), pk=[], last=0, simT=0, spawnAcc={n:0,i:0,s:0,f:0};
+  var phaseEls=[].slice.call(document.querySelectorAll("#phases span"));
+  var pauseBtn=$("netpause");
+  function phase(tc){ return tc<4?0:tc<6.5?1:tc<10.5?2:tc<16.5?3:0; }
+
+  function layout(w,h){
+    var L={}, narrow=w<620;
+    if(!narrow){
+      DEV.forEach(function(d,i){ d.x=w*(i%2?0.27:0.1); d.y=h*(0.16+Math.floor(i/2)*0.22); });
+      L.gw={x:w*0.55,y:h*0.5}; L.c2={x:w*0.9,y:h*0.18}; L.cloud={x:w*0.9,y:h*0.5}; L.tgt={x:w*0.9,y:h*0.82};
+      L.home=[w*0.035,h*0.06,w*0.55-w*0.035-30,h*0.88];
+    } else {
+      DEV.forEach(function(d,i){ d.x=w*(0.14+(i%4)*0.24); d.y=h*(0.12+Math.floor(i/4)*0.2); });
+      L.gw={x:w*0.5,y:h*0.58}; L.c2={x:w*0.16,y:h*0.88}; L.cloud={x:w*0.5,y:h*0.88}; L.tgt={x:w*0.84,y:h*0.88};
+      L.home=[w*0.03,h*0.035,w*0.94,h*0.58-h*0.035-26];
+    }
+    L.narrow=narrow; return L;
+  }
+  var L=null, lw=0, lh=0;
+
+  function add(path,dur,col,sz){ pk.push({p:path,t:0,d:dur,c:col,s:sz}); }
+  function edgePoint(w,h){ return L.narrow? {x:R()*w, y:h-2} : {x:w-2, y:h*(0.05+R()*0.9)}; }
+
+  function update(dt,w,h){
+    simT+=dt; var tc=simT%CYCLE, ph=phase(tc);
+    if(tc<dt){ pk.length=0; }
+    /* ordinary traffic, always */
+    spawnAcc.n+=dt*(ph===3?3:5);
+    while(spawnAcc.n>1){ spawnAcc.n--; var d=DEV[Math.floor(R()*DEV.length)];
+      if(R()<0.5) add([d,L.gw,L.cloud],2.4+R()*1.2,C.trace,4); else add([L.cloud,L.gw,d],2.4+R()*1.2,C.trace,4); }
+    if(ph===1){ spawnAcc.i+=dt*4; while(spawnAcc.i>1){ spawnAcc.i--; add([L.c2,L.gw,DEV[0]],1.6,C.sig,5); } }
+    if(ph===2){ spawnAcc.s+=dt*9; while(spawnAcc.s>1){ spawnAcc.s--;
+      if(R()<0.55){ var v=DEV[1+Math.floor(R()*(DEV.length-1))]; add([DEV[0],L.gw,v],1.3,C.sig,3); }
+      else add([DEV[0],L.gw,edgePoint(w,h)],1.5,C.sig,3); } }
+    if(ph===3){ spawnAcc.f+=dt*46; while(spawnAcc.f>1){ spawnAcc.f--; add([DEV[0],L.gw,L.tgt],1.1+R()*0.3,C.sig,5); } }
+    for(var i=pk.length-1;i>=0;i--){ pk[i].t+=dt/pk[i].d; if(pk[i].t>=1) pk.splice(i,1); }
+    return {tc:tc,ph:ph};
+  }
+
+  function along(path,t){
+    var a=path[0],b=path[1],c=path[2];
+    var l1=Math.hypot(b.x-a.x,b.y-a.y), l2=Math.hypot(c.x-b.x,c.y-b.y), s=t*(l1+l2);
+    if(s<l1){ var f=s/l1; return {x:a.x+(b.x-a.x)*f, y:a.y+(b.y-a.y)*f, dx:b.x-a.x, dy:b.y-a.y}; }
+    var f2=(s-l1)/(l2||1); return {x:b.x+(c.x-b.x)*f2, y:b.y+(c.y-b.y)*f2, dx:c.x-b.x, dy:c.y-b.y};
+  }
+
+  function label(g,txt,x,y,col,al){ g.font="400 10px "+MONO; var tw=g.measureText(txt).width, a=al||"center", x0=a==="left"?x:x-tw/2;
+    g.fillStyle=rgba(C.ink2,.85); g.fillRect(x0-2,y-9,tw+4,12); g.fillStyle=col; g.textAlign=a; g.fillText(txt,x,y); }
+
+  function render(S,st){
+    var g=S.g,w=S.w,h=S.h,tc=st.tc,ph=st.ph;
+    g.clearRect(0,0,w,h);
+    /* home boundary */
+    var H=L.home; g.strokeStyle=rgba(C.dim,.16); g.lineWidth=1; g.setLineDash([3,5]);
+    g.strokeRect(H[0]+.5,H[1]+.5,H[2],H[3]); g.setLineDash([]);
+    label(g,"HOME NETWORK 192.168.1.0/24",H[0]+8,H[1]+14,C.mutedTxt,"left");
+    if(!L.narrow) label(g,"INTERNET",w*0.9,h*0.06,C.mutedTxt);
+    /* links */
+    g.strokeStyle=rgba(C.dim,.09);
+    g.beginPath();
+    DEV.forEach(function(d){ g.moveTo(d.x,L.narrow?d.y+38:d.y); g.lineTo(L.gw.x,L.gw.y); });
+    [L.c2,L.cloud,L.tgt].forEach(function(n){ g.moveTo(L.gw.x,L.gw.y); g.lineTo(n.x,n.y); });
+    g.stroke();
+    /* packets */
+    for(var i=0;i<pk.length;i++){ var p=pk[i], q=along(p.p,p.t), m=Math.hypot(q.dx,q.dy)||1;
+      g.strokeStyle=p.c===C.sig?rgba(C.sig,.95):rgba(C.trace,.6); g.lineWidth=p.c===C.sig?1.8:1.4;
+      g.beginPath(); g.moveTo(q.x,q.y); g.lineTo(q.x-q.dx/m*p.s*1.8,q.y-q.dy/m*p.s*1.8); g.stroke(); }
+    /* devices */
+    var infected = tc>5.2 && tc<16.5;
+    DEV.forEach(function(d,i){
+      var bad = i===0 && infected;
+      g.fillStyle=C.ink2; g.fillRect(d.x-7,d.y-7,14,14);
+      g.strokeStyle=bad?C.sig:rgba(C.dim,.7); g.lineWidth=1; g.strokeRect(d.x-6.5,d.y-6.5,13,13);
+      if(bad){ var pr=(tc*1.4)%1; g.strokeStyle=rgba(C.sig,.6*(1-pr)); g.beginPath(); g.arc(d.x,d.y,9+pr*16,0,6.283); g.stroke(); g.fillStyle=C.sig; g.fillRect(d.x-3,d.y-3,6,6); }
+      label(g,d.n,d.x,d.y+21,bad?C.sig:rgba(C.dim,.9));
+      label(g,"."+d.ip,d.x,d.y+33,C.mutedTxt);
+    });
+    /* outside nodes */
+    function node(n,txt,hot){ g.beginPath(); g.arc(n.x,n.y,7,0,6.283); g.fillStyle=C.ink2; g.fill(); g.strokeStyle=hot?C.sig:rgba(C.dim,.6); g.stroke();
+      label(g,txt,n.x,n.y+(L.narrow?-14:21),hot?C.sig:rgba(C.dim,.9)); }
+    node(L.c2,"C2 server",ph===1);
+    node(L.cloud,"Cloud services",false);
+    node(L.tgt,"Flood target",ph===3);
+    /* gateway */
+    var alert = tc>11.2 && tc<16.5, G=L.gw;
+    g.fillStyle=C.ink; g.fillRect(G.x-18,G.y-14,36,28);
+    g.strokeStyle=alert?C.sig:C.bone; g.lineWidth=1; g.strokeRect(G.x-17.5,G.y-13.5,35,27);
+    g.fillStyle=alert?C.sig:C.trace; for(var k=0;k<4;k++){ g.fillRect(G.x-11+k*6,G.y-2,3,4); }
+    label(g,"Gateway",G.x,G.y-22,C.bone);
+    label(g,"detector would run here",G.x,G.y+29,rgba(C.dim,.9));
+    if(alert){
+      var ax=G.x, ay=G.y+(L.narrow?50:52);
+      g.font="500 10px "+MONO; var txt="ALERT  camera .23 flagged"; var tw=g.measureText(txt).width+16;
+      g.fillStyle=C.sig; g.fillRect(ax-tw/2,ay-11,tw,20);
+      g.fillStyle=C.ink; g.textAlign="center"; g.fillText(txt,ax,ay+3);
+    }
+    phaseEls.forEach(function(el,i){ el.classList.toggle("on", i===ph); });
+  }
+
+  var S=Scene(cv,function(S,t){
+    if(S.w!==lw||S.h!==lh){ L=layout(S.w,S.h); lw=S.w; lh=S.h; }
+    var dt=Math.min(0.05, last?t-last:0.016); last=t;
+    var st=update(dt,S.w,S.h); render(S,st);
+  });
+  if(reduced){
+    /* static frame mid-flood */
+    L=layout(S.w,S.h); lw=S.w; lh=S.h;
+    for(var i=0;i<12*30;i++) update(1/30,S.w,S.h);
+    var st={tc:simT%CYCLE,ph:phase(simT%CYCLE)};
+    render(S,st);
+    S.size=(function(orig){ return function(){ orig(); L=layout(S.w,S.h); render(S,st); }; })(S.size);
+    if(pauseBtn) pauseBtn.hidden=true;
+  }
+  if(pauseBtn) pauseBtn.addEventListener("click",function(){
+    S.paused=!S.paused; pauseBtn.textContent=S.paused?"Play":"Pause"; last=0; if(!S.paused) S.kick();
+  });
+})();
+
+/* ============================================================
+   2. TABLE 3 — dot-line chart, zoomed and labelled as such
+   ============================================================ */
+var T3=[
+  {m:"CNN",  col:C.muted, shape:"c", acc:[90.66,90.75,89.68], loss:[14.01,14.08,14.88]},
+  {m:"1DCNN",col:C.trace, shape:"s", acc:[90.96,90.91,90.97], loss:[13.44,13.51,13.45]},
+  {m:"CNN-RNN",col:C.sig, shape:"d", acc:[90.99,91.89,90.81], loss:[13.40,13.12,13.72]}
+];
+var BATCH=[128,256,512];
+var t3drawn=false;
+function mark(shape,x,y,r,fill){
+  x=+x; y=+y;
+  if(shape==="c") return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+fill+'" stroke="'+C.ink2+'" stroke-width="2"/>';
+  if(shape==="s") return '<rect x="'+(x-r)+'" y="'+(y-r)+'" width="'+(2*r)+'" height="'+(2*r)+'" fill="'+fill+'" stroke="'+C.ink2+'" stroke-width="2"/>';
+  var q=r*1.3; return '<path d="M'+x+' '+(y-q)+' L'+(x+q)+' '+y+' L'+x+' '+(y+q)+' L'+(x-q)+' '+y+'Z" fill="'+fill+'" stroke="'+C.ink2+'" stroke-width="2"/>';
+}
+function renderT3(){
+  var box=$("t3"), tip=$("t3tip"); if(!box) return;
+  var W=Math.max(280,box.clientWidth), narrow=W<560;
+  var Hh=narrow?300:360, ml=narrow?44:56, mr=narrow?74:110, mt=26, mb=40;
+  var pw=W-ml-mr, ph=Hh-mt-mb, y0=89.5, y1=92.0;
+  function X(i){ return ml+pw*(0.12+i*0.38); }
+  function Y(v){ return mt+ph*(1-(v-y0)/(y1-y0)); }
+  var s='<svg viewBox="0 0 '+W+' '+Hh+'" width="'+W+'" height="'+Hh+'" role="img" aria-label="Line chart of accuracy by batch size. CNN: 90.66, 90.75, 89.68 percent. 1DCNN: 90.96, 90.91, 90.97. CNN-RNN: 90.99, 91.89, 90.81 for batch sizes 128, 256 and 512. Y axis zoomed from 89.5 to 92 percent.">';
+  for(var v=89.5; v<=92.001; v+=0.5){
+    var yy=Y(v).toFixed(1);
+    s+='<line x1="'+ml+'" x2="'+(W-mr+20)+'" y1="'+yy+'" y2="'+yy+'" stroke="'+C.rule+'" stroke-width="1"'+(v===89.5?'':' stroke-dasharray="2 4"')+'/>';
+    s+='<text x="'+(ml-10)+'" y="'+yy+'" dy="4" text-anchor="end" font-family="'+MONO+'" font-size="11" fill="'+C.mutedTxt+'">'+v.toFixed(1)+'%</text>';
+  }
+  /* zoom break mark on the baseline */
+  s+='<path d="M'+(ml-4)+' '+(Y(89.5)+6)+' l8 -6 M'+(ml-4)+' '+(Y(89.5)+11)+' l8 -6" stroke="'+C.dim+'" stroke-width="1" fill="none"/>';
+  BATCH.forEach(function(b,i){ s+='<text x="'+X(i)+'" y="'+(Hh-14)+'" text-anchor="middle" font-family="'+MONO+'" font-size="11" fill="'+C.dim+'">'+b+'</text>'; });
+  s+='<text x="'+(ml+pw*0.5)+'" y="'+(Hh-1)+'" text-anchor="middle" font-family="'+MONO+'" font-size="10" fill="'+C.mutedTxt+'" letter-spacing="1.2">BATCH SIZE</text>';
+  /* lines */
+  T3.forEach(function(r,k){
+    var d=r.acc.map(function(a,i){ return (i?'L':'M')+X(i).toFixed(1)+' '+Y(a).toFixed(1); }).join(' ');
+    s+='<path class="ln" d="'+d+'" fill="none" stroke="'+r.col+'" stroke-width="2" stroke-linejoin="round"/>';
+  });
+  /* points */
+  T3.forEach(function(r,k){ r.acc.forEach(function(a,i){
+    s+='<g class="pt">'+mark(r.shape,X(i).toFixed(1),Y(a).toFixed(1),narrow?4.5:5,r.col)+'</g>';
+  }); });
+  /* direct labels at the right end, nudged apart */
+  var labs=T3.map(function(r){ return {m:r.m,col:r.col,y:Y(r.acc[2]),v:r.acc[2]}; }).sort(function(a,b){return a.y-b.y;});
+  for(var i=1;i<labs.length;i++){ if(labs[i].y-labs[i-1].y<15) labs[i].y=labs[i-1].y+15; }
+  labs.forEach(function(l){
+    s+='<text x="'+(X(2)+14)+'" y="'+l.y.toFixed(1)+'" dy="4" font-family="'+MONO+'" font-size="11" fill="'+C.bone+'">'+l.m+'</text>';
+  });
+  /* best annotation */
+  var bx=X(1), by=Y(91.89);
+  s+='<line x1="'+bx+'" x2="'+bx+'" y1="'+(by-9)+'" y2="'+(by-20)+'" stroke="'+C.sig+'" stroke-width="1"/>';
+  s+='<text x="'+bx+'" y="'+(by-25)+'" text-anchor="middle" font-family="'+MONO+'" font-size="11" fill="'+C.bone+'">91.89% best</text>';
+  /* hit targets */
+  T3.forEach(function(r,k){ r.acc.forEach(function(a,i){
+    s+='<circle class="hit" tabindex="0" role="img" aria-label="'+r.m+', batch '+BATCH[i]+': accuracy '+a.toFixed(2)+'%, loss '+r.loss[i].toFixed(2)+'%" data-k="'+k+'" data-i="'+i+'" cx="'+X(i).toFixed(1)+'" cy="'+Y(a).toFixed(1)+'" r="13" fill="transparent"/>';
+  }); });
+  s+='</svg>';
+  var old=box.querySelector("svg"); if(old) old.remove();
+  box.insertAdjacentHTML("beforeend",s);
+  [].forEach.call(box.querySelectorAll(".hit"),function(h){
+    function show(){
+      var r=T3[+h.dataset.k], i=+h.dataset.i;
+      tip.innerHTML="<b>"+r.m+" · batch "+BATCH[i]+"</b>Accuracy "+r.acc[i].toFixed(2)+"%<br>Loss "+r.loss[i].toFixed(2)+"%";
+      tip.classList.add("on"); var bw=box.clientWidth, tw=tip.offsetWidth||170, cx=+h.getAttribute("cx"); tip.style.left=Math.min(bw-tw/2, Math.max(tw/2, cx))+"px"; tip.style.top=h.getAttribute("cy")+"px"; tip.classList.add("on");
+    }
+    function hide(){ tip.classList.remove("on"); }
+    h.addEventListener("pointerenter",show); h.addEventListener("pointerleave",hide);
+    h.addEventListener("focus",show); h.addEventListener("blur",hide);
+  });
+
+  /* the same nine runs on a full 0-100 scale */
+  var fb=$("t3full"); var lo=89.68, hi=91.89, fx=function(v){ return ml+(W-ml-mr)*(v/100); };
+  var f='<svg viewBox="0 0 '+W+' 58" width="'+W+'" height="58" role="img" aria-label="On a full 0 to 100 percent scale, all nine runs fall between 89.68 and 91.89 percent.">';
+  f+='<line x1="'+fx(0)+'" x2="'+fx(100)+'" y1="22" y2="22" stroke="'+C.rule+'" stroke-width="6"/>';
+  f+='<rect x="'+fx(lo).toFixed(1)+'" y="19" width="'+Math.max(2,fx(hi)-fx(lo)).toFixed(1)+'" height="6" fill="'+C.sig+'"/>';
+  [0,25,50,75,100].forEach(function(v){ f+='<text x="'+fx(v)+'" y="44" text-anchor="middle" font-family="'+MONO+'" font-size="10" fill="'+C.mutedTxt+'">'+v+'</text>'; });
+  f+='<text x="'+(fx(lo)-8)+'" y="12" text-anchor="end" font-family="'+MONO+'" font-size="10" fill="'+C.dim+'">all nine runs</text>';
+  f+='<text x="'+ml+'" y="12" font-family="'+MONO+'" font-size="10" fill="'+C.mutedTxt+'" letter-spacing="1">FULL SCALE</text>';
+  f+='</svg>';
+  fb.innerHTML=f;
+
+  if(hasST && !reduced && !t3drawn){
+    t3drawn=true;
+    var lines=box.querySelectorAll(".ln"), pts=box.querySelectorAll(".pt");
+    [].forEach.call(lines,function(p){ var L=p.getTotalLength(); p.style.strokeDasharray=L; p.style.strokeDashoffset=L; });
+    gsap.set(pts,{opacity:0});
+    var tl=gsap.timeline({ scrollTrigger:{ trigger:box, start:"top 78%", once:true } });
+    tl.to(lines,{ strokeDashoffset:0, duration:1.1, ease:"power2.out", stagger:.12 })
+      .to(pts,{ opacity:1, duration:.3, stagger:.03 }, "-=.6")
+      .add(function(){ [].forEach.call(lines,function(p){ p.style.strokeDasharray=""; p.style.strokeDashoffset=""; }); });
+  }
+}
+renderT3();
+var t3w=0; addEventListener("resize",function(){ var b=$("t3"); if(b && b.clientWidth!==t3w){ t3w=b.clientWidth; t3drawn=true; renderT3(); } });
+
+/* ============================================================
+   3. ARCHITECTURE — scroll-driven layer diagram
+   ============================================================ */
+var LAYERS=[
+  {k:"IN",   name:"Input",                 shape:"122",      seq:[122,1],  units:0,   params:0,      note:"One connection, as 122 numbers: 38 measurements scaled to a common range, plus protocol, service and connection-state flag encoded as one-hot columns."},
+  {k:"CONV", name:"Conv1D, 64 filters",    shape:"122 × 64", seq:[122,64], params:384,    note:"Slides 64 five-wide filters along the feature vector, picking up local patterns between neighbouring features."},
+  {k:"CONV", name:"Conv1D, 32 filters",    shape:"122 × 32", seq:[122,32], params:10272,  note:"Combines those patterns into 32 higher-level ones at every position."},
+  {k:"RNN",  name:"SimpleRNN, 32, ReLU",   shape:"122 × 32", seq:[122,32], params:2080,   note:"Reads the 122 positions in order and carries a running state, so each step sees what came before it."},
+  {k:"RNN",  name:"SimpleRNN, 16, tanh",   shape:"122 × 16", seq:[122,16], params:784,    note:"A second, narrower recurrent pass. It still returns all 122 steps."},
+  {k:"FLAT", name:"Flatten",               shape:"1,952",    vec:1952,     params:0,      note:"Lays the 122 × 16 grid out as one vector. No weights."},
+  {k:"DENSE",name:"Dense, 128, ReLU",      shape:"128",      vec:128,      params:249984, note:"Every one of the 1,952 values connects to 128 units. This one layer holds over 91% of the model's weights."},
+  {k:"DENSE",name:"Dense, 64, ReLU",       shape:"64",       vec:64,       params:8256,   note:"Compresses to 64 units."},
+  {k:"OUT",  name:"Dense, 23, softmax",    shape:"23",       vec:23,       params:1495,   note:"One probability per training label: normal plus 22 attack types. The demo adds up the 22 attack probabilities to get the chance of attack."}
+];
+var TOTAL=273255, archP=0, archSet=null;
+(function(){
+  var ol=$("layers"); if(!ol) return;
+  ol.innerHTML=LAYERS.map(function(l,i){
+    var share=l.params/TOTAL;
+    return '<li data-i="'+i+'"'+(l.params>200000?' class="big"':'')+'><div class="row1"><h3>'+l.name+'</h3><span class="shape">'+l.shape+'</span></div>'+
+      '<p>'+l.note+'</p>'+
+      '<div class="pbar"><span class="tr" aria-hidden="true"><i style="width:'+(share*100).toFixed(2)+'%"></i></span><span class="mono">'+fmt(l.params)+' params'+(l.params?' · '+(share*100).toFixed(share<0.01?2:1)+'%':'')+'</span></div></li>';
+  }).join("");
+  var items=[].slice.call(ol.children), now=$("archnow");
+  var cv=$("archc"), R=mk(88);
+
+  function geom(w,h){
+    var n=LAYERS.length, padX=w<520?10:24, sw=(w-padX*2)/n, base=h*(w<520?0.8:0.74), top=h*0.14, maxH=base-top-(w<520?6:18);
+    return LAYERS.map(function(l,i){
+      var cx=padX+sw*(i+0.5), o={cx:cx,sw:sw,base:base};
+      if(l.seq){ o.hh=maxH*0.86; o.depth=Math.max(2,(l.seq[1]/64)*sw*0.62); o.fw=Math.max(3,sw*0.12); }
+      else { o.hh=Math.max(10,maxH*Math.sqrt(l.vec/1952)); o.depth=0; o.fw=Math.max(3,sw*0.12); }
+      o.x=cx-(o.fw+o.depth*0.7)/2; o.y=base-o.hh;
+      return o;
+    });
+  }
+  function draw(S,t){
+    var g=S.g,w=S.w,h=S.h; g.clearRect(0,0,w,h);
+    var G=geom(w,h), p=archP, narrow=w<520;
+    /* connections */
+    for(var i=0;i<G.length-1;i++){
+      var a=G[i], b=G[i+1], lit=p>=i+0.5;
+      g.strokeStyle=rgba(C.trace, lit?0.22:0.06); g.lineWidth=1; g.beginPath();
+      var n=6; for(var k=0;k<=n;k++){ var ya=a.y+a.hh*k/n, yb=b.y+b.hh*k/n; g.moveTo(a.x+a.fw+a.depth*0.7,ya-a.depth*0.5); g.lineTo(b.x,yb); }
+      g.stroke();
+      /* pulses on edges already reached */
+      if(lit && !reduced){ for(var q=0;q<3;q++){ var f=((t*0.7+q/3+i*0.13)%1), kk=(q*2+i)%(n+1);
+        var xa=a.x+a.fw+a.depth*0.7, ya2=a.y+a.hh*kk/n-a.depth*0.5, xb=b.x, yb2=b.y+b.hh*kk/n;
+        g.fillStyle=rgba(C.trace,.85); g.fillRect(xa+(xb-xa)*f-1.5, ya2+(yb2-ya2)*f-1, 3, 2); } }
+    }
+    /* layers */
+    for(var j=0;j<G.length;j++){
+      var o=G[j], l=LAYERS[j], on=Math.round(p)===j, lit2=p>=j-0.5;
+      var stroke=on?C.sig:(lit2?rgba(C.bone,.75):rgba(C.dim,.28));
+      if(l.seq){
+        var dx=o.depth*0.7, dy=o.depth*0.5;
+        /* top + side faces */
+        g.fillStyle=rgba(on?C.sig:C.trace, lit2?(on?0.16:0.08):0.02);
+        g.beginPath(); g.moveTo(o.x,o.y); g.lineTo(o.x+dx,o.y-dy); g.lineTo(o.x+o.fw+dx,o.y-dy); g.lineTo(o.x+o.fw+dx,o.y+o.hh-dy); g.lineTo(o.x+o.fw,o.y+o.hh); g.lineTo(o.x,o.y+o.hh); g.closePath(); g.fill();
+        g.strokeStyle=stroke; g.lineWidth=1; g.stroke();
+        g.beginPath(); g.moveTo(o.x+o.fw,o.y); g.lineTo(o.x+o.fw+dx,o.y-dy); g.moveTo(o.x+o.fw,o.y); g.lineTo(o.x,o.y); g.moveTo(o.x+o.fw,o.y); g.lineTo(o.x+o.fw,o.y+o.hh); g.stroke();
+        /* timestep activations on the front face */
+        if(lit2){ var rows=Math.min(40,Math.floor(o.hh/4)); for(var r=0;r<rows;r++){ var act=0.5+0.5*Math.sin(t*(reduced?0:2.2)+r*0.9+j*1.7);
+          g.fillStyle=rgba(on?C.sig:C.trace,(on?0.55:0.3)*act); g.fillRect(o.x+1,o.y+r*(o.hh/rows)+1,o.fw-2,Math.max(1,o.hh/rows-1.5)); } }
+      } else if(l.k==="OUT"){
+        var dots=23, gap=o.hh/dots;
+        for(var d=0;d<dots;d++){ g.fillStyle=(on||p>=8)&&d===11?C.sig:rgba(lit2?C.bone:C.dim,lit2?0.6:0.25); g.fillRect(o.x,o.y+d*gap,o.fw,Math.max(1,gap-1)); }
+        if(on){ g.strokeStyle=C.sig; g.strokeRect(o.x-2.5,o.y-2.5,o.fw+5,o.hh+5); }
+      } else {
+        g.fillStyle=rgba(on?C.sig:C.trace, lit2?(on?0.5:0.28):0.05); g.fillRect(o.x,o.y,o.fw,o.hh);
+        g.strokeStyle=stroke; g.strokeRect(o.x+.5,o.y+.5,o.fw-1,o.hh-1);
+      }
+      /* labels */
+      g.textAlign="center"; g.font=(narrow?"400 9.5px ":"400 10px ")+MONO;
+      g.fillStyle=on?C.sig:(lit2?C.dim:C.mutedTxt);
+      g.fillText(l.k, o.cx, o.base+(narrow?14:18));
+      if(!narrow){ g.fillStyle=on?C.bone:C.mutedTxt; g.fillText(l.shape.replace(" × ","×"), o.cx, o.base+32);
+        g.fillStyle=C.mutedTxt; g.fillText(l.params?fmt(l.params):"–", o.cx, o.base+46); }
+    }
+  }
+  var S=Scene(cv,draw);
+  archSet=function(v){
+    archP=clamp(v,0,LAYERS.length-1);
+    var a=Math.round(archP);
+    items.forEach(function(li,i){ li.classList.toggle("on",i===a); li.classList.toggle("past",i<a); });
+    var l=LAYERS[a]; now.innerHTML="<b>"+l.name+"</b> · "+l.shape+" · "+fmt(l.params)+" params";
+    S.kick(); if(reduced) draw(S,0);
+  };
+  if(reduced){ archSet(LAYERS.length-1); items.forEach(function(li){ li.classList.add("past"); }); return; }
+  function fromScroll(){
+    var mid=innerHeight*0.55, best=0;
+    for(var i=0;i<items.length;i++){ var r=items[i].getBoundingClientRect(); if(r.top<mid) best=i+clamp((mid-r.top)/r.height,0,1)-0.5; }
+    archSet(clamp(best,0,LAYERS.length-1));
+  }
+  if(hasST){ ScrollTrigger.create({ trigger:ol, start:"top 70%", end:"bottom 40%", onUpdate:fromScroll, onRefresh:fromScroll }); }
+  else { var pend=false; addEventListener("scroll",function(){ if(pend) return; pend=true; requestAnimationFrame(function(){ pend=false; fromScroll(); }); },{passive:true}); }
+  fromScroll();
+})();
+
+/* ============================================================
+   4. DEMO — window.NIDS, loaded after the page
+   ============================================================ */
+var Demo=(function(){
+  var M=null, F=null, pool={}, cursor={}, filter="random", tally={runs:0,ok:0,miss:0,fa:0}, busy=false, queued=false;
+  var FILTERS=[["random","Random"],["normal","Normal"],["DoS","DoS"],["Probe","Probe"],["R2L","R2L"],["U2R","U2R"],["unseen","Unseen attack types"]];
+  var CAT={normal:"Normal traffic",DoS:"Denial of service",Probe:"Probe / scan",R2L:"Remote to local",U2R:"User to root"};
+  var SHOW=[
+    ["protocol_type","Protocol","s"],["service","Service","s"],["flag","Connection state flag","s"],
+    ["duration","Duration","sec"],["src_bytes","Bytes sent","b"],["dst_bytes","Bytes returned","b"],
+    ["logged_in","Logged in","yn"],["count","Connections to the same host, last 2 s","n"],
+    ["srv_count","Connections to the same service, last 2 s","n"],["serror_rate","SYN error rate, same host","r"],
+    ["rerror_rate","Rejected rate, same host","r"],["same_srv_rate","Share to the same service","r"],
+    ["dst_host_count","Same destination, last 100 connections","n"],["dst_host_serror_rate","SYN error rate, destination","r"]
+  ];
+  function shuffle(a,seed){ var r=mk(seed); for(var i=a.length-1;i>0;i--){ var j=Math.floor(r()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  function idx(name){ return F.indexOf(name); }
+  function val(s,name){ var i=idx(name); return i<0?null:s.raw[i]; }
+  function show(v,kind){
+    if(v==null) return "—";
+    if(kind==="s") return String(v);
+    var n=+v; if(isNaN(n)) return String(v);
+    if(kind==="sec") return n+" s";
+    if(kind==="b") return fmt(n);
+    if(kind==="yn") return n?"Yes":"No";
+    if(kind==="r") return Math.round(n*100)+"%";
+    return fmt(n);
+  }
+  function setState(msg,spin){ var st=$("dstate"); st.hidden=false; $("dstatemsg").textContent=msg; st.querySelector(".spin").style.display=spin?"":"none"; }
+  function init(nids){
+    M=nids; F=nids.features||[];
+    var S=nids.samples||[];
+    pool.random=S.slice();
+    pool.normal=S.filter(function(s){ return s.category==="normal"; });
+    ["DoS","Probe","R2L","U2R"].forEach(function(c){ pool[c]=S.filter(function(s){ return s.category===c; }); });
+    pool.unseen=S.filter(function(s){ return s.category!=="normal" && !s.seenInTrain; });
+    Object.keys(pool).forEach(function(k,i){ shuffle(pool[k],(Math.random()*4294967296)>>>0); cursor[k]=0; });
+    var pk=$("picker");
+    pk.innerHTML=FILTERS.map(function(f){ var n=pool[f[0]].length;
+      return '<button type="button" data-f="'+f[0]+'" aria-pressed="'+(f[0]===filter)+'"'+(n?'':' disabled')+'>'+f[1]+' <small>'+n+'</small></button>'; }).join("");
+    pk.addEventListener("click",function(e){ var b=e.target.closest("button"); if(!b||b.disabled) return;
+      filter=b.dataset.f; [].forEach.call(pk.children,function(x){ x.setAttribute("aria-pressed", x===b?"true":"false"); }); run(); });
+    $("runbtn").addEventListener("click",run);
+    $("pass").innerHTML=LAYERS.map(function(l){ return "<span>"+l.k+"</span>"; }).join("");
+    $("dstate").hidden=true; $("dlive").hidden=false;
+    if(!S.length){ setState("The model loaded but came with no sample connections.",false); return; }
+    run();
+  }
+  function run(){
+    if(busy){ queued=true; return; }
+    var list=pool[filter]; if(!list||!list.length) return;
+    var s=list[cursor[filter]%list.length]; cursor[filter]++;
+    var out;
+    try{ out=M.predict(s.raw); }catch(err){ setState("The model could not score this connection ("+err.message+"). Try another kind.",false); return; }
+    busy=true; $("runbtn").disabled=true;
+    /* record */
+    $("recid").textContent="KDDTest+ row #"+s.id;
+    $("reckv").innerHTML=SHOW.map(function(f){ return '<div><dt>'+f[1]+'</dt><dd>'+show(val(s,f[0]),f[2])+'</dd></div>'; }).join("");
+    /* reset outputs */
+    var cells=[].slice.call($("pass").children); cells.forEach(function(c){ c.classList.remove("lit","end"); });
+    $("mfill").style.width="0"; $("pv").textContent="…"; $("vbig").textContent="…"; $("vbig").className="big";
+    $("top3").innerHTML=""; $("tlbl").textContent="…"; $("tunseen").hidden=true; $("outc").hidden=true;
+    var step=reduced?0:70;
+    cells.forEach(function(c,i){ setTimeout(function(){ c.classList.add("lit"); if(i===cells.length-1) c.classList.add("end"); }, step*i); });
+    setTimeout(function(){ reveal(s,out); }, step*cells.length+(reduced?0:80));
+  }
+  function reveal(s,out){
+    var p=+out.pAttack||0, atk=out.verdict==="attack";
+    $("pv").textContent=p.toFixed(3);
+    $("mtr").setAttribute("aria-valuenow",p.toFixed(3));
+    $("mtr").classList.toggle("atk",atk);
+    $("mfill").style.width=(p*100).toFixed(1)+"%";
+    $("vbig").textContent=atk?"Attack":"Normal"; $("vbig").className="big"+(atk?" atk":"");
+    $("top3").innerHTML=(out.top||[]).slice(0,3).map(function(t){
+      return '<div class="r"><span title="'+t.label+'">'+t.label+'</span><span class="tr"><i style="width:'+(t.p*100).toFixed(1)+'%"></i></span><span>'+(t.p*100).toFixed(1)+'%</span></div>'; }).join("");
+    var truthAtk=s.category!=="normal";
+    $("tlbl").textContent=s.label+" · "+(CAT[s.category]||s.category);
+    $("tunseen").hidden=!(truthAtk && !s.seenInTrain);
+    var ok=truthAtk===atk, oc=$("outc");
+    oc.hidden=false; oc.className="outcome "+(ok?"ok":"bad");
+    oc.textContent=ok?(truthAtk?"Correct · attack caught":"Correct · normal passed"):(truthAtk?"Wrong · missed attack":"Wrong · false alarm");
+    tally.runs++; if(ok) tally.ok++; else if(truthAtk) tally.miss++; else tally.fa++;
+    $("tRuns").textContent=tally.runs; $("tOk").textContent=tally.ok; $("tMiss").textContent=tally.miss; $("tFa").textContent=tally.fa;
+    busy=false; $("runbtn").disabled=false;
+    if(queued){ queued=false; run(); }
+  }
+  function fail(msg){ setState(msg,false); $("dlive").hidden=true; }
+  return { init:init, fail:fail };
+})();
+
+/* ============================================================
+   5. RE-EXAMINATION — fill from NIDS.meta
+   ============================================================ */
+function bar(cls,label,sub,v,txt){
+  return '<div class="b '+cls+'"><span class="t">'+label+(sub?'<small>'+sub+'</small>':'')+'</span><span class="tr"><i style="width:'+(v==null?0:clamp(v,0,1)*100).toFixed(1)+'%"></i></span><span class="v">'+(txt||(v==null?'—':pct(v)))+'</span></div>';
+}
+var AX='<div class="axis100" aria-hidden="true"><span></span><span class="ticks"><span>0</span><span>50</span><span>100</span></span><span></span></div>';
+function fillMeta(meta){
+  var T=meta&&meta.test, H=meta&&meta.holdout;
+  function setBar(id,v){ var el=$(id); if(!el) return; el.classList.remove("pending"); el.querySelector("i").style.width=(v*100).toFixed(2)+"%"; el.querySelector(".v").textContent=pct(v,2); }
+  if(H && typeof H.accuracy==="number"){ setBar("bHold",H.accuracy); $("bHold").querySelector(".v").textContent=pct(H.accuracy,1); }
+  if(T && typeof T.accuracy==="number"){ setBar("bTest",T.accuracy); $("dnacc").textContent=" ("+pct(T.accuracy)+" on all of KDDTest+)"; }
+  if(T){
+    $("sRec").textContent=pct(T.recall); $("sPre").textContent=pct(T.precision); $("sFpr").textContent=pct(T.fpr);
+    $("sF1").textContent=(+T.f1).toFixed(3); $("sAuc").textContent=(+T.auc).toFixed(3);
+    var pc=T.perCategory||{};
+    $("cat").innerHTML=["DoS","Probe","R2L","U2R"].map(function(c){
+      var sub={DoS:"denial of service",Probe:"scans and probes",R2L:"remote to local",U2R:"user to root"}[c];
+      return bar(c==="R2L"||c==="U2R"?"off":"split",c,sub,pc[c]); }).join("")+AX;
+    var cn=T.counts||{};
+    $("seen").innerHTML=bar("split","Attack types seen in training",cn.attack&&cn.unseenAttack?fmt(cn.attack-cn.unseenAttack)+" rows":"",T.seenRecall)+
+      bar("off","Attack types never seen",cn.unseenAttack?fmt(cn.unseenAttack)+" rows":"",T.unseenRecall)+AX;
+  }
+  var cap=$("cmpcap");
+  if(meta && cap){ cap.insertAdjacentHTML("beforeend"," Demo model: "+fmt(meta.params||TOTAL)+" parameters, "+(meta.epochs||"?")+" epochs, seed "+(meta.seed==null?"?":meta.seed)+", trained on "+fmt(meta.trainRows||0)+" rows."); }
+}
+function metaUnavailable(){
+  ["bHold","bTest"].forEach(function(id){ var el=$(id); if(el){ el.querySelector(".v").textContent="n/a"; } });
+  ["sRec","sPre","sFpr","sF1","sAuc"].forEach(function(id){ $(id).textContent="—"; });
+  var msg='<p class="prose" style="padding-top:12px;font-size:14px">These bars need the model file, which did not load.</p>';
+  $("cat").innerHTML=msg; $("seen").innerHTML=msg;
+}
+/* placeholders until the model arrives */
+$("cat").innerHTML=["DoS","Probe","R2L","U2R"].map(function(c){ return bar("pending",c,"",null,"…"); }).join("");
+$("seen").innerHTML=bar("pending","Attack types seen in training","",null,"…")+bar("pending","Attack types never seen","",null,"…");
+
+/* ============================================================
+   6. BASE-RATE CALCULATOR
+   ============================================================ */
+(function(){
+  var NS=[10000,100000,1000000,10000000], AS=[100,1000,10000,100000], REC=0.645;
+  var cN=$("cN"), cA=$("cA"), cF=$("cF");
+  function upd(){
+    var N=NS[+cN.value], k=AS[+cA.value], fpr=(+cF.value)/100;
+    var att=N/k, ben=N-att, FA=ben*fpr, TA=att*REC, P=TA/(TA+FA||1);
+    $("oN").textContent=fmt(N); $("oA").textContent="1 in "+fmt(k); $("oF").textContent=(+cF.value).toFixed(1)+"%";
+    $("cAtt").textContent=fmt(att); $("cTA").textContent=fmt(TA); $("cFA").textContent=fmt(FA); $("cP").textContent=(P*100).toFixed(P<0.01?2:1)+"%";
+    var ratio = P>0 ? Math.round(1/P) : 0, phr;
+    if(P>=0.5) phr="most alerts are real";
+    else if(P>=0.01) phr="about <b>1 in "+fmt(ratio)+"</b> alerts is real";
+    else phr="under <b>1 in 100</b> alerts is real";
+    $("cLine").innerHTML="About <b>"+fmt(FA)+"</b> false alerts a day, and "+phr+".";
+    $("cReal").style.width=(P*100).toFixed(2)+"%";
+  }
+  [cN,cA,cF].forEach(function(el){ el.addEventListener("input",upd); });
+  upd();
+})();
+
+/* ============================================================
+   7. SMALL THINGS
+   ============================================================ */
+$("copybtn").addEventListener("click",function(){
+  var b=this, addr="farhad.maleki1618@outlook.com";
+  function done(t){ b.textContent=t; setTimeout(function(){ b.textContent="Copy email"; },1800); }
+  function sel(){ var r=document.createRange(); r.selectNodeContents($("mail")); var s=getSelection(); s.removeAllRanges(); s.addRange(r); done("Selected, press copy"); }
+  try{ navigator.clipboard.writeText(addr).then(function(){ done("Copied"); },sel); }catch(e){ sel(); }
+});
+/* pipeline packets travel exactly one segment */
+function pipeRuns(){ [].forEach.call(document.querySelectorAll(".pipe li"),function(li){ li.style.setProperty("--run",(li.offsetWidth-20)+"px"); }); }
+pipeRuns(); addEventListener("resize",pipeRuns);
+[].forEach.call(document.querySelectorAll(".pipe .pk"),function(p,i){ p.style.animationDelay=(i*0.4)+"s"; });
+
+/* ============================================================
+   8. HERO MOMENT (GSAP + SplitText), safe without either
+   ============================================================ */
+(function(){
+  var h1=document.querySelector(".hero h1");
+  if(!hasG || reduced || !window.SplitText){ doc.classList.remove("will-anim"); return; }
+  try{
+    gsap.registerPlugin(SplitText);
+    var run=function(){
+      var sp=new SplitText(h1,{ type:"lines,words", mask:"lines" });
+      doc.classList.remove("will-anim");
+      var tl=gsap.timeline();
+      tl.from(sp.words,{ yPercent:110, duration:1.1, ease:"expo.out", stagger:.045 })
+        .from(".fig99 .n",{ opacity:0, y:24, duration:.9, ease:"expo.out" },"-=.8")
+        .from(".hero .role, .fig99 .q, .fig99 .q2, .fig99 .alt",{ opacity:0, duration:.7, stagger:.06 },"-=.6")
+        .add(function(){ sp.revert(); });
+    };
+    if(document.fonts && document.fonts.ready){ document.fonts.ready.then(run,run); } else run();
+    setTimeout(function(){ doc.classList.remove("will-anim"); },2500);
+  }catch(e){ doc.classList.remove("will-anim"); }
+})();
+
+/* ============================================================
+   9. MODEL BOOT — the model script is injected near the demo and never blocks the page
+   ============================================================ */
+var booted=false;
+function boot(){
+  if(booted) return; booted=true;
+  var N=window.NIDS;
+  if(!N || !N.ready || typeof N.predict!=="function"){
+    Demo.fail("The model file did not load, so the live demo is off. Everything else on this page works without it, and the code is on GitHub.");
+    metaUnavailable(); return;
+  }
+  Promise.resolve(N.ready).then(function(){
+    try{ fillMeta(N.meta||{}); }catch(e){ metaUnavailable(); }
+    Demo.init(N);
+    if(hasST) ScrollTrigger.refresh();
+  },function(err){
+    Demo.fail("The model failed to start"+(err&&err.message?" ("+err.message+")":"")+". The rest of the page is unaffected.");
+    metaUnavailable();
+  });
+}
+/* load the 750 KB model only when the demo nears the viewport; boot on load or error either way */
+var modelReq=false;
+function loadModel(){
+  if(modelReq) return; modelReq=true;
+  var sc=document.createElement("script"); sc.src="research-model.js";
+  sc.onload=boot; sc.onerror=boot; document.body.appendChild(sc);
+}
+var demoSec=$("demo");
+if("IntersectionObserver" in window && demoSec){
+  var io=new IntersectionObserver(function(es){ if(es.some(function(e){ return e.isIntersecting; })){ io.disconnect(); loadModel(); } },{ rootMargin:"1500px 0px" });
+  io.observe(demoSec);
+} else loadModel();
+})();
+</script>
+</body>
+</html>
