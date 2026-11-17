@@ -80,6 +80,17 @@ footer a:hover{color:var(--sig)}
 html.motion .rv{opacity:0;transform:translateY(40px)}
 html.motion .rv.in{opacity:1;transform:none}
 
+.drive{padding-top:14vh;padding-bottom:14vh;border-top:1px solid var(--rule-soft)}
+.drive h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em;max-width:14ch;margin-bottom:8vh}
+.drive h2 em{font-style:italic;color:var(--sig)}
+.moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft)}
+.moment{background:var(--ink);padding:28px 22px 32px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between;transition:background .4s}
+.moment:hover{background:var(--ink-2)}
+.moment .t{font-family:var(--mono);font-size:44px;color:var(--sig);letter-spacing:-.02em}
+.moment h3{font-family:var(--disp);font-weight:400;font-size:24px;line-height:1.15;margin:18px 0 10px}
+.moment p{color:var(--dim);font-size:15px}
+@media (max-width:1023px){.moments{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.moments{grid-template-columns:1fr}}
 @media (max-width:860px){
   header.topbar nav{display:none}
   .who{grid-template-columns:1fr}
@@ -131,7 +142,16 @@ html.motion .rv.in{opacity:1;transform:none}
       </div>
     </div>
   </section>
-  <section id="drive"></section>
+  <section class="drive" id="drive">
+    <div class="chap rv"><span class="mono sig">02</span><i></i><span class="mono">What drives me</span></div>
+    <h2 class="rv">Obsessed with the <em>hardest</em> problem in the room.</h2>
+    <div class="moments">
+      <div class="moment rv"><div class="t">13</div><div><h3>Security as architecture</h3><p>Cyrus holds 21 CFR Part 11, SOC 2 Type II and ISO 27001 with thirteen security layers and a hash-chained audit trail.</p></div></div>
+      <div class="moment rv"><div class="t">3 / 5</div><div><h3>Power that needs a quorum</h3><p>Zagros comes alive through a sealed Genesis ceremony: no single key can run it.</p></div></div>
+      <div class="moment rv"><div class="t">99.34%</div><div><h3>Published, not just shipped</h3><p>CNN-RNN botnet detection on N-BaIoT (TCP removed), Springer LNCS, NEW2AN 2023.</p></div></div>
+      <div class="moment rv"><div class="t">0</div><div><h3>Demo without the machine</h3><p>Black Pearl runs its whole CNC rig in a browser, and the same build drives the real factory floor.</p></div></div>
+    </div>
+  </section>
   <section id="work"></section>
   <section id="paper"></section>
   <section id="contact"></section>

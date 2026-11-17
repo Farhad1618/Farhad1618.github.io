@@ -117,6 +117,15 @@ check("photo slot: swap removes monogram, caption not unfinished", () => {
   return errs;
 });
 
+check("drive section: headline and 4 moments", () => {
+  const errs = [];
+  if (!src.includes("Obsessed with the")) errs.push('"Obsessed with the" missing');
+  if (!/<em>hardest<\/em>/.test(src)) errs.push("<em>hardest</em> missing");
+  const n = (src.match(/class="moment[\s"]/g) || []).length;
+  if (n !== 4) errs.push(`found ${n} class="moment" elements, want 4`);
+  return errs;
+});
+
 let failed = 0;
 for (const c of checks) {
   if (c.pending && !all) { console.log(`SKIP  ${c.name} (pending, use --all)`); continue; }
