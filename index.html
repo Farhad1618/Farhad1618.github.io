@@ -130,8 +130,30 @@ html.motion .rv.in{opacity:1;transform:none}
 .btn:hover{background:var(--sig)}
 .btn.ghost{color:var(--bone);background:none;border:1px solid var(--rule)}
 .btn.ghost:hover{border-color:var(--sig);color:var(--sig)}
+/* 04 research */
+.paper{padding-top:18vh;padding-bottom:18vh;border-top:1px solid var(--rule-soft);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,6vw,96px);align-items:end}
+.big{font-family:var(--disp);font-weight:400;font-size:clamp(96px,17vw,280px);line-height:.8;letter-spacing:-.04em;color:var(--sig)}
+.big small{font-size:.32em;color:var(--bone)}
+.paper h3{font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);line-height:1.1;margin:14px 0 18px}
+.paper p{color:var(--dim);max-width:48ch;margin-bottom:24px}
+.paper .cta-row{margin-top:4px}
+
+/* 05 contact */
+.contact{min-height:100svh;display:flex;flex-direction:column;justify-content:center;border-top:1px solid var(--rule-soft);padding-top:12vh;padding-bottom:12vh}
+.contact h2{font-family:var(--disp);font-weight:400;font-size:clamp(52px,11vw,190px);line-height:.88;letter-spacing:-.03em}
+.contact h2 a{color:var(--bone);text-decoration:none;font-style:italic;background:linear-gradient(var(--sig),var(--sig)) 0 92%/0 2px no-repeat;transition:background-size .6s cubic-bezier(.16,1,.3,1),color .3s}
+.contact h2 a:hover{background-size:100% 2px;color:var(--sig)}
+.paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);margin-top:9vh}
+.paths>div{background:var(--ink);padding:28px 24px}
+.paths h4{font-family:var(--disp);font-weight:400;font-size:28px;margin:10px 0 8px}
+.paths p{color:var(--dim);font-size:15px;margin-bottom:22px}
+/* .btn sets display:inline-flex, which would override [hidden] */
+[data-booking][hidden]{display:none}
+footer .links{display:flex;gap:14px;flex-wrap:wrap}
 @media (max-width:860px){
   .proj{grid-template-columns:1fr}
+  .paper{grid-template-columns:1fr}
+  .paths{grid-template-columns:1fr}
   .proj .plate{min-height:56svh}
   .pab div{grid-template-columns:1fr;gap:6px}
 }
@@ -277,13 +299,32 @@ html.motion .rv.in{opacity:1;transform:none}
       <div class="cta-row"><a class="btn" href="research.html">Case study and live demo &rarr;</a><a class="btn ghost" href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Read the paper &#8599;</a></div>
     </div>
   </section>
-  <section id="paper"></section>
-  <section id="contact"></section>
+  <section class="paper" id="paper">
+    <div class="big rv">99.34<small>%</small></div>
+    <div class="rv">
+      <div class="chap"><span class="mono sig">04</span><i></i><span class="mono">Research</span></div>
+      <span class="mono">N-BaIoT, TCP removed &middot; 98.23% on NSL-KDD</span>
+      <h3>Deep Learning for Preventing Botnet Attacks on IoT</h3>
+      <p>NEW2AN / ruSMART 2023, Springer LNCS, pp. 37-46. The model runs live in your browser on the case-study page.</p>
+      <div class="cta-row"><a class="btn" href="research.html">Read the case study &rarr;</a><a class="btn ghost" href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Read the paper &#8599;</a></div>
+    </div>
+  </section>
+  <section class="contact" id="contact">
+    <div class="chap rv"><span class="mono sig">05</span><i></i><span class="mono">Next</span></div>
+    <h2 class="rv">Bring me your<br><a href="mailto:farhad.maleki1618@outlook.com">hardest problem.</a></h2>
+    <div class="paths">
+      <div class="rv"><span class="mono sig">For clients</span><h4>Build with me</h4><p>Ontologies, agentic systems, AI governance. From first diagram to production.</p>
+        <div class="cta-row"><a class="btn" href="mailto:farhad.maleki1618@outlook.com?subject=Build%20with%20me">Email me</a><a class="btn ghost" data-booking hidden>Book a time</a></div></div>
+      <div class="rv"><span class="mono sig">For teams</span><h4>Hire me</h4><p>Leadership roles in AI and systems architecture.</p>
+        <div class="cta-row"><a class="btn" href="mailto:farhad.maleki1618@outlook.com?subject=Hire%20me">Email me</a><a class="btn ghost" data-booking hidden>Book a time</a></div></div>
+    </div>
+  </section>
 </main>
 
 <footer>
   <span class="mono">Farhad Maleki · Dubai</span>
   <a class="mono" href="mailto:farhad.maleki1618@outlook.com">farhad.maleki1618@outlook.com</a>
+  <span class="mono links"><a href="https://github.com/Farhad1618" target="_blank" rel="noopener">github.com/Farhad1618</a><a href="https://linkedin.com/in/farhad-maleki" target="_blank" rel="noopener">linkedin.com/in/farhad-maleki</a></span>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
@@ -292,6 +333,8 @@ html.motion .rv.in{opacity:1;transform:none}
 <script>
 (function(){
 "use strict";
+/* Booking link. Empty keeps every "Book a time" button hidden. */
+var BOOKING_URL = "";
 var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 var TAU = Math.PI * 2;
 
@@ -830,6 +873,11 @@ var plates = [];
   document.addEventListener("visibilitychange", run);
   run();
 })();
+
+document.querySelectorAll("[data-booking]").forEach(function(a){
+  if (!BOOKING_URL) return;
+  a.href = BOOKING_URL; a.target = "_blank"; a.rel = "noopener"; a.hidden = false;
+});
 
 /* Later tasks add scenes and motion below. Only enable the hidden-before-reveal
    state when GSAP actually loaded and motion is allowed. */

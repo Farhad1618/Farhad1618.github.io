@@ -146,6 +146,21 @@ check("drive section: headline and 4 moments", () => {
   return errs;
 });
 
+check("research and contact: paper, paths, booking hidden", () => {
+  const errs = [];
+  for (const s of ["Deep Learning for Preventing Botnet Attacks on IoT", "10.1007/978-3-031-60994-7_4", "98.23%", "NSL-KDD",
+    'href="research.html"', "Bring me your", "Email me", "data-booking", "BOOKING_URL", "Build with me", "Hire me",
+    "github.com/Farhad1618", "linkedin.com/in/farhad-maleki"]) if (!src.includes(s)) errs.push(`missing "${s}"`);
+  const bk = [...src.matchAll(/<a\b[^>]*data-booking[^>]*>/g)].map((m) => m[0]);
+  if (bk.length !== 2) errs.push(`found ${bk.length} data-booking links, want 2`);
+  bk.forEach((t) => { if (!/\shidden(\s|>|=)/.test(t)) errs.push(`Book a time lacks hidden: ${t}`); });
+  if (!/\[data-booking\]\[hidden\]\s*\{\s*display\s*:\s*none/.test(src)) errs.push("[data-booking][hidden]{display:none} rule missing");
+  if (!/var BOOKING_URL\s*=\s*"[^"]*";/.test(src)) errs.push('var BOOKING_URL = "" missing');
+  if (!/subject=Build%20with%20me/.test(src) || !/subject=Hire%20me/.test(src)) errs.push("mailto subjects missing");
+  if (src.includes("on request")) errs.push('"on request" present');
+  return errs;
+});
+
 let failed = 0;
 for (const c of checks) {
   if (c.pending && !all) { console.log(`SKIP  ${c.name} (pending, use --all)`); continue; }
