@@ -26,10 +26,11 @@ body{background:var(--ink);color:var(--bone);font-family:var(--body);font-size:1
 body::after{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:50;opacity:.07;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   animation:grain 1.2s steps(6) infinite}
+@media (prefers-reduced-motion:reduce){body::after{animation:none}}
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-5%)}100%{transform:translate(0,0)}}
 
 /* top bar */
-header.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);mix-blend-mode:difference}
+header.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);background:linear-gradient(180deg,rgba(12,12,14,.7),transparent)}
 header.topbar .name{font-family:var(--disp);font-size:20px;letter-spacing:.01em;color:var(--bone);text-decoration:none}
 header.topbar nav{display:flex;gap:28px}
 header.topbar nav a{color:var(--bone);text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
@@ -44,14 +45,13 @@ section{position:relative;padding:0 var(--g)}
 #field{position:absolute;inset:0;width:100%;height:100%}
 .hero .scrim{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 75%,rgba(12,12,14,.92) 0%,rgba(12,12,14,.4) 55%,transparent 80%)}
 .hero .role{position:relative;margin-bottom:22px}
-.hero h1{position:relative;font-family:var(--disp);font-weight:400;font-size:clamp(40px,9vw,148px);line-height:.92;letter-spacing:-.02em;max-width:13ch}
+.hero h1{position:relative;font-family:var(--disp);font-weight:400;font-size:clamp(40px,9vw,148px);line-height:.92;letter-spacing:-.02em}
 .hero h1 em{font-style:italic;color:var(--sig)}
 .hero .meta{position:relative;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:44px;border-top:1px solid var(--rule);padding-top:18px}
-.line{display:block;overflow:hidden;padding-bottom:.06em}
-.line>span{display:block;transition:transform 1.2s cubic-bezier(.16,1,.3,1)}
+.line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
+@media (min-width:861px){.hero h1 .line{white-space:nowrap}}
+.line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
-html.motion .in .line>span{transform:none}
-.in .line:nth-child(2)>span{transition-delay:.08s}.in .line:nth-child(3)>span{transition-delay:.16s}.in .line:nth-child(4)>span{transition-delay:.24s}
 
 /* 02 who */
 .who{padding-top:22vh;padding-bottom:18vh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:clamp(28px,6vw,96px);align-items:center}
@@ -76,16 +76,14 @@ footer a{color:var(--dim);text-decoration:none}
 footer a:hover{color:var(--sig)}
 
 /* reveal: visible by default; hidden only once JS marks html.motion */
-.rv{transition:opacity 1s,transform 1.2s cubic-bezier(.16,1,.3,1)}
+/* GSAP owns opacity/transform on .rv; no CSS transitions here */
 html.motion .rv{opacity:0;transform:translateY(40px)}
-html.motion .rv.in{opacity:1;transform:none}
 
 .drive{padding-top:14vh;padding-bottom:14vh;border-top:1px solid var(--rule-soft)}
 .drive h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em;max-width:14ch;margin-bottom:8vh}
 .drive h2 em{font-style:italic;color:var(--sig)}
 .moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft)}
-.moment{background:var(--ink);padding:28px 22px 32px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between;transition:opacity 1s,transform 1.2s cubic-bezier(.16,1,.3,1),background .4s}
-.moment:nth-child(2){transition-delay:.08s,.08s,0s}.moment:nth-child(3){transition-delay:.16s,.16s,0s}.moment:nth-child(4){transition-delay:.24s,.24s,0s}
+.moment{background:var(--ink);padding:28px 22px 32px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between;transition:background .4s}
 .moment:hover{background:var(--ink-2)}
 .moment .t{font-family:var(--mono);font-size:44px;color:var(--sig);letter-spacing:-.02em}
 .moment h3{font-family:var(--disp);font-weight:400;font-size:24px;line-height:1.15;margin:18px 0 10px}
@@ -142,9 +140,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
   .who{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
-  .line>span{transition:none}
-  body::after{animation:none}
-  .rv{transition:none}
+  html.motion .rv,html.motion .line>span{opacity:1;transform:none}
 }
 </style>
 
@@ -276,7 +272,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="paper" id="paper">
-    <div class="big rv">99.34<small>%</small></div>
+    <div class="big rv" role="img" aria-label="99.34% accuracy, N-BaIoT, TCP removed"><span id="bigNum" aria-hidden="true">99.34</span><small aria-hidden="true">%</small></div>
     <div class="rv">
       <div class="chap"><span class="mono sig">04</span><i></i><span class="mono">Research</span></div>
       <span class="mono">N-BaIoT, TCP removed &middot; 98.23% on NSL-KDD</span>
@@ -800,7 +796,9 @@ var plates = [];
   function fitPlate(p){
     var dpr = Math.min(window.devicePixelRatio||1, 2);
     var r = p.box.getBoundingClientRect();
-    p.w = Math.max(1,Math.round(r.width)); p.h = Math.max(1,Math.round(r.height));
+    var nw = Math.max(1,Math.round(r.width)), nh = Math.max(1,Math.round(r.height));
+    if (nw === p.w && nh === p.h && p.cv.width) return; /* mobile address bar resize: keep layout */
+    p.w = nw; p.h = nh;
     p.cv.width = p.w*dpr; p.cv.height = p.h*dpr;
     p.g.setTransform(dpr,0,0,dpr,0,0);
     if (p.i === 0) docsCache = null;
@@ -861,11 +859,31 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   gsap.registerPlugin(ScrollTrigger);
   if (window.SplitText) gsap.registerPlugin(SplitText);
   document.documentElement.classList.add("motion");
-  /* temporary reveal trigger; later tasks may replace it with GSAP */
-  if ("IntersectionObserver" in window) {
-    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }); }, { threshold:.15 });
-    document.querySelectorAll(".rv,.hero h1").forEach(function(el){ io.observe(el); });
-  } else document.querySelectorAll(".rv,.hero h1").forEach(function(el){ el.classList.add("in"); });
+  var EASE = "expo.out";
+  gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.3, ease:EASE, stagger:.09, delay:.15 });
+  ScrollTrigger.batch(".rv", {
+    start:"top 88%", once:true,
+    onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
+  });
+  /* plate parallax: the big outline numeral drifts against the scene (moving the canvas itself would expose its edges) */
+  gsap.utils.toArray(".proj .plate .num").forEach(function(n){
+    gsap.fromTo(n, { yPercent:-12 }, { yPercent:24, ease:"none",
+      scrollTrigger:{ trigger:n.parentNode, start:"top bottom", end:"bottom top", scrub:true } });
+  });
+  /* research numeral counts up and lands exactly on 99.34 */
+  var bn = document.getElementById("bigNum");
+  if (bn) {
+    var cnt = { v:0 };
+    bn.textContent = "0.00";
+    ScrollTrigger.create({ trigger:".big", start:"top 85%", once:true, onEnter:function(){
+      gsap.to(cnt, { v:99.34, duration:2, ease:"power3.out",
+        onUpdate:function(){ bn.textContent = cnt.v.toFixed(2); },
+        onComplete:function(){ bn.textContent = "99.34"; } });
+    }});
+  }
+  /* scroll progress bar */
+  gsap.to("#progress", { width:"100%", ease:"none",
+    scrollTrigger:{ trigger:document.body, start:"top top", end:"bottom bottom", scrub:.3 } });
 }
 })();
 </script>
