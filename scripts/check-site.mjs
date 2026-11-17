@@ -115,6 +115,9 @@ check("opacity:0 on .rv gated by html.motion", () => {
   return errs;
 });
 
+check("no family name in visible copy", () =>
+  /Farhad Maleki|FARHAD MALEKI/.test(src) ? ['"Farhad Maleki" present; use "Farhad"'] : []);
+
 check("hero and who copy present", () => {
   const need = ['aria-label="Farhad"', "Software Developer", "Featured systems", "CTO at OnePharma"];
   return need.filter((s) => !src.includes(s)).map((s) => `missing "${s}"`);
