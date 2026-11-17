@@ -60,8 +60,8 @@ html.motion .in .line>span{transform:none}
   background:radial-gradient(ellipse at 50% 38%,#2a2218 0%,#141210 55%,var(--ink) 100%)}
 .photo .ph span{font-family:var(--disp);font-style:italic;font-size:clamp(90px,14vw,200px);color:#3a2d1c;letter-spacing:-.04em}
 .photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) sepia(.35) contrast(1.05)}
-.photo .tag{position:absolute;left:14px;bottom:12px}
-.photo .cap{position:absolute;right:14px;top:12px}
+.photo .tag{z-index:1;position:absolute;left:14px;bottom:12px}
+.photo .cap{z-index:1;position:absolute;right:14px;top:12px}
 .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(233,160,59,.08));mix-blend-mode:screen}
 .photo.has-img::after{background:rgba(233,160,59,.14)}
 .who h2{font-family:var(--disp);font-weight:400;font-size:clamp(34px,4.6vw,72px);line-height:1.02;letter-spacing:-.015em;margin-bottom:28px}
@@ -116,7 +116,7 @@ html.motion .rv.in{opacity:1;transform:none}
   <section class="who" id="who">
     <figure class="photo rv" data-photo="">
       <div class="ph"><span>FM</span></div>
-      <figcaption class="mono tag">Portrait · coming soon</figcaption>
+      <figcaption class="mono tag">Farhad Maleki · Dubai</figcaption>
       <span class="mono cap sig">● Dubai, GST</span>
     </figure>
     <div class="rv">
@@ -223,8 +223,7 @@ var heroMouse = { x:-1e4, y:-1e4 };
   if (!url) return;
   var img = new Image(); img.alt = "Farhad Maleki"; img.src = url;
   img.onload = function(){
-    var ph = fig.querySelector(".ph"); if (ph) ph.hidden = true;
-    var tag = fig.querySelector(".tag"); if (tag) tag.hidden = true;
+    var ph = fig.querySelector(".ph"); if (ph) ph.remove();
     fig.insertBefore(img, fig.firstChild); fig.classList.add("has-img");
   };
 })();

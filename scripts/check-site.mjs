@@ -110,6 +110,13 @@ check("who copy: headline, photo slot, no origin line", () => {
   return errs;
 });
 
+check("photo slot: swap removes monogram, caption not unfinished", () => {
+  const errs = [];
+  if (/coming soon/i.test(src)) errs.push('"coming soon" caption present');
+  if (!/ph\.remove\(\)/.test(src)) errs.push("photo swap must remove .ph (display:grid overrides [hidden])");
+  return errs;
+});
+
 let failed = 0;
 for (const c of checks) {
   if (c.pending && !all) { console.log(`SKIP  ${c.name} (pending, use --all)`); continue; }
