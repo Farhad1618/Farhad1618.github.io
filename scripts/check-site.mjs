@@ -63,7 +63,27 @@ check("section ids appear once", () => {
 check("exactly 6 .proj elements", () => {
   const n = (src.match(/class=["'][^"']*\bproj\b[^"']*["']/g) || []).length;
   return n === 6 ? [] : [`found ${n} class="proj" elements, want 6`];
-}, true);
+});
+
+check("work chapters: names in h3, problem/built/matters rows", () => {
+  const errs = [];
+  const names = ["Cyrus", "Zagros", "OnePharma", "Black Pearl", "Falah", "Network Intrusion Detection"];
+  const h3 = [...src.matchAll(/<h3>([^<]*)<\/h3>/g)].map((m) => m[1]);
+  for (const n of names) if (!h3.includes(n)) errs.push(`no <h3> ${n}`);
+  const parts = src.split(/<section class="proj"/).slice(1).map((p) => p.split("</section>")[0]);
+  parts.forEach((p, i) => {
+    for (const row of ["The problem", "What I built", "Why it matters"]) if (!p.includes(row)) errs.push(`proj ${i + 1} lacks "${row}"`);
+    if (!/<canvas/.test(p)) errs.push(`proj ${i + 1} lacks canvas`);
+  });
+  const zag = parts[1] || "";
+  if (/<a\s/.test(zag)) errs.push("Zagros must have no link");
+  const nids = parts[5] || "";
+  if (!nids.includes('href="research.html"') || !nids.includes("10.1007/978-3-031-60994-7_4")) errs.push("nids links missing");
+  if (!/SCENES\s*=\s*\[sceneCyrus,\s*sceneZagros,\s*sceneGraph,\s*scenePearl,\s*sceneFalah,\s*sceneNids\]/.test(src)) errs.push("SCENES array missing");
+  if (!/function fitPlate\(/.test(src)) errs.push("fitPlate missing");
+  if (!/rootMargin\s*:\s*"100px"/.test(src)) errs.push("IntersectionObserver rootMargin 100px missing");
+  return errs;
+});
 
 check("forbidden substrings absent", () => {
   const bad = ["97%", "Apache", "ICNGN", "PyTorch", "[Your", "CV", "a week", "Onyxs", "SR-71", "Purple Finance"];
