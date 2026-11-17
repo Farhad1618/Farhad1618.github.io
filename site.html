@@ -186,8 +186,8 @@ html.motion .rv.in{opacity:1;transform:none}
       <span class="mono sig">Cyrus &middot; Pharmaceutical analytics</span>
       <h3>Cyrus</h3>
       <div class="pab">
-        <div><span class="mono">The problem</span><p>Regulated pharma teams hold bilingual Arabic and English documents that no system reads consistently, and every control around them has to survive an audit.</p></div>
-        <div><span class="mono">What I built</span><p>A multi-tenant ontology platform that classifies those documents and UAE Ministry of Health price lists, with a Neo4j graph and local embeddings for semantic search. The performance path runs in Rust, Go and C++, with Python on top for business logic.</p></div>
+        <div><span class="mono">The problem</span><p>Bilingual Arabic and English regulatory documents have to be classified, with every control around them able to survive an audit.</p></div>
+        <div><span class="mono">What I built</span><p>A multi-tenant ontology platform that classifies those documents and UAE Ministry of Health price lists, with a Neo4j graph and local embeddings for semantic search.</p></div>
         <div><span class="mono">Why it matters</span><p>Thirteen security layers and a hash-chained audit trail hold it to 21 CFR Part 11, SOC 2 Type II and ISO 27001. It is built for pharma first and for any industry after that.</p></div>
       </div>
     </div>
@@ -198,7 +198,7 @@ html.motion .rv.in{opacity:1;transform:none}
       <span class="mono sig">Zagros &middot; Identity &amp; governance platform</span>
       <h3>Zagros</h3>
       <div class="pab">
-        <div><span class="mono">The problem</span><p>Most identity products assume an outside provider and one all-powerful admin. In a regulated or air-gapped setting, neither is acceptable.</p></div>
+        <div><span class="mono">The problem</span><p>Regulated and air-gapped teams can't hand identity to an outside provider, or trust any single key-holder.</p></div>
         <div><span class="mono">What I built</span><p>Multi-tenant identity and governance with no external identity provider in the loop. Passkeys, email OTP and passwords are all verified in-instance, authorization runs on Cerbos policies, and the instance is brought up through a sealed Genesis ceremony with K-of-N constitutional keys.</p></div>
         <div><span class="mono">Why it matters</span><p>No single key can run it, and the same code runs local, on-premise, air-gapped or managed. This is a private repository, so there is no public source.</p></div>
       </div>
@@ -210,9 +210,9 @@ html.motion .rv.in{opacity:1;transform:none}
       <span class="mono sig">OnePharma &middot; Pharmaceutical intelligence</span>
       <h3>OnePharma</h3>
       <div class="pab">
-        <div><span class="mono">The problem</span><p>Pharma data lives in silos that cannot talk to each other: products, regulations, suppliers, markets.</p></div>
+        <div><span class="mono">The problem</span><p>The product surface is what the whole platform is judged on, and it has to sit on a graph and an LLM layer it never needs to see.</p></div>
         <div><span class="mono">What I built</span><p>The product surface, built as CTO. Next.js and strict TypeScript with passwordless sign-in, a GraphQL decision service in front of a Neo4j activity graph, and a pluggable LLM layer that runs against a hosted gateway or a self-hosted model.</p></div>
-        <div><span class="mono">Why it matters</span><p>One shared semantic layer lets a question cross every silo, and the product never needs to know which model is answering.</p></div>
+        <div><span class="mono">Why it matters</span><p>The product does not know which model is answering, so the model can change without the product changing.</p></div>
       </div>
     </div>
   </section>
@@ -234,9 +234,9 @@ html.motion .rv.in{opacity:1;transform:none}
       <span class="mono sig">Falah &middot; Full-stack budgeting app</span>
       <h3>Falah</h3>
       <div class="pab">
-        <div><span class="mono">The problem</span><p>Budgeting apps fail because people stop typing things in.</p></div>
+        <div><span class="mono">The problem</span><p>Most budgeting apps depend on manual entry.</p></div>
         <div><span class="mono">What I built</span><p>A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. A Swift and SwiftUI client on a Supabase backend of Postgres and edge functions, owned from schema to screen.</p></div>
-        <div><span class="mono">Why it matters</span><p>Budgets that stay honest without upkeep. The app is built end to end and is not on the App Store yet.</p></div>
+        <div><span class="mono">Why it matters</span><p>It fills itself in from bank accounts through open banking and from email receipts with consent, so there is little to type. It is not on the App Store yet.</p></div>
       </div>
     </div>
   </section>
@@ -246,7 +246,7 @@ html.motion .rv.in{opacity:1;transform:none}
       <span class="mono sig">Network Intrusion Detection &middot; Applied research</span>
       <h3>Network Intrusion Detection</h3>
       <div class="pab">
-        <div><span class="mono">The problem</span><p>IoT networks are an easy target for botnets, and detection has to keep up with traffic it has never seen.</p></div>
+        <div><span class="mono">The problem</span><p>IoT networks are an easy target for botnets, and detection has to separate attack traffic from normal traffic.</p></div>
         <div><span class="mono">What I built</span><p>A comparison of CNN, 1DCNN and hybrid CNN-RNN models for detecting botnet traffic. The CNN-RNN performed best: 99.34% accuracy on N-BaIoT with TCP removed, and 98.23% on NSL-KDD.</p></div>
         <div><span class="mono">Why it matters</span><p>Co-authored and published by Springer in the NEW2AN / ruSMART 2023 proceedings.</p></div>
       </div>
