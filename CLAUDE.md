@@ -10,7 +10,8 @@ Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so
 
 - v5 "Farsh" (Three.js Persian-tile scroll film) was live Oct 21 – Nov 16, 2026. Archived at `archive/farsh/` (its own `site.html`, `index.html` and `build.sh`, which splits at a `<!-- body -->` marker).
 - A separate v4 (GSAP + raw WebGL) is archived at `archive/v4/`. Design concepts live in `concepts/` (a-girih, b-index, c-cortex, d-farsh, e-hook).
-- Current live build (Nov 16, 2026) is the v3-derived GSAP + OGL site below, plus the research case study.
+- v3 viewer (GSAP + OGL fixed viewer) archived at `archive/v3-viewer/` on Nov 17, 2026. It was the live build Nov 16-17, 2026.
+- Current build is the v6 story page (one scrolling page, see "Structure (v6, current)"), plus the research case study.
 
 ## Files
 
@@ -60,12 +61,24 @@ The JS `C` palette object mirrors these and must stay in sync with `:root`.
 Type: **Bodoni Moda** (display: project titles, ledes), **Archivo** (body), **IBM Plex Mono** (labels, metrics, node names, uppercase + tracking).
 Avoid: Inter/Space Grotesk, purple gradients, emoji, badge soup, cards-everywhere.
 
-## Structure (v3, current)
+## Structure (v6, current)
 
-- Preloader `000→100`, skipped by any input.
-- Stage: `#plate` (canvas `#art` + vignette/centre scrim), `#titles` (slides), `#pgn`, `#strip` (filmstrip of real scene miniatures, text suppressed), `+` nav, Dubai GST clock.
-- Input: wheel (threshold 55, 780ms lock), pointer drag/swipe, arrow keys, filmstrip, `+`.
-- "Open project" → detail sheet (body, metrics, chips, links, prev/next). "About" → bio, track, research, stack, contact.
+One scrolling story page in `site.html`. Six chapters:
+
+1. Hero
+2. Who (01)
+3. What drives me (02)
+4. Work (03): six `.proj` chapters, one per project
+5. Research (04)
+6. Contact (05)
+
+Key facts:
+- One shared rAF drives all project plates; the hero has its own rAF.
+- GSAP + ScrollTrigger reveals are gated by `html.motion`.
+- `BOOKING_URL` (JS constant). Empty means the "Book a time" button is hidden.
+- Photo slot: `data-photo` on `figure.photo`. Empty means the FM monogram shows.
+- `node scripts/check-site.mjs --all` is the content/rules check. Run it with `./build.sh` before committing.
+- Local preview: the `portfolio` server in `.claude/launch.json` (node static server).
 
 ## Projects (display name → real name / repo)
 
@@ -89,8 +102,7 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 
 ## Known weaknesses (why the next step matters)
 
-- Canvas 2D can't do displacement/ripple transitions; that's what makes the reference feel liquid.
-- Preview harness can't drive keyboard/scroll in the `data:` frame. Verify transitions by hand.
+- Preview harness can't drive keyboard/scroll in the `data:` frame. Verify scroll reveals by hand.
 - Mobile layout untested at depth.
 
 ## Roadmap (agreed direction)
@@ -98,7 +110,7 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 Stack decision: **GSAP + OGL, no framework.** Next.js was rejected: animation code fights React's render cycle, and Farhad's projects already prove React.
 
 1. **GSAP rebuild (DONE, GSAP 3.13.0 + SplitText from cdnjs).** `go()` builds one interruptible `gsap.timeline()` (kills the previous, no `busy` lock; `target` tracks destination, `cur` changes only at the `swap` label). SplitText per-character title reveals. Scene loop pauses on `visibilitychange`. Remaining: verify by hand with real wheel/drag, mobile. GSAP is free including former Club plugins (verify terms before client work).
-2. **OGL shader transitions (DONE).** OGL 1.0.11 has no UMD build; it loads as ESM from `cdn.jsdelivr.net/npm/ogl@1.0.11/+esm` via a trailing `<script type="module">` that sets `window.__OGL` and fires `ogl-ready`. `go()` freezes the on-screen frame (scene, or the half-finished transition canvas `#fx`) into offscreen canvas `offA`, renders only the incoming scene live into `offB`, and blends them in `FX_FS` (noise-edge wipe, displacement, RGB split). `#fx` is `display:none` outside transitions. Falls back to the plate shrink/fade if OGL fails to load, WebGL is missing, or reduced-motion is set. Tune the look in `FX_FS` and the `p` tween in `go()`.
+2. **OGL shader transitions (DONE, but not used in v6; the code lives in `archive/v3-viewer/`).** OGL 1.0.11 has no UMD build; it loads as ESM from `cdn.jsdelivr.net/npm/ogl@1.0.11/+esm` via a trailing `<script type="module">` that sets `window.__OGL` and fires `ogl-ready`. `go()` freezes the on-screen frame (scene, or the half-finished transition canvas `#fx`) into offscreen canvas `offA`, renders only the incoming scene live into `offB`, and blends them in `FX_FS` (noise-edge wipe, displacement, RGB split). `#fx` is `display:none` outside transitions. Falls back to the plate shrink/fade if OGL fails to load, WebGL is missing, or reduced-motion is set. Tune the look in `FX_FS` and the `p` tween in `go()`.
 3. Move to **Vite + TypeScript**, static build, deploy to Vercel or Cloudflare Pages on Farhad's domain. Keep producing a single-file build for the artifact preview.
 
 Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.tailwindcss.com, code.jquery.com. GSAP and OGL are on those.
@@ -108,6 +120,13 @@ Artifact CSP: scripts only from cdnjs.cloudflare.com, cdn.jsdelivr.net/npm, cdn.
 - Falah: Supabase backend (follow the code), not live on the App Store yet.
 - Cyrus: Palantir Foundry-style ontology platform for any industry, first modelled on pharma, no real users yet. Describe the hard problem and how it solves it, not pipeline internals.
 - Zagros: private repo, enterprise governance/auth. No Apache 2.0, no public source link.
+
+## Content Farhad still owes
+
+- Origin story.
+- The moments he wants in his own words.
+- Photos (portrait first).
+- A booking URL (`BOOKING_URL`).
 
 ## Open questions for Farhad
 
