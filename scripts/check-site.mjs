@@ -86,7 +86,7 @@ check("work chapters: names in h3, problem/built/matters rows", () => {
 });
 
 check("forbidden substrings absent", () => {
-  const bad = ["97%", "Apache", "ICNGN", "PyTorch", "[Your", "CV", "a week", "Onyxs", "SR-71", "Purple Finance"];
+  const bad = ["97%", "Apache", "ICNGN", "PyTorch", "[Your", "CV", "a week", "Onyxs", "SR-71", "Purple Finance", "Cyrus holds"];
   return bad.filter((s) => src.includes(s)).map((s) => `found "${s}"`);
 });
 

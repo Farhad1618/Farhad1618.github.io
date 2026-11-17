@@ -3,7 +3,7 @@
 Personal portfolio for Farhad Maleki, AI & Agentic Systems Engineer (CTO, OnePharma, Dubai).
 Goal: win clients and employers. Inspired by camillemormal.com (studied it directly — see "Reference" below).
 
-Live preview (Claude artifact, private until shared): https://claude.ai/artifact/2TVyGhJNC1EnD3yGFmDyBP
+Live preview (v6 story, Claude artifact, private until shared): https://claude.ai/artifact/5Ebg4aXP3fwZxvheKuLeRY
 Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so a push to main is live.
 
 ## History
@@ -109,7 +109,7 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 
 Stack decision: **GSAP + OGL, no framework.** Next.js was rejected: animation code fights React's render cycle, and Farhad's projects already prove React.
 
-1. **GSAP rebuild (DONE, GSAP 3.13.0 + SplitText from cdnjs).** `go()` builds one interruptible `gsap.timeline()` (kills the previous, no `busy` lock; `target` tracks destination, `cur` changes only at the `swap` label). SplitText per-character title reveals. Scene loop pauses on `visibilitychange`. Remaining: verify by hand with real wheel/drag, mobile. GSAP is free including former Club plugins (verify terms before client work).
+1. **GSAP rebuild (DONE; v3, archived: this describes v3 code no longer in site.html; GSAP 3.13.0 + SplitText from cdnjs).** `go()` builds one interruptible `gsap.timeline()` (kills the previous, no `busy` lock; `target` tracks destination, `cur` changes only at the `swap` label). SplitText per-character title reveals. Scene loop pauses on `visibilitychange`. Remaining: verify by hand with real wheel/drag, mobile. GSAP is free including former Club plugins (verify terms before client work).
 2. **OGL shader transitions (DONE, but not used in v6; the code lives in `archive/v3-viewer/`).** OGL 1.0.11 has no UMD build; it loads as ESM from `cdn.jsdelivr.net/npm/ogl@1.0.11/+esm` via a trailing `<script type="module">` that sets `window.__OGL` and fires `ogl-ready`. `go()` freezes the on-screen frame (scene, or the half-finished transition canvas `#fx`) into offscreen canvas `offA`, renders only the incoming scene live into `offB`, and blends them in `FX_FS` (noise-edge wipe, displacement, RGB split). `#fx` is `display:none` outside transitions. Falls back to the plate shrink/fade if OGL fails to load, WebGL is missing, or reduced-motion is set. Tune the look in `FX_FS` and the `p` tween in `go()`.
 3. Move to **Vite + TypeScript**, static build, deploy to Vercel or Cloudflare Pages on Farhad's domain. Keep producing a single-file build for the artifact preview.
 
