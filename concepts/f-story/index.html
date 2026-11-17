@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Farhad Maleki — Story mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
+  --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --sig:#E9A03B; --trace:#5FA8B8;
+  --disp:'Bodoni Moda',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
+  --g:clamp(16px,4vw,56px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--ink)}
+body{background:var(--ink);color:var(--bone);font-family:var(--body);font-size:17px;line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:var(--sig);color:var(--ink)}
+.mono{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.sig{color:var(--sig)}
+/* grain over everything */
+body::after{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:50;opacity:.07;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 1.2s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-5%)}100%{transform:translate(0,0)}}
+
+/* mockup banner */
+.note{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;background:var(--ink-2);border:1px solid var(--rule);
+  padding:8px 14px;border-radius:999px;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.note b{color:var(--sig);font-weight:500}
+
+/* top bar */
+header{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);mix-blend-mode:difference}
+header .name{font-family:var(--disp);font-size:20px;letter-spacing:.01em}
+header nav{display:flex;gap:28px}
+header nav a{color:var(--bone);text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+.progress{position:fixed;top:0;left:0;height:2px;background:var(--sig);z-index:45;width:0}
+
+section{position:relative;padding:0 var(--g)}
+.chap{display:flex;gap:14px;align-items:center;margin-bottom:40px}
+.chap i{display:block;width:48px;height:1px;background:var(--rule)}
+
+/* 01 hero */
+.hero{height:100svh;min-height:620px;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:9vh;overflow:hidden}
+#field{position:absolute;inset:0;width:100%;height:100%}
+.hero .scrim{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 75%,rgba(12,12,14,.92) 0%,rgba(12,12,14,.4) 55%,transparent 80%)}
+.hero h1{position:relative;font-family:var(--disp);font-weight:400;font-size:clamp(44px,9vw,148px);line-height:.92;letter-spacing:-.02em;max-width:13ch}
+.hero h1 em{font-style:italic;color:var(--sig)}
+.hero .meta{position:relative;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:44px;border-top:1px solid var(--rule);padding-top:18px}
+.line{display:block;overflow:hidden}
+.line>span{display:block;transform:translateY(105%);transition:transform 1.2s cubic-bezier(.16,1,.3,1)}
+.in .line>span{transform:none}
+.in .line:nth-child(2)>span{transition-delay:.08s}.in .line:nth-child(3)>span{transition-delay:.16s}
+
+/* 02 who */
+.who{padding-top:22vh;padding-bottom:18vh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:clamp(28px,6vw,96px);align-items:center}
+.photo{position:relative;aspect-ratio:4/5;background:var(--ink-2);overflow:hidden;border:1px solid var(--rule-soft)}
+.photo .ph{position:absolute;inset:0;display:grid;place-items:center;
+  background:radial-gradient(ellipse at 50% 38%,#2a2218 0%,#141210 55%,var(--ink) 100%)}
+.photo .ph span{font-family:var(--disp);font-style:italic;font-size:clamp(90px,14vw,200px);color:#3a2d1c;letter-spacing:-.04em}
+.photo .tag{position:absolute;left:14px;bottom:12px}
+.photo .cap{position:absolute;right:14px;top:12px}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(233,160,59,.08));mix-blend-mode:screen}
+.who h2{font-family:var(--disp);font-weight:400;font-size:clamp(34px,4.6vw,72px);line-height:1.02;letter-spacing:-.015em;margin-bottom:28px}
+.who p{color:var(--dim);max-width:46ch;margin-bottom:18px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);margin-top:36px;border-top:1px solid var(--rule)}
+.facts div{padding:16px 16px 0 0}
+.facts b{display:block;font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);color:var(--bone)}
+
+/* 03 drive: horizontal obsession moments */
+.drive{padding-top:14vh;padding-bottom:14vh;border-top:1px solid var(--rule-soft)}
+.drive h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em;max-width:14ch;margin-bottom:8vh}
+.drive h2 em{color:var(--sig)}
+.moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft)}
+.moment{background:var(--ink);padding:28px 22px 32px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between;transition:background .4s}
+.moment:hover{background:var(--ink-2)}
+.moment .t{font-family:var(--mono);font-size:44px;color:var(--sig);letter-spacing:-.02em}
+.moment h3{font-family:var(--disp);font-weight:400;font-size:24px;line-height:1.15;margin:18px 0 10px}
+.moment p{color:var(--dim);font-size:15px}
+.ph-copy{border-bottom:1px dashed var(--muted)}
+
+/* 04 work chapters */
+.work-intro{padding-top:16vh;padding-bottom:6vh;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+.work-intro h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em}
+.proj{position:relative;min-height:100svh;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);border-top:1px solid var(--rule-soft);padding:0}
+.proj .plate{position:relative;min-height:70svh;overflow:hidden;background:#0E0E11}
+.proj canvas{position:absolute;inset:0;width:100%;height:100%}
+.proj .num{position:absolute;left:var(--g);top:28px;font-family:var(--disp);font-size:clamp(80px,12vw,180px);line-height:.8;color:transparent;-webkit-text-stroke:1px rgba(236,231,220,.18)}
+.proj .txt{padding:clamp(32px,6vh,80px) var(--g);display:flex;flex-direction:column;justify-content:center;gap:28px}
+.proj h3{font-family:var(--disp);font-weight:400;font-size:clamp(48px,6vw,96px);line-height:.95;letter-spacing:-.02em}
+.pab{display:grid;gap:18px}
+.pab div{display:grid;grid-template-columns:120px 1fr;gap:16px;border-top:1px solid var(--rule);padding-top:14px}
+.pab p{color:var(--dim);font-size:15.5px}
+.pab .mono{padding-top:3px}
+.cta-row{display:flex;gap:20px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:12px;color:var(--ink);background:var(--bone);text-decoration:none;padding:14px 22px;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;border-radius:999px;transition:background .3s}
+.btn:hover{background:var(--sig)}
+.ghost{color:var(--bone);background:none;border:1px solid var(--rule)}
+.more{padding:40px var(--g) 12vh;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--rule-soft);border-top:1px solid var(--rule-soft)}
+.more div{background:var(--ink);padding:22px 18px 26px}
+.more b{display:block;font-family:var(--disp);font-weight:400;font-size:26px;margin:8px 0 4px}
+.more p{color:var(--muted);font-size:13.5px}
+
+/* 05 paper */
+.paper{padding-top:18vh;padding-bottom:18vh;border-top:1px solid var(--rule-soft);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(28px,6vw,96px);align-items:end}
+.big{font-family:var(--disp);font-weight:400;font-size:clamp(96px,17vw,280px);line-height:.8;letter-spacing:-.04em;color:var(--sig)}
+.big small{font-size:.32em;color:var(--bone)}
+.paper h3{font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);line-height:1.1;margin:14px 0 18px}
+.paper p{color:var(--dim);max-width:48ch;margin-bottom:24px}
+
+/* 06 contact */
+.contact{min-height:100svh;display:flex;flex-direction:column;justify-content:center;border-top:1px solid var(--rule-soft);padding-top:12vh;padding-bottom:12vh}
+.contact h2{font-family:var(--disp);font-weight:400;font-size:clamp(52px,11vw,190px);line-height:.88;letter-spacing:-.03em}
+.contact h2 a{color:var(--bone);text-decoration:none;font-style:italic;background:linear-gradient(var(--sig),var(--sig)) 0 92%/0 2px no-repeat;transition:background-size .6s cubic-bezier(.16,1,.3,1),color .3s}
+.contact h2 a:hover{background-size:100% 2px;color:var(--sig)}
+.paths{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);margin-top:9vh}
+.paths div{background:var(--ink);padding:28px 24px}
+.paths h4{font-family:var(--disp);font-weight:400;font-size:28px;margin:10px 0 8px}
+.paths p{color:var(--dim);font-size:15px}
+footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:22px var(--g) 80px;border-top:1px solid var(--rule)}
+footer a{color:var(--dim);text-decoration:none}
+
+.rv{opacity:0;transform:translateY(40px);transition:opacity 1s,transform 1.2s cubic-bezier(.16,1,.3,1)}
+.rv.in{opacity:1;transform:none}
+
+@media (max-width:860px){
+  header nav{display:none}
+  .who,.paper,.proj{grid-template-columns:1fr}
+  .moments{grid-template-columns:1fr 1fr}
+  .more{grid-template-columns:1fr 1fr}
+  .paths{grid-template-columns:1fr}
+  .proj .plate{min-height:56svh}
+  .pab div{grid-template-columns:1fr;gap:6px}
+}
+@media (max-width:520px){.moments,.more{grid-template-columns:1fr}.facts{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="progress" id="prog"></div>
+<div class="note"><b>Mockup</b> · layout &amp; feel only · scroll ↓</div>
+
+<header>
+  <div class="name">Farhad Maleki</div>
+  <nav><a href="#who">About</a><a href="#work">Work</a><a href="#paper">Research</a><a href="#contact">Contact</a></nav>
+</header>
+
+<!-- 01 HERO -->
+<section class="hero" id="top">
+  <canvas id="field"></canvas>
+  <div class="scrim"></div>
+  <p class="mono" style="position:relative;margin-bottom:22px">AI &amp; Agentic Systems Engineer · CTO, OnePharma · Dubai</p>
+  <h1 class="h"><span class="line"><span>Most systems</span></span><span class="line"><span>remember.</span></span><span class="line"><span>I build systems that <em>understand.</em></span></span></h1>
+  <div class="meta">
+    <span class="mono">I don't imagine the future. I build it.</span>
+    <span class="mono">Scroll ↓</span>
+  </div>
+</section>
+
+<!-- 02 WHO -->
+<section class="who" id="who">
+  <div class="photo rv">
+    <div class="ph"><span>FM</span></div>
+    <span class="mono tag">Portrait · coming soon</span>
+    <span class="mono cap sig">● Dubai, GST</span>
+  </div>
+  <div class="rv">
+    <div class="chap"><span class="mono sig">01</span><i></i><span class="mono">Who</span></div>
+    <h2>I'm Farhad. I turn chaos into systems that think.</h2>
+    <p>CTO at OnePharma in Dubai. I design the layer most companies skip: ontologies, knowledge graphs and governance that let AI <em>understand</em> a business, not just store it.</p>
+    <p><span class="ph-copy">[Your origin story: the moment you got hooked. Two sentences, in your words.]</span></p>
+    <div class="facts">
+      <div><b>6</b><span class="mono">Systems built</span></div>
+      <div><b>1</b><span class="mono">Springer paper</span></div>
+      <div><b>2</b><span class="mono">Languages, AR/EN</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 DRIVE -->
+<section class="drive">
+  <div class="chap rv"><span class="mono sig">02</span><i></i><span class="mono">What drives me</span></div>
+  <h2 class="rv">Obsessed with the <em>hardest</em> problem in the room.</h2>
+  <div class="moments">
+    <div class="moment rv"><div><div class="t">03:12</div><h3>The night Cyrus clicked</h3><p class="ph-copy">[A real moment: when, what broke, what you saw.]</p></div><span class="mono">Moment 01</span></div>
+    <div class="moment rv"><div><div class="t">5 keys</div><h3>Governance nobody asked for</h3><p>Zagros began because "who is allowed to decide" was the question no one in the room could answer.</p></div><span class="mono">Moment 02</span></div>
+    <div class="moment rv"><div><div class="t">99.34%</div><h3>Published, not just shipped</h3><p>Took a botnet-detection model all the way to Springer LNCS, NEW2AN 2023.</p></div><span class="mono">Moment 03</span></div>
+    <div class="moment rv"><div><div class="t">∞</div><h3>How I work</h3><p class="ph-copy">[Your rule, ritual or habit people notice about you.]</p></div><span class="mono">Moment 04</span></div>
+  </div>
+</section>
+
+<!-- 04 WORK -->
+<section class="work-intro" id="work">
+  <div class="rv"><div class="chap"><span class="mono sig">03</span><i></i><span class="mono">Proof</span></div><h2>The work.</h2></div>
+  <p class="mono rv" style="max-width:34ch">Each plate is a live scene drawn in the project's own language. No stock imagery.</p>
+</section>
+
+<section class="proj">
+  <div class="plate"><canvas id="graph"></canvas><div class="num">03</div></div>
+  <div class="txt rv">
+    <span class="mono sig">OnePharma · Knowledge graph</span>
+    <h3>OnePharma</h3>
+    <div class="pab">
+      <div><span class="mono">The problem</span><p>Pharma data lives in silos that can't talk: products, regulations, suppliers, markets.</p></div>
+      <div><span class="mono">What I built</span><p>An ontology of 36 entities and ~60 relationships that lets every question cross every silo.</p></div>
+      <div><span class="mono">Why it matters</span><p>Answers that took a team a week arrive in one query.</p></div>
+    </div>
+    <div class="cta-row"><a class="btn" href="#">Case study →</a><span class="mono">1 of 6 chapters</span></div>
+  </div>
+</section>
+
+<div class="more">
+  <div><span class="mono sig">01</span><b>Cyrus</b><p>Ontology platform for any industry</p></div>
+  <div><span class="mono sig">02</span><b>Zagros</b><p>Constitutional governance &amp; auth</p></div>
+  <div><span class="mono sig">04</span><b>Black Pearl</b><p>Signals to CNC toolpaths</p></div>
+  <div><span class="mono sig">05</span><b>Falah</b><p>Personal finance, honest budgets</p></div>
+  <div><span class="mono sig">06</span><b>Intrusion Detection</b><p>CNN-RNN botnet detection</p></div>
+</div>
+
+<!-- 05 PAPER -->
+<section class="paper" id="paper">
+  <div class="big rv">99.34<small>%</small></div>
+  <div class="rv">
+    <div class="chap"><span class="mono sig">04</span><i></i><span class="mono">Research</span></div>
+    <span class="mono">N-BaIoT, TCP removed · 98.23% on NSL-KDD</span>
+    <h3>Deep Learning for Preventing Botnet Attacks on IoT</h3>
+    <p>NEW2AN / ruSMART 2023, Springer LNCS. The model runs live in your browser on the case-study page.</p>
+    <a class="btn ghost" href="#">Read the case study →</a>
+  </div>
+</section>
+
+<!-- 06 CONTACT -->
+<section class="contact" id="contact">
+  <div class="chap rv"><span class="mono sig">05</span><i></i><span class="mono">Next</span></div>
+  <h2 class="rv">Bring me your<br><a href="mailto:farhad.maleki1618@outlook.com">hardest problem.</a></h2>
+  <div class="paths">
+    <div class="rv"><span class="mono sig">For clients</span><h4>Build with me</h4><p>Ontologies, agentic systems, AI governance. From first diagram to production.</p></div>
+    <div class="rv"><span class="mono sig">For teams</span><h4>Hire me</h4><p>Leadership roles in AI and systems architecture. CV on request.</p></div>
+  </div>
+</section>
+<footer>
+  <span class="mono">farhad.maleki1618@outlook.com</span>
+  <span class="mono"><a href="#">GitHub</a> · <a href="#">LinkedIn</a></span>
+  <span class="mono">© 2026 Farhad Maleki</span>
+</footer>
+
+<script>
+const C={ink:'#0C0C0E',bone:'#ECE7DC',sig:'#E9A03B',trace:'#5FA8B8',muted:'#716E68'};
+const dpr=Math.min(devicePixelRatio||1,2);
+function fit(cv){const r=cv.getBoundingClientRect();cv.width=r.width*dpr;cv.height=r.height*dpr;return cv.getContext('2d')}
+
+/* hero: drifting node field that links to the cursor */
+const hf=document.getElementById('field');let hx=fit(hf);
+let P=[],mx=-1e4,my=-1e4;
+function seed(){P=[];const n=Math.round(hf.width*hf.height/(14000*dpr*dpr));for(let i=0;i<n;i++)P.push({x:Math.random()*hf.width,y:Math.random()*hf.height,vx:(Math.random()-.5)*.25*dpr,vy:(Math.random()-.5)*.25*dpr,a:Math.random()<.07})}
+seed();
+addEventListener('pointermove',e=>{mx=e.clientX*dpr;my=e.clientY*dpr});
+function hero(){
+  hx.clearRect(0,0,hf.width,hf.height);
+  const L=140*dpr;
+  for(const p of P){p.x+=p.vx;p.y+=p.vy;if(p.x<0||p.x>hf.width)p.vx*=-1;if(p.y<0||p.y>hf.height)p.vy*=-1}
+  hx.lineWidth=dpr*.6;
+  for(let i=0;i<P.length;i++){const a=P[i];
+    for(let j=i+1;j<P.length;j++){const b=P[j],d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<L){hx.strokeStyle=`rgba(95,168,184,${(1-d/L)*.22})`;hx.beginPath();hx.moveTo(a.x,a.y);hx.lineTo(b.x,b.y);hx.stroke()}}
+    const dm=Math.hypot(a.x-mx,a.y-my);
+    if(dm<L*1.6){hx.strokeStyle=`rgba(233,160,59,${(1-dm/(L*1.6))*.55})`;hx.beginPath();hx.moveTo(a.x,a.y);hx.lineTo(mx,my);hx.stroke()}
+    hx.fillStyle=a.a?C.sig:'rgba(236,231,220,.5)';hx.beginPath();hx.arc(a.x,a.y,(a.a?2.2:1.2)*dpr,0,7);hx.fill()}
+}
+
+/* project plate: force graph with query pulses */
+const gc=document.getElementById('graph');let gx=fit(gc);
+const N=36,nodes=[],edges=[];
+function scatter(){const W=gc.width||800,H=gc.height||600;nodes.forEach(n=>{n.x=W/2+(Math.random()-.5)*W*.6;n.y=H/2+(Math.random()-.5)*H*.6})}
+for(let i=0;i<N;i++)nodes.push({x:0,y:0,vx:0,vy:0,hub:i<5});scatter();
+for(let i=5;i<N;i++){edges.push([i,i%5]);if(Math.random()<.65)edges.push([i,5+Math.floor(Math.random()*(N-5))])}
+for(let i=0;i<5;i++)edges.push([i,(i+1)%5]);
+let pulses=[];
+function graph(){
+  if(Math.abs(gc.clientHeight*dpr-gc.height)>2){gx=fit(gc);scatter()}
+  const W=gc.width,H=gc.height,k=Math.min(W,H)*.11;
+  for(const a of nodes){for(const b of nodes){if(a===b)continue;const dx=a.x-b.x,dy=a.y-b.y,d=Math.max(Math.hypot(dx,dy),1);const f=k*k/d/d*.6;a.vx+=dx/d*f;a.vy+=dy/d*f}
+    a.vx+=(W/2-a.x)*.0009;a.vy+=(H/2-a.y)*.0009}
+  for(const[i,j]of edges){const a=nodes[i],b=nodes[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,f=(d-k)*.004;a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f}
+  for(const n of nodes){n.vx*=.82;n.vy*=.82;n.x+=n.vx;n.y+=n.vy}
+  if(Math.random()<.06)pulses.push({e:edges[Math.floor(Math.random()*edges.length)],t:0});
+  gx.clearRect(0,0,W,H);gx.lineWidth=dpr;
+  for(const[i,j]of edges){gx.strokeStyle='rgba(95,168,184,.22)';gx.beginPath();gx.moveTo(nodes[i].x,nodes[i].y);gx.lineTo(nodes[j].x,nodes[j].y);gx.stroke()}
+  pulses=pulses.filter(p=>(p.t+=.018)<1);
+  for(const p of pulses){const a=nodes[p.e[0]],b=nodes[p.e[1]];gx.fillStyle=C.sig;gx.beginPath();gx.arc(a.x+(b.x-a.x)*p.t,a.y+(b.y-a.y)*p.t,2.4*dpr,0,7);gx.fill()}
+  for(const n of nodes){gx.fillStyle=n.hub?C.sig:C.bone;gx.globalAlpha=n.hub?1:.7;gx.beginPath();gx.arc(n.x,n.y,(n.hub?4:2)*dpr,0,7);gx.fill();gx.globalAlpha=1}
+}
+
+(function loop(){hero();graph();requestAnimationFrame(loop)})();
+addEventListener('resize',()=>{hx=fit(hf);gx=fit(gc);seed()});
+
+/* reveals + progress */
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.15});
+document.querySelectorAll('.rv,.h').forEach(el=>io.observe(el));
+addEventListener('scroll',()=>{const h=document.documentElement;document.getElementById('prog').style.width=(h.scrollTop/(h.scrollHeight-innerHeight)*100)+'%'},{passive:true});
+</script>
+</body>
+</html>
