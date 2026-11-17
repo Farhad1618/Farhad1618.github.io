@@ -95,6 +95,21 @@ check("opacity:0 on .rv gated by html.motion", () => {
   return errs;
 });
 
+check("hero and who copy present", () => {
+  const need = ["Most systems remember.", "I build systems that", "understand",
+    "I don't imagine the future. I build it.", "Featured systems", "CTO, OnePharma"];
+  return need.filter((s) => !src.includes(s)).map((s) => `missing "${s}"`);
+});
+
+check("who copy: headline, photo slot, no origin line", () => {
+  const errs = [];
+  if (!src.includes("I'm Farhad. I turn chaos into systems that think.")) errs.push("who headline missing");
+  if (!/<figure class="photo[^"]*" data-photo="">/.test(src)) errs.push('photo slot <figure class="photo" data-photo=""> missing');
+  if (!/function heroField\(g,\s*w,\s*h,\s*t\)/.test(src)) errs.push("heroField(g,w,h,t) missing");
+  if (/origin (story|line)/i.test(src)) errs.push("origin text present");
+  return errs;
+});
+
 let failed = 0;
 for (const c of checks) {
   if (c.pending && !all) { console.log(`SKIP  ${c.name} (pending, use --all)`); continue; }

@@ -51,15 +51,47 @@ body::after{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:50;
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-5%)}100%{transform:translate(0,0)}}
 
 /* top bar */
-header{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);mix-blend-mode:difference}
-header .name{font-family:var(--disp);font-size:20px;letter-spacing:.01em;color:var(--bone);text-decoration:none}
-header nav{display:flex;gap:28px}
-header nav a{color:var(--bone);text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
+header.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);mix-blend-mode:difference}
+header.topbar .name{font-family:var(--disp);font-size:20px;letter-spacing:.01em;color:var(--bone);text-decoration:none}
+header.topbar nav{display:flex;gap:28px}
+header.topbar nav a{color:var(--bone);text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 .progress{position:fixed;top:0;left:0;height:2px;background:var(--sig);z-index:45;width:0}
 
 section{position:relative;padding:0 var(--g)}
 .chap{display:flex;gap:14px;align-items:center;margin-bottom:40px}
 .chap i{display:block;width:48px;height:1px;background:var(--rule)}
+
+/* 01 hero */
+.hero{height:100svh;min-height:620px;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:9vh;overflow:hidden}
+#field{position:absolute;inset:0;width:100%;height:100%}
+.hero .scrim{position:absolute;inset:0;background:radial-gradient(ellipse at 30% 75%,rgba(12,12,14,.92) 0%,rgba(12,12,14,.4) 55%,transparent 80%)}
+.hero .role{position:relative;margin-bottom:22px}
+.hero h1{position:relative;font-family:var(--disp);font-weight:400;font-size:clamp(40px,9vw,148px);line-height:.92;letter-spacing:-.02em;max-width:13ch}
+.hero h1 em{font-style:italic;color:var(--sig)}
+.hero .meta{position:relative;display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-top:44px;border-top:1px solid var(--rule);padding-top:18px}
+.line{display:block;overflow:hidden;padding-bottom:.06em}
+.line>span{display:block;transition:transform 1.2s cubic-bezier(.16,1,.3,1)}
+html.motion .line>span{transform:translateY(105%)}
+html.motion .in .line>span{transform:none}
+.in .line:nth-child(2)>span{transition-delay:.08s}.in .line:nth-child(3)>span{transition-delay:.16s}.in .line:nth-child(4)>span{transition-delay:.24s}
+
+/* 02 who */
+.who{padding-top:22vh;padding-bottom:18vh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:clamp(28px,6vw,96px);align-items:center}
+.photo{position:relative;aspect-ratio:4/5;background:var(--ink-2);overflow:hidden;border:1px solid var(--rule-soft)}
+.photo .ph{position:absolute;inset:0;display:grid;place-items:center;
+  background:radial-gradient(ellipse at 50% 38%,#2a2218 0%,#141210 55%,var(--ink) 100%)}
+.photo .ph span{font-family:var(--disp);font-style:italic;font-size:clamp(90px,14vw,200px);color:#3a2d1c;letter-spacing:-.04em}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) sepia(.35) contrast(1.05)}
+.photo .tag{position:absolute;left:14px;bottom:12px}
+.photo .cap{position:absolute;right:14px;top:12px}
+.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(233,160,59,.08));mix-blend-mode:screen}
+.photo.has-img::after{background:rgba(233,160,59,.14)}
+.who h2{font-family:var(--disp);font-weight:400;font-size:clamp(34px,4.6vw,72px);line-height:1.02;letter-spacing:-.015em;margin-bottom:28px}
+.who p{color:var(--dim);max-width:46ch;margin-bottom:18px}
+.who p em{color:var(--bone)}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);margin-top:36px;border-top:1px solid var(--rule)}
+.facts div{padding:16px 16px 0 0}
+.facts b{display:block;font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);color:var(--bone)}
 
 footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:22px var(--g) 80px;border-top:1px solid var(--rule)}
 footer a{color:var(--dim);text-decoration:none}
@@ -71,9 +103,11 @@ html.motion .rv{opacity:0;transform:translateY(40px)}
 html.motion .rv.in{opacity:1;transform:none}
 
 @media (max-width:860px){
-  header nav{display:none}
+  header.topbar nav{display:none}
+  .who{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
+  .line>span{transition:none}
   body::after{animation:none}
   .rv{transition:none}
 }
@@ -93,8 +127,34 @@ html.motion .rv.in{opacity:1;transform:none}
 <div class="progress" id="progress"></div>
 
 <main>
-  <section id="top"></section>
-  <section id="who"></section>
+  <section class="hero" id="top">
+    <canvas id="field" aria-hidden="true"></canvas>
+    <div class="scrim"></div>
+    <p class="mono role">AI &amp; Agentic Systems Engineer · CTO, OnePharma · Dubai</p>
+    <h1 class="h" aria-label="Most systems remember. I build systems that understand."><span class="line" aria-hidden="true"><span>Most systems</span></span><span class="line" aria-hidden="true"><span>remember.</span></span><span class="line" aria-hidden="true"><span>I build systems that</span></span><span class="line" aria-hidden="true"><span><em>understand.</em></span></span></h1>
+    <div class="meta">
+      <span class="mono">I don't imagine the future. I build it.</span>
+      <span class="mono">Scroll &darr;</span>
+    </div>
+  </section>
+  <section class="who" id="who">
+    <figure class="photo rv" data-photo="">
+      <div class="ph"><span>FM</span></div>
+      <figcaption class="mono tag">Portrait · coming soon</figcaption>
+      <span class="mono cap sig">● Dubai, GST</span>
+    </figure>
+    <div class="rv">
+      <div class="chap"><span class="mono sig">01</span><i></i><span class="mono">Who</span></div>
+      <h2>I'm Farhad. I turn chaos into systems that think.</h2>
+      <p>CTO at OnePharma in Dubai. I design the layer most companies skip: ontologies, knowledge graphs and governance layers that let AI <em>understand</em> a business, not just store it.</p>
+      <p>I build ontology platforms, constitutional governance and detection models, and I took one of them all the way to a Springer paper.</p>
+      <div class="facts">
+        <div><b>6</b><span class="mono">Featured systems</span></div>
+        <div><b>1</b><span class="mono">Springer paper</span></div>
+        <div><b>AR/EN</b><span class="mono">Bilingual systems</span></div>
+      </div>
+    </div>
+  </section>
   <section id="drive"></section>
   <section id="work"></section>
   <section id="paper"></section>
@@ -127,12 +187,83 @@ function rgba(hex,a){
 /* deterministic pseudo-random so every visitor sees the same composition */
 function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 
+/* ============================================================
+   HERO FIELD: drifting nodes, teal links, amber links to the cursor.
+   Stateless in t (positions are a function of time), so a still frame is just t=0.
+   ============================================================ */
+var heroPts = null, heroKey = "";
+function heroField(g,w,h,t){
+  var key = w+"x"+h;
+  if (heroKey !== key) {
+    var r = mk(1618), n = Math.round(w*h/14000), i;
+    heroPts = [];
+    for (i=0;i<n;i++) heroPts.push({ x:r()*w, y:r()*h, ax:8+r()*26, ay:8+r()*26,
+      sx:.12+r()*.22, sy:.12+r()*.22, px:r()*TAU, py:r()*TAU, a:r()<.07 });
+    heroKey = key;
+  }
+  var L = 140, M = L*1.6, P = heroPts, i, j, a, b, d, dm;
+  for (i=0;i<P.length;i++){ a=P[i]; a.cx = a.x + Math.sin(t*a.sx+a.px)*a.ax; a.cy = a.y + Math.sin(t*a.sy+a.py)*a.ay; }
+  g.clearRect(0,0,w,h);
+  g.lineWidth = .6;
+  for (i=0;i<P.length;i++){
+    a = P[i];
+    for (j=i+1;j<P.length;j++){
+      b = P[j]; d = Math.hypot(a.cx-b.cx, a.cy-b.cy);
+      if (d < L){ g.strokeStyle = rgba(C.trace,(1-d/L)*.22); g.beginPath(); g.moveTo(a.cx,a.cy); g.lineTo(b.cx,b.cy); g.stroke(); }
+    }
+    dm = Math.hypot(a.cx-heroMouse.x, a.cy-heroMouse.y);
+    if (dm < M){ g.strokeStyle = rgba(C.sig,(1-dm/M)*.55); g.beginPath(); g.moveTo(a.cx,a.cy); g.lineTo(heroMouse.x,heroMouse.y); g.stroke(); }
+    g.fillStyle = a.a ? C.sig : rgba(C.bone,.5);
+    g.beginPath(); g.arc(a.cx,a.cy,a.a?2.2:1.2,0,TAU); g.fill();
+  }
+}
+var heroMouse = { x:-1e4, y:-1e4 };
+(function(){
+  var sec = document.getElementById("top"), cv = document.getElementById("field");
+  if (!sec || !cv || !cv.getContext) return;
+  var g = cv.getContext("2d"), dpr = Math.min(window.devicePixelRatio||1, 2);
+  var w = 0, h = 0, raf = 0, onScreen = true, t0 = performance.now();
+  function size(){
+    var r = cv.getBoundingClientRect(); w = Math.max(1,Math.round(r.width)); h = Math.max(1,Math.round(r.height));
+    cv.width = w*dpr; cv.height = h*dpr; g.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function frame(now){ raf = 0; heroField(g,w,h,(now-t0)/1000); if (onScreen && !document.hidden) raf = requestAnimationFrame(frame); }
+  function run(){ if (!raf && onScreen && !document.hidden && !reduced) raf = requestAnimationFrame(frame); }
+  function still(){ heroField(g,w,h,0); }
+  size(); still();
+  addEventListener("resize", function(){ size(); if (reduced) still(); });
+  sec.addEventListener("pointermove", function(e){ var r = cv.getBoundingClientRect(); heroMouse.x = e.clientX-r.left; heroMouse.y = e.clientY-r.top; });
+  sec.addEventListener("pointerleave", function(){ heroMouse.x = heroMouse.y = -1e4; });
+  if (reduced) return;
+  if ("IntersectionObserver" in window) new IntersectionObserver(function(es){ onScreen = es[0].isIntersecting; run(); }).observe(sec);
+  document.addEventListener("visibilitychange", run);
+  run();
+})();
+
+/* Portrait slot: a URL in data-photo swaps the monogram for a graded <img>. */
+(function(){
+  var fig = document.querySelector("figure.photo[data-photo]");
+  var url = fig && fig.getAttribute("data-photo");
+  if (!url) return;
+  var img = new Image(); img.alt = "Farhad Maleki"; img.src = url;
+  img.onload = function(){
+    var ph = fig.querySelector(".ph"); if (ph) ph.hidden = true;
+    var tag = fig.querySelector(".tag"); if (tag) tag.hidden = true;
+    fig.insertBefore(img, fig.firstChild); fig.classList.add("has-img");
+  };
+})();
+
 /* Later tasks add scenes and motion below. Only enable the hidden-before-reveal
    state when GSAP actually loaded and motion is allowed. */
 if (window.gsap && window.ScrollTrigger && !reduced) {
   gsap.registerPlugin(ScrollTrigger);
   if (window.SplitText) gsap.registerPlugin(SplitText);
   document.documentElement.classList.add("motion");
+  /* temporary reveal trigger; later tasks may replace it with GSAP */
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function(es){ es.forEach(function(e){ if (e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }); }, { threshold:.15 });
+    document.querySelectorAll(".rv,.hero h1").forEach(function(el){ io.observe(el); });
+  } else document.querySelectorAll(".rv,.hero h1").forEach(function(el){ el.classList.add("in"); });
 }
 })();
 </script>
