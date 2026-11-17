@@ -116,8 +116,7 @@ check("opacity:0 on .rv gated by html.motion", () => {
 });
 
 check("hero and who copy present", () => {
-  const need = ["Most systems remember.", "I build systems that", "understand",
-    "I don't imagine the future. I build it.", "Featured systems", "CTO, OnePharma"];
+  const need = ['aria-label="Farhad"', "Software Developer", "Featured systems", "CTO at OnePharma"];
   return need.filter((s) => !src.includes(s)).map((s) => `missing "${s}"`);
 });
 
