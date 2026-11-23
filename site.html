@@ -80,6 +80,15 @@ footer a:hover{color:var(--sig)}
 /* GSAP owns opacity/transform on .rv; no CSS transitions here */
 html.motion .rv{opacity:0;transform:translateY(40px)}
 
+/* chromatic reveal: one key phrase per project. Static = amber + hairline.
+   Under html.motion a teal-to-amber edge sweeps across and leaves bone-warm amber behind. */
+@property --sw{syntax:"<percentage>";inherits:false;initial-value:114%}
+.chroma{position:relative;color:var(--sig);white-space:nowrap}
+.chroma::after{content:"";position:absolute;left:0;right:0;bottom:-.12em;height:1px;background:currentColor;opacity:.55;transform-origin:left}
+html.motion .chroma{color:transparent;-webkit-background-clip:text;background-clip:text;background-repeat:no-repeat;
+  background-image:linear-gradient(90deg,var(--sig) 0%,var(--sig) calc(var(--sw) - 14%),#F4C77A calc(var(--sw) - 9%),var(--bone) calc(var(--sw) - 3%),#9FD2DC calc(var(--sw) + 3%),var(--trace) calc(var(--sw) + 9%),transparent calc(var(--sw) + 14%),transparent 100%)}
+html.motion .chroma::after{background:var(--sig);transform:scaleX(var(--ul,1))}
+
 .drive{padding-top:14vh;padding-bottom:14vh;border-top:1px solid var(--rule-soft)}
 .drive h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em;max-width:14ch;margin-bottom:8vh}
 .drive h2 em{font-style:italic;color:var(--sig)}
@@ -143,6 +152,8 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 }
 @media (prefers-reduced-motion:reduce){
   html.motion .rv,html.motion .line>span{opacity:1;transform:none}
+  html.motion .chroma{--sw:114%}
+  html.motion .chroma::after{transform:none}
 }
 </style>
 
@@ -207,7 +218,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <div class="pab">
         <div><span class="mono">The problem</span><p>Bilingual Arabic and English regulatory documents have to be classified, with every control around them able to survive an audit.</p></div>
         <div><span class="mono">What I built</span><p>A multi-tenant ontology platform that classifies those documents and UAE Ministry of Health price lists, with a Neo4j graph and local embeddings for semantic search.</p></div>
-        <div><span class="mono">Why it matters</span><p>Thirteen security layers and a hash-chained audit trail hold it to 21 CFR Part 11, SOC 2 Type II and ISO 27001. It is built for pharma first and for any industry after that.</p></div>
+        <div><span class="mono">Why it matters</span><p>Thirteen security layers and a <span class="chroma">hash-chained audit trail</span> hold it to 21 CFR Part 11, SOC 2 Type II and ISO 27001. It is built for pharma first and for any industry after that.</p></div>
       </div>
     </div>
   </section>
@@ -218,7 +229,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <h3>Zagros</h3>
       <div class="pab">
         <div><span class="mono">The problem</span><p>Regulated and air-gapped teams can't hand identity to an outside provider, or trust any single key-holder.</p></div>
-        <div><span class="mono">What I built</span><p>Multi-tenant identity and governance with no external identity provider in the loop. Passkeys, email OTP and passwords are all verified in-instance, authorization runs on Cerbos policies, and the instance is brought up through a sealed Genesis ceremony with K-of-N constitutional keys.</p></div>
+        <div><span class="mono">What I built</span><p>Multi-tenant identity and governance with no external identity provider in the loop. Passkeys, email OTP and passwords are all verified in-instance, authorization runs on Cerbos policies, and the instance is brought up through a sealed Genesis ceremony with <span class="chroma">K-of-N constitutional keys</span>.</p></div>
         <div><span class="mono">Why it matters</span><p>No single key can run it, and the same code runs local, on-premise, air-gapped or managed. This is a private repository, so there is no public source.</p></div>
       </div>
     </div>
@@ -231,7 +242,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <div class="pab">
         <div><span class="mono">The problem</span><p>The product surface is what the whole platform is judged on, and it has to sit on a graph and an LLM layer it never needs to see.</p></div>
         <div><span class="mono">What I built</span><p>The product surface, built as CTO. Next.js and strict TypeScript with passwordless sign-in, a GraphQL decision service in front of a Neo4j activity graph, and a pluggable LLM layer that runs against a hosted gateway or a self-hosted model.</p></div>
-        <div><span class="mono">Why it matters</span><p>The product does not know which model is answering, so the model can change without the product changing.</p></div>
+        <div><span class="mono">Why it matters</span><p>The product <span class="chroma">does not know which model</span> is answering, so the model can change without the product changing.</p></div>
       </div>
     </div>
   </section>
@@ -243,7 +254,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <div class="pab">
         <div><span class="mono">The problem</span><p>CNC rigs are hard to demonstrate, test or build software for without the machine in the room.</p></div>
         <div><span class="mono">What I built</span><p>Live telemetry over WebSocket and configuration over REST, behind a single connection interface with swappable simulated and real machine implementations.</p></div>
-        <div><span class="mono">Why it matters</span><p>The whole rig demonstrates in a browser with no hardware attached, and the same build drives the actual machine on the factory floor.</p></div>
+        <div><span class="mono">Why it matters</span><p>The whole rig demonstrates in a browser with <span class="chroma">no hardware attached</span>, and the same build drives the actual machine on the factory floor.</p></div>
       </div>
     </div>
   </section>
@@ -254,7 +265,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <h3>Falah</h3>
       <div class="pab">
         <div><span class="mono">The problem</span><p>A budget only helps if it stays current without constant data entry.</p></div>
-        <div><span class="mono">What I built</span><p>A budgeting app that fills itself in. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. A Swift and SwiftUI client on a Supabase backend of Postgres and edge functions, owned from schema to screen.</p></div>
+        <div><span class="mono">What I built</span><p>A budgeting app that <span class="chroma">fills itself in</span>. It links bank accounts through open banking, finds subscriptions in email receipts with consent, and answers questions about your money in plain words. A Swift and SwiftUI client on a Supabase backend of Postgres and edge functions, owned from schema to screen.</p></div>
         <div><span class="mono">Why it matters</span><p>There is little to type, and the budget stays current. It is not on the App Store yet.</p></div>
       </div>
     </div>
@@ -266,7 +277,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <h3>Network Intrusion Detection</h3>
       <div class="pab">
         <div><span class="mono">The problem</span><p>IoT networks are an easy target for botnets, and detection has to separate attack traffic from normal traffic.</p></div>
-        <div><span class="mono">What I built</span><p>A comparison of CNN, 1DCNN and hybrid CNN-RNN models for detecting botnet traffic. The CNN-RNN performed best: 99.34% accuracy on N-BaIoT with TCP removed, and 98.23% on NSL-KDD.</p></div>
+        <div><span class="mono">What I built</span><p>A comparison of CNN, 1DCNN and hybrid CNN-RNN models for detecting botnet traffic. The CNN-RNN performed best: <span class="chroma">99.34% accuracy</span> on N-BaIoT with TCP removed, and 98.23% on NSL-KDD.</p></div>
         <div><span class="mono">Why it matters</span><p>Co-authored and published by Springer in the NEW2AN / ruSMART 2023 proceedings.</p></div>
       </div>
       <div class="cta-row"><a class="btn" href="research.html">Case study and live demo &rarr;</a><a class="btn ghost" href="https://doi.org/10.1007/978-3-031-60994-7_4" target="_blank" rel="noopener">Read the paper &#8599;</a></div>
@@ -887,6 +898,14 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
         onComplete:function(){ bn.textContent = "99.34"; } });
     }});
   }
+  /* chromatic reveal: sweep the edge across each key phrase as it enters */
+  gsap.utils.toArray(".chroma").forEach(function(el){
+    gsap.set(el, { "--sw":"-14%", "--ul":0 });
+    var tl = gsap.timeline({ paused:true, delay:.35 })
+      .to(el, { "--sw":"114%", duration:1.6, ease:"power2.inOut" })
+      .to(el, { "--ul":1, duration:.9, ease:EASE }, .7);
+    ScrollTrigger.create({ trigger:el, start:"top 82%", once:true, onEnter:function(){ tl.play(); } });
+  });
   /* scroll progress bar */
   gsap.to("#progress", { scaleX:1, ease:"none",
     scrollTrigger:{ trigger:document.body, start:"top top", end:"bottom bottom", scrub:.3 } });
