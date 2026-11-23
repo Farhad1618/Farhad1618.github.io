@@ -91,6 +91,8 @@ export async function mountHero(stage, layout, opts = {}) {
       tl.loadAsync(BASE + "matcap.webp"), tl.loadAsync(BASE + "haze.webp"),
     ]);
   } catch (e) { renderer.dispose(); throw e; }
+  let cleanup = () => { for (const d of disposables) { try { d.dispose(); } catch (_) { /* gone */ } } canvas.remove(); };
+  try {
   [boardTex, matcapTex, hazeTex].forEach(raw);
   boardTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   disposables.push(boardTex, matcapTex, hazeTex);
@@ -242,10 +244,14 @@ export async function mountHero(stage, layout, opts = {}) {
     hoverFromPointer(pick(e));
   });
   on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") { pointer.set(0, 0); hoverFromPointer(null); } });
-  on(canvas, "pointerdown", e => { down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType }; });
+  on(canvas, "pointerdown", e => {
+    if (e.button !== 0 || e.isPrimary === false) { down = null; return; }
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType };
+  });
   on(canvas, "pointerup", e => {
     if (!down) return;
-    const tap = performance.now() - down.t < 300 && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10;
+    const quick = down.type === "mouse" || performance.now() - down.t < 300;
+    const tap = quick && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10;
     const type = down.type; down = null;
     if (!tap) return;
     const id = pick(e);
@@ -330,6 +336,7 @@ export async function mountHero(stage, layout, opts = {}) {
     raf = requestAnimationFrame(frame);
   }
   function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
+  cleanup = () => dispose();
   let io = null;
   if ("IntersectionObserver" in window) {
     io = new IntersectionObserver(es => { visible = es[0].isIntersecting; visible ? start() : stop(); });
@@ -355,4 +362,5 @@ export async function mountHero(stage, layout, opts = {}) {
   update(0); render();          // first frame is on screen before the caller fades the stage in
   start();
   return handle;
+  } catch (e) { cleanup(); throw e; }
 }
