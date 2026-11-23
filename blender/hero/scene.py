@@ -49,7 +49,7 @@ def _set(bsdf, **kw):
             bsdf.inputs[k].default_value = v
 
 
-def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=False, aged=False):
+def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=False, aged=False, sss_scale=0.04):
     mat = bpy.data.materials.new(name)
     nt, N, L, bsdf = _nodes(mat)
     tc = N.new("ShaderNodeTexCoord")
@@ -141,7 +141,7 @@ def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=Fals
     L.new(col_out, bsdf.inputs["Base Color"])
     _set(bsdf, Roughness=rough)
     if sss:
-        _set(bsdf, **{"Subsurface Weight": sss, "Subsurface Scale": 0.04})
+        _set(bsdf, **{"Subsurface Weight": sss, "Subsurface Scale": sss_scale})
         if "Subsurface Radius" in bsdf.inputs:
             bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.75, 0.55)
     if text_bump:
@@ -235,8 +235,8 @@ def board_material():
     L.new(col.outputs["Color"], bsdf.inputs["Base Color"])
     L.new(mask.outputs[0], bsdf.inputs["Metallic"])
     rough = N.new("ShaderNodeMapRange")
-    rough.inputs["To Min"].default_value = 0.34
-    rough.inputs["To Max"].default_value = 0.5
+    rough.inputs["To Min"].default_value = 0.6       # honed stone, not polished: no mirror streaks
+    rough.inputs["To Max"].default_value = 0.72
     L.new(chk.outputs["Fac"], rough.inputs["Value"])
     L.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
     return mat
@@ -322,11 +322,72 @@ def fov_y_deg(which):
     return math.degrees(2 * math.atan(half / (w / h) if w >= h else half))
 
 
+def clay_lines(mat, axis_z, lines=44, depth=0.6):
+    """Lines of writing along the Cyrus barrel (object X), stacked round its circumference at uneven
+    spacing, cut in as a bump on top of whatever the material already has."""
+    nt = mat.node_tree
+    N, L = nt.nodes, nt.links
+    bsdf = N["Principled BSDF"]
+    tc = N.new("ShaderNodeTexCoord")
+    sep = N.new("ShaderNodeSeparateXYZ")
+    L.new(tc.outputs["Object"], sep.inputs["Vector"])
+    zc = N.new("ShaderNodeMath"); zc.operation = "SUBTRACT"; zc.inputs[1].default_value = axis_z
+    L.new(sep.outputs["Z"], zc.inputs[0])
+    ang = N.new("ShaderNodeMath"); ang.operation = "ARCTAN2"
+    L.new(zc.outputs[0], ang.inputs[0]); L.new(sep.outputs["Y"], ang.inputs[1])
+    per = N.new("ShaderNodeMath"); per.operation = "MULTIPLY"; per.inputs[1].default_value = lines / (2 * math.pi)
+    L.new(ang.outputs[0], per.inputs[0])
+    # uneven: the spacing wanders along the length and round the barrel, as a hand's would
+    wob = N.new("ShaderNodeTexNoise"); wob.inputs["Scale"].default_value = 1.3; wob.inputs["Detail"].default_value = 2.0
+    L.new(tc.outputs["Object"], wob.inputs["Vector"])
+    wobs = N.new("ShaderNodeMath"); wobs.operation = "MULTIPLY_ADD"; wobs.inputs[1].default_value = 1.6; wobs.inputs[2].default_value = -0.8
+    L.new(wob.outputs["Fac"], wobs.inputs[0])
+    v = N.new("ShaderNodeMath"); v.operation = "ADD"
+    L.new(per.outputs[0], v.inputs[0]); L.new(wobs.outputs[0], v.inputs[1])
+    fr = N.new("ShaderNodeMath"); fr.operation = "FRACT"
+    L.new(v.outputs[0], fr.inputs[0])
+    dist = N.new("ShaderNodeMath"); dist.operation = "PINGPONG"; dist.inputs[1].default_value = 0.5
+    L.new(fr.outputs[0], dist.inputs[0])
+    groove = N.new("ShaderNodeMapRange"); groove.interpolation_type = "SMOOTHSTEP"
+    groove.inputs["From Min"].default_value = 0.0; groove.inputs["From Max"].default_value = 0.09
+    L.new(dist.outputs[0], groove.inputs["Value"])
+    # the grooves are cut to uneven depth
+    dn = N.new("ShaderNodeTexNoise"); dn.inputs["Scale"].default_value = 6.0
+    L.new(tc.outputs["Object"], dn.inputs["Vector"])
+    dmix = N.new("ShaderNodeMapRange"); dmix.inputs["To Min"].default_value = 0.35; dmix.inputs["To Max"].default_value = 1.0
+    L.new(dn.outputs["Fac"], dmix.inputs["Value"])
+    h = N.new("ShaderNodeMath"); h.operation = "MULTIPLY"
+    L.new(groove.outputs["Result"], h.inputs[0]); L.new(dmix.outputs["Result"], h.inputs[1])
+    bump = N.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = depth
+    bump.inputs["Distance"].default_value = 0.004
+    L.new(h.outputs[0], bump.inputs["Height"])
+    prev = bsdf.inputs["Normal"].links[0].from_socket if bsdf.inputs["Normal"].is_linked else None
+    if prev is not None:
+        L.new(prev, bump.inputs["Normal"])
+    L.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    # the cut floors hold old dirt: a touch darker
+    col = bsdf.inputs["Base Color"].links[0].from_socket
+    dark = N.new("ShaderNodeMix"); dark.data_type = "RGBA"; dark.blend_type = "MULTIPLY"
+    inv = N.new("ShaderNodeMath"); inv.operation = "SUBTRACT"; inv.inputs[0].default_value = 1.0
+    L.new(groove.outputs["Result"], inv.inputs[1])
+    fac = N.new("ShaderNodeMath"); fac.operation = "MULTIPLY"; fac.inputs[1].default_value = 0.55
+    L.new(inv.outputs[0], fac.inputs[0])
+    L.new(fac.outputs[0], dark.inputs["Factor"])
+    L.new(col, dark.inputs["A"]); dark.inputs["B"].default_value = (0.45, 0.4, 0.34, 1)
+    L.new(dark.outputs["Result"], bsdf.inputs["Base Color"])
+
+
 def build_scene():
     sc = bpy.context.scene
     # ivory with only a whisper of veining: the reference statues are almost plain
-    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.4, aged=True)
-    pale_text = marble("marble-text", (0.80, 0.73, 0.61), (0.62, 0.55, 0.45), vein_scale=0.9, sss=0.3, text_bump=True, aged=True)
+    # ivory marble: light comes through where it is thin (wings, rims, chains) and not where it is thick
+    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45, aged=True, sss_scale=0.06)
+    # the Cyrus Cylinder is fired clay: buff, matte, opaque, written over
+    clay = marble("clay", (0.58, 0.47, 0.34), (0.45, 0.36, 0.25), vein_scale=1.6, rough=0.78, sss=0.0, text_bump=True, aged=True)
+    clay_lines(clay, pieces.CYRUS_AXIS_Z)
+    # its museum mount is alabaster: milky, and it glows where the saddles are thin
+    alabaster = marble("alabaster", (0.74, 0.70, 0.62), (0.64, 0.60, 0.52), vein_scale=0.7, rough=0.4, sss=0.7, sss_scale=0.022)
     gem = bpy.data.materials.new("pearl-black")
     gem.use_nodes = True
     _set(gem.node_tree.nodes["Principled BSDF"], **{"Base Color": (0.006, 0.006, 0.009, 1), "Roughness": 0.08,
@@ -348,7 +409,8 @@ def build_scene():
             for m in (dark, pale, gem):
                 ob.data.materials.append(m)
         else:
-            ob.data.materials.append(pale_text if pid == "cyrus" else pale)
+            for m in ((clay, alabaster) if pid == "cyrus" else (pale,)):
+                ob.data.materials.append(m)
         out["pieces"][pid], out["plinths"][pid] = ob, pl
 
     board = build_board()
@@ -360,29 +422,25 @@ def build_scene():
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.0013, 0.0019, 0.0042, 1)    # deep blue night: this is what lights the fog
+    bg.inputs["Color"].default_value = (0.0011, 0.0019, 0.0055, 1)    # a hint of dark blue in the shadows and the fog
     bg.inputs["Strength"].default_value = 1.0
     sc.world = world
 
-    # Each piece has its own soft spot from above and in front, so the marble glows out of
-    # the dark and the board is lit only in pools around the plinths. No broad key light.
-    lights = []
-    for pid in pieces.PIECE_IDS:
-        x, y, _yaw = PLACEMENT[pid]
-        ld = bpy.data.lights.new("spot-" + pid, "SPOT")
-        ld.energy = 1200 if pid == FOCUS_ID else 850
-        ld.spot_size = math.radians(40)
-        ld.spot_blend = 0.9
-        ld.shadow_soft_size = 0.45
-        ld.color = (1.0, 0.87, 0.68)
-        lo = bpy.data.objects.new("spot-" + pid, ld)
-        lo.location = (x * 0.8 - 1.8, y - 2.8, 5.6)     # upper left, so each piece has a lit side and a shadow side
-        sc.collection.objects.link(lo)
-        _look_at(lo, (x, y, 1.0))
-        lo.visible_camera = False
-        lights.append(lo)
-    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.5, 0.6), 300, 7.0, (0.66, 0.74, 0.95)))   # moonlight from behind: it is what makes the fog banks show from behind
-    lights.append(_area("fill", (0.0, -9.0, 3.0), (0.0, 0.0, 1.0), 10, 8.0, (0.60, 0.70, 1.0)))
+    # One light, after the reference: a single source hidden right behind the Cyrus Cylinder, at its height.
+    # It lights the fog from inside, rims the cylinder, lights the faces of the pieces that turn toward the
+    # centre, and falls off to nothing at the left and right edges of the board. No spots, no fill.
+    cx, cy, _ = PLACEMENT[FOCUS_ID]
+    ld = bpy.data.lights.new("source", "POINT")
+    ld.energy = 900
+    ld.shadow_soft_size = 0.12
+    ld.color = (1.0, 0.92, 0.80)
+    lo = bpy.data.objects.new("source", ld)
+    # behind the cylinder (not in it), level with the middle of the barrel: the camera cannot see it.
+    # The barrel stands dark against it with a lit outline, and its shadow runs through the air toward the camera.
+    lo.location = (cx, cy + 1.5, PLATFORM[FOCUS_ID] + PLINTH_H + 0.80)
+    sc.collection.objects.link(lo)
+    lo.visible_camera = False
+    lights = [lo]
     out["lights"] = lights
 
     # haze: used for posters only (bakes hide it)
@@ -395,7 +453,7 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Color"].default_value = (0.74, 0.80, 0.95, 1)     # smoke-grey with a little blue, not blue
+    vol.inputs["Color"].default_value = (0.76, 0.81, 0.92, 1)     # smoke-grey with a cold edge
     # Not an even haze: banks of low fog that lie between the pieces, thick in places, thin in others.
     # The box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
     htc = hn.nodes.new("ShaderNodeTexCoord")
@@ -428,8 +486,8 @@ def build_scene():
     hn.links.new(bank.outputs["Result"], mul.inputs[0])
     hn.links.new(low.outputs["Result"], mul.inputs[1])
     dens = hn.nodes.new("ShaderNodeMapRange")
-    dens.inputs["To Min"].default_value = 0.0013        # the thin air everywhere
-    dens.inputs["To Max"].default_value = 0.36         # the thick of a bank
+    dens.inputs["To Min"].default_value = 0.0035        # thin air everywhere: enough to show light shafts
+    dens.inputs["To Max"].default_value = 0.15         # the thick of a bank
     hn.links.new(mul.outputs[0], dens.inputs["Value"])
     hn.links.new(dens.outputs["Result"], vol.inputs["Density"])
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])

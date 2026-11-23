@@ -12,6 +12,7 @@ from mathutils import Matrix, Vector, noise
 
 PIECE_IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"]
 PLINTH_SIZE = (0.9, 0.9, 0.35)
+CYRUS_AXIS_Z = 0.80        # height of the barrel's axis above the piece origin
 
 
 # ---------- primitives (all add into an existing bmesh) ----------
@@ -166,47 +167,75 @@ def height(ob):
 
 # ---------- the six pieces ----------
 
+def _saddle(bm, x, w, half_y, z0, cz, R, lip=0.05):
+    """A thin upright plate at x, w thick: flat-bottomed at z0, its top cut to a circle of radius R about
+    (y=0, z=cz) so the barrel sits in it, rising to cz - R * 0.6 at its tips. Thin, so light comes through."""
+    zt = cz - R * 0.6
+    yt = math.sqrt(max(R * R - (zt - cz) ** 2, 0.0))
+    half_y = max(half_y, yt + lip * 0.6)
+    outline = [(-half_y, z0), (half_y, z0), (half_y, zt - 0.02), (yt + lip * 0.35, zt)]
+    a0, a1 = math.atan2(zt - cz, yt), math.atan2(zt - cz, -yt)
+    n = 16
+    arc = []
+    # the inner arc runs from the right tip down under the barrel to the left tip
+    start, end = a0, a1
+    for i in range(n + 1):
+        a = start + (end - start) * i / n
+        arc.append((R * math.cos(a), cz + R * math.sin(a)))
+    outline += arc + [(-yt - lip * 0.35, zt), (-half_y, zt - 0.02)]
+    front = [bm.verts.new((x - w / 2, y, z)) for y, z in outline]
+    back = [bm.verts.new((x + w / 2, y, z)) for y, z in outline]
+    bm.faces.new(list(reversed(front)))
+    bm.faces.new(back)
+    m = len(outline)
+    for i in range(m):
+        j = (i + 1) % m
+        bm.faces.new((front[i], front[j], back[j], back[i]))
+
+
 def build_cyrus():
-    """The Cyrus Cylinder: a barrel of incised text bands lying on a cradle and stand."""
+    """The Cyrus Cylinder: a clay barrel, its surface written in uneven lines, one end broken away,
+    resting in an alabaster museum mount. Material 0 is the clay, material 1 the alabaster."""
     bm = bmesh.new()
-    # stand: round foot, waisted stem
-    lathe(bm, [(0.0, 0.0), (0.27, 0.0), (0.27, 0.035), (0.22, 0.06), (0.09, 0.09), (0.055, 0.16),
-               (0.05, 0.30), (0.07, 0.40), (0.11, 0.44), (0.0, 0.44)], segs=40)
-    # cradle: slab and two saddles
-    box(bm, 0.74, 0.20, 0.05, (0, 0, 0.455))
+    L, rmax, rend = 1.0, 0.285, 0.165
+    cz = CYRUS_AXIS_Z
+    # the mount: a stepped block, and two thin saddle plates the barrel lies in
+    box(bm, 0.80, 0.50, 0.06, (0, 0, 0.03))
+    box(bm, 0.70, 0.42, 0.30, (0, 0, 0.21))
+    box(bm, 0.76, 0.48, 0.05, (0, 0, 0.385))
     for x in (-0.25, 0.25):
-        box(bm, 0.05, 0.30, 0.20, (x, 0, 0.56))
-    # barrel along X, widest in the middle, with shallow grooves between text bands
-    L, bands, rmax, rend = 1.0, 17, 0.285, 0.165
+        _saddle(bm, x, 0.026, 0.2, 0.41, cz, 0.266)
+    mount_faces = len(bm.faces)
+
+    # barrel along X, widest in the middle, a smooth swell. The lines of writing run along its length,
+    # over the top and round underneath; they are cut into the clay material (scene.clay_lines), not the mesh.
+    def radius(t):
+        return rend + (rmax - rend) * math.sin(math.pi * (0.08 + 0.84 * t)) ** 0.9
+
     prof = [(0.0, -L / 2), (rend * 0.72, -L / 2), (rend, -L / 2 + 0.02)]
-    for i in range(bands + 1):
-        t = i / bands
-        x = -L / 2 + 0.03 + t * (L - 0.06)
-        r = rend + (rmax - rend) * math.sin(math.pi * (0.08 + 0.84 * t)) ** 0.9
-        if 0 < i < bands:
-            prof += [(r, x - 0.006), (r - 0.010, x), (r, x + 0.006)]
-        else:
-            prof.append((r, x))
+    for i in range(23):
+        t = 0.03 + 0.94 * i / 22
+        prof.append((radius(t), -L / 2 + t * L))
     prof += [(rend, L / 2 - 0.02), (rend * 0.72, L / 2), (0.0, L / 2)]
-    cz = 0.48 + 0.10 + 0.275
     v0 = len(bm.verts)
-    lathe(bm, prof, segs=40, matrix=_T(0, 0, cz) @ Matrix.Rotation(math.pi / 2, 4, "Y"))
-    # Age it. The real cylinder is cracked and has lost a piece: the surface is uneven and
-    # one end is broken away in a rough bite.
+    lathe(bm, prof, segs=72, matrix=_T(0, 0, cz) @ Matrix.Rotation(math.pi / 2, 4, "Y"))
+    # Age it: an uneven surface, and one end broken away in a rough bite.
     bm.verts.ensure_lookup_table()
     for v in bm.verts[v0:]:
         ry, rz = v.co.y, v.co.z - cz
-        rad = math.hypot(ry, rz)
-        if rad < 1e-5:
+        if math.hypot(ry, rz) < 1e-5:
             continue
         ang = math.atan2(rz, ry)
-        k = 1.0 + 0.018 * noise.noise(v.co * 7.0) + 0.008 * noise.noise(v.co * 23.0)
+        k = 1.0 + 0.014 * noise.noise(v.co * 7.0) + 0.006 * noise.noise(v.co * 23.0)
         fx = min(1.0, max(0.0, (v.co.x - 0.16) / 0.22))
         fa = min(1.0, max(0.0, 1.0 - abs(ang - math.radians(118)) / math.radians(62)))
         bite = (fx * fx * (3 - 2 * fx)) * (fa * fa * (3 - 2 * fa))
         k *= 1.0 - 0.46 * bite * (0.75 + 0.25 * noise.noise(v.co * 15.0))
         v.co.y, v.co.z = ry * k, cz + rz * k
-    return _finish(bm, "piece-cyrus", bevel=0.005, bevel_angle=55.0)
+    bm.faces.ensure_lookup_table()
+    for f in bm.faces[:mount_faces]:
+        f.material_index = 1
+    return _finish(bm, "piece-cyrus", bevel=0.004, bevel_angle=80.0)
 
 
 def build_zagros():
@@ -297,38 +326,118 @@ def build_pearl():
     return _finish(bm, "piece-pearl", bevel=0.006, bevel_angle=50.0)
 
 
+def _half_disc(bm, R, t, matrix, segs=32):
+    """Upper half of a disc in the local XZ plane, thickness t along Y, centre at the origin."""
+    def ring(y):
+        vs = [bm.verts.new(matrix @ Vector((0, y, 0)))]
+        vs += [bm.verts.new(matrix @ Vector((R * math.cos(math.pi * i / segs), y, R * math.sin(math.pi * i / segs))))
+               for i in range(segs + 1)]
+        return vs
+    f, k = ring(-t / 2), ring(t / 2)
+    bm.faces.new(f)
+    bm.faces.new(list(reversed(k)))
+    n = len(f)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((f[j], f[i], k[i], k[j]))
+
+
+def _chain(bm, a, b, pitch=0.042, R=0.0125, r=0.0042):
+    """Oval links from a to b, each turned a quarter from the last."""
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    n = max(2, int(d.length / pitch))
+    Q = d.to_track_quat("Y", "Z").to_matrix().to_4x4()
+    for i in range(n):
+        c = a + d * ((i + 0.5) / n)
+        M = _T(*c) @ Q @ Matrix.Rotation(math.pi / 2 * (i % 2), 4, "Y") @ Matrix.Diagonal((1, 1.65, 1, 1))
+        torus(bm, R, r, M, seg_major=8, seg_minor=5)
+
+
+def _coin(bm, loc, rot=None, r=0.038, h=0.010):
+    prism(bm, r, r, h, loc, segs=16, rot=rot)
+
+
+def _stack(bm, loc, n, lean=0.0, r=0.038, h=0.0105):
+    """n coins as one turned piece: a groove between each coin."""
+    prof = [(0.0, 0.0)]
+    for i in range(n):
+        prof += [(r - 0.0025, i * h + 0.0005), (r, (i + 0.5) * h)]
+    prof.append((r - 0.0025, n * h - 0.0005))
+    prof.append((0.0, n * h))
+    lathe(bm, prof, segs=14, matrix=_T(*loc) @ Matrix.Rotation(lean, 4, "X") @ Matrix.Rotation(lean * 0.7, 4, "Y"))
+
+
 def build_falah():
-    """A balance scale, pans level."""
+    """Falah: a money-changer's scale. Spending has outweighed the budget: the left pan overflows with coins,
+    the right holds one small weight, and the pointer has swung off the dial's centre mark."""
     bm = bmesh.new()
-    lathe(bm, [(0.0, 0.0), (0.25, 0.0), (0.25, 0.03), (0.20, 0.055), (0.07, 0.09), (0.04, 0.16),
-               (0.032, 0.50), (0.045, 0.56), (0.03, 0.62), (0.026, 1.02), (0.0, 1.02)], segs=40)
-    sphere(bm, 0.05, (0, 0, 1.08), u=20, v=12)
-    lathe(bm, [(0.0, 1.11), (0.022, 1.12), (0.0, 1.19)], segs=16)
-    half, tilt = 0.36, math.radians(13)
-    box(bm, 2 * half + 0.06, 0.04, 0.058, (0, 0, 0.99), rot=Matrix.Rotation(tilt, 4, "Y"))
-    sphere(bm, 0.04, (0, 0, 0.99), u=16, v=10)
+    # stepped octagonal base, then a turned baluster column
+    lathe(bm, [(0.0, 0.0), (0.31, 0.0), (0.31, 0.035), (0.29, 0.045), (0.245, 0.045), (0.245, 0.08),
+               (0.225, 0.095), (0.15, 0.115), (0.0, 0.115)], segs=8)
+    lathe(bm, [(0.0, 0.11), (0.10, 0.11), (0.115, 0.135), (0.09, 0.165), (0.06, 0.19), (0.045, 0.24),
+               (0.042, 0.33), (0.066, 0.36), (0.07, 0.38), (0.046, 0.41), (0.036, 0.50), (0.032, 0.74),
+               (0.052, 0.765), (0.056, 0.785), (0.036, 0.81), (0.03, 0.88), (0.042, 0.905), (0.0, 0.93)], segs=28)
+    P = Vector((0, 0, 0.96))                                   # the pivot
+    tilt = math.radians(17)
+    T = _T(*P) @ Matrix.Rotation(-tilt, 4, "Y")                # left side down, right side up
+    # pivot boss and pin through to the dial
+    sphere(bm, 0.046, P, u=16, v=10)
+    rod(bm, P + Vector((0, -0.055, 0)), P + Vector((0, 0.07, 0)), 0.012, segs=10)
+    # the dial behind the pivot, with a centre mark the pointer no longer sits on
+    dial_y = 0.062
+    _half_disc(bm, 0.165, 0.014, _T(P.x, dial_y, P.z), segs=36)
+    for k in range(-2, 3):
+        ang = math.radians(90 + 32 * k)
+        long = 0.075 if k == 0 else 0.03
+        d = Vector((math.cos(ang), 0, math.sin(ang)))
+        c = P + Vector((0, dial_y - 0.009, 0)) + d * (0.15 - long / 2)
+        box(bm, 0.012 if k == 0 else 0.007, 0.006, long, c, rot=Matrix.Rotation(-(ang - math.pi / 2), 4, "Y"))
+    top = P + Vector((0, dial_y, 0.165))
+    sphere(bm, 0.026, top + Vector((0, 0, 0.012)), u=12, v=7)
+    lathe(bm, [(0.0, 0.03), (0.012, 0.034), (0.0, 0.085)], segs=12, matrix=_T(*top))
+    # the pointer, fixed to the beam: it swings with it
+    lathe(bm, [(0.0, 0.0), (0.016, 0.0), (0.011, 0.11), (0.024, 0.15), (0.0, 0.205)], segs=4,
+          matrix=T @ _T(0, -0.05, 0))
+    # the beam: turned, thick at the middle, beaded near the ends
+    L = 0.37
+    lathe(bm, [(0.0, -L - 0.012), (0.011, -L), (0.018, -L + 0.012), (0.011, -L + 0.03), (0.014, -0.25),
+               (0.022, -0.12), (0.030, -0.05), (0.030, 0.05), (0.022, 0.12), (0.014, 0.25),
+               (0.011, L - 0.03), (0.018, L - 0.012), (0.011, L), (0.0, L + 0.012)],
+          segs=12, matrix=T @ Matrix.Rotation(math.pi / 2, 4, "Y"))
     for sx in (-1, 1):
-        # the beam tips: the left pan is weighed down, the right one rides up
-        x = sx * half * math.cos(tilt)
-        top = Vector((x, 0, 0.985 + sx * half * math.sin(tilt)))
-        sphere(bm, 0.034, top, u=14, v=8)
-        pan_z = top.z - 0.50
-        pr = 0.155
-        lathe(bm, [(0.0, pan_z - 0.045), (pr * 0.55, pan_z - 0.04), (pr * 0.9, pan_z - 0.015), (pr, pan_z),
-                   (pr - 0.012, pan_z), (pr * 0.86, pan_z - 0.008), (pr * 0.5, pan_z - 0.028), (0.0, pan_z - 0.032)],
-              segs=36, matrix=_T(x, 0, 0))
+        tip = T @ Vector((sx * (L - 0.01), 0, 0))
+        torus(bm, 0.024, 0.0065, _T(*(tip - Vector((0, 0, 0.022)))) @ Matrix.Rotation(math.pi / 2, 4, "X"),
+              seg_major=14, seg_minor=6)
+        hook = tip - Vector((0, 0, 0.046))
+        pan_z = hook.z - 0.40
+        pr = 0.175
+        lathe(bm, [(0.0, pan_z - 0.075), (pr * 0.45, pan_z - 0.072), (pr * 0.8, pan_z - 0.05), (pr * 0.97, pan_z - 0.015),
+                   (pr + 0.012, pan_z + 0.002), (pr + 0.004, pan_z + 0.012), (pr - 0.012, pan_z + 0.004),
+                   (pr * 0.8, pan_z - 0.035), (pr * 0.45, pan_z - 0.058), (0.0, pan_z - 0.062)],
+              segs=32, matrix=_T(hook.x, 0, 0))
+        sphere(bm, 0.013, (hook.x, 0, pan_z - 0.078), u=8, v=5)
         for k in range(3):
             a = math.radians(90 + 120 * k)
-            rim = Vector((x + (pr - 0.008) * math.cos(a), (pr - 0.008) * math.sin(a), pan_z))
-            rod(bm, top, rim, 0.0115, segs=8)
+            rim = Vector((hook.x + (pr - 0.004) * math.cos(a), (pr - 0.004) * math.sin(a), pan_z + 0.008))
+            _chain(bm, hook, rim)
+        floor = pan_z - 0.058
         if sx < 0:
-            # the heavy pan: coins, stacked a little carelessly
-            for i in range(6):
-                prism(bm, 0.052, 0.052, 0.013, (x - 0.035 + 0.008 * math.sin(i * 2.1), 0.02 + 0.008 * math.cos(i * 1.7),
-                                               pan_z - 0.034 + i * 0.0135), segs=20)
-            for i in range(3):
-                prism(bm, 0.045, 0.045, 0.013, (x + 0.065, -0.045 + 0.006 * i, pan_z - 0.03 + i * 0.0135), segs=20)
-    return _finish(bm, "piece-falah", bevel=0.004)
+            # spending: more coins than the pan can hold, stacked well above the rim
+            cx = hook.x
+            for (sx0, sy0, n) in ((-0.035, 0.02, 13), (0.045, -0.03, 10), (0.03, 0.065, 7), (-0.075, -0.06, 5)):
+                _stack(bm, (cx + sx0, sy0, floor + 0.002), n, lean=0.06 * math.sin(n * 1.7))
+            for (dx, dy, dz, rx, ry) in ((0.10, 0.02, 0.03, -0.3, 0.45), (-0.02, -0.11, 0.035, 0.5, 0.1)):
+                _coin(bm, (cx + dx, dy, floor + dz), rot=Matrix.Rotation(rx, 4, "X") @ Matrix.Rotation(ry, 4, "Y"))
+            # one propped on the rim, about to go over
+            _coin(bm, (cx - pr + 0.01, -0.04, pan_z - 0.004), rot=Matrix.Rotation(math.radians(-58), 4, "Y"))
+        else:
+            # the budget: one small weight
+            lathe(bm, [(0.0, 0.0), (0.058, 0.0), (0.058, 0.045), (0.042, 0.056), (0.034, 0.08), (0.02, 0.088),
+                       (0.027, 0.108), (0.0, 0.122)], segs=20, matrix=_T(hook.x, 0, floor))
+    # and one that already went over, lying on the base step
+    _coin(bm, (-0.262, -0.085, 0.035), r=0.036, rot=Matrix.Rotation(math.radians(-7), 4, "Y"))
+    return _finish(bm, "piece-falah", bevel=0.003, bevel_angle=80.0)
 
 
 def build_nids():
