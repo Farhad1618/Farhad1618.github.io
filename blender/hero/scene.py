@@ -26,7 +26,7 @@ CAMERAS = {
     "landscape": ((0.0, -10.0, 1.3), (0.0, 0.0, 1.05), 45.0, (1920, 1080)),
     "portrait": ((0.0, -13.0, 1.9), (0.0, 0.0, 1.45), 30.0, (1080, 1920)),
 }
-FSTOP = 0.4
+FSTOP = 0.28
 
 
 def _nodes(mat):
@@ -244,7 +244,7 @@ def build_scene():
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.0006, 0.0008, 0.0016, 1)
+    bg.inputs["Color"].default_value = (0.0025, 0.005, 0.016, 1)    # deep blue night: this is what lights the fog
     bg.inputs["Strength"].default_value = 1.0
     sc.world = world
 
@@ -279,8 +279,8 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Density"].default_value = 0.0016
-    vol.inputs["Color"].default_value = (0.62, 0.70, 0.9, 1)
+    vol.inputs["Density"].default_value = 0.0048
+    vol.inputs["Color"].default_value = (0.42, 0.55, 1.0, 1)
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)
     out["haze"] = haze

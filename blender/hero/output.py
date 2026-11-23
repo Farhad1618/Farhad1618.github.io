@@ -24,6 +24,26 @@ def _save_webp(png_path, webp_path, max_bytes=None, start=86, extra=()):
     print(f"wrote {os.path.basename(webp_path)} q={q} {size} bytes")
 
 
+def _glow(png_path):
+    """Film-like bloom: the bright marble bleeds softly into the fog. Works on the display image."""
+    import numpy as np
+    img = bpy.data.images.load(png_path)
+    img.colorspace_settings.name = "Non-Color"
+    w, h = img.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    bpy.data.images.remove(img)
+    rgb = px.reshape(h, w, 4)[..., :3]
+    bright = np.clip(rgb - 0.38, 0, None)
+    r = max(2, h // 60)
+    wide = bright
+    for _ in range(3):                      # three box passes ~ a gaussian
+        wide = _box_blur(wide, r)
+    tight = _box_blur(_box_blur(bright, max(1, r // 4)), max(1, r // 4))
+    out = rgb + wide * 0.85 + tight * 0.35
+    _write_png(np.clip(out, 0, 1), png_path)
+
+
 def render_posters(objs, draft, assets_dir, out_dir=None):
     sc = bpy.context.scene
     out_dir = out_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out")
@@ -34,6 +54,7 @@ def render_posters(objs, draft, assets_dir, out_dir=None):
         png = os.path.join(out_dir, name + ".png")
         sc.render.filepath = png
         bpy.ops.render.render(write_still=True)
+        _glow(png)
         _save_webp(png, os.path.join(assets_dir, name + ".webp"), POSTER_MAX)
     sc.render.resolution_percentage = 100
 

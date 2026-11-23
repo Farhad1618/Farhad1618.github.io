@@ -95,7 +95,7 @@ Design: `docs/superpowers/specs/2026-11-23-chessboard-hero-design.md`. Mood refe
 - Pieces: Cyrus = the Cyrus Cylinder, Zagros = hex vault with five keys (three turned), OnePharma = graph lattice, Black Pearl = a dark milled block holding an open ivory shell with a black pearl (centre), Falah = balance scale tilted, left pan down, Network Intrusion Detection = watchtower.
 - The poster (`poster.webp`, or `poster-portrait.webp` under `(orientation: portrait)`) is the first paint and the fallback. It always fits the width, so no piece is cropped.
 - Six `a[data-piece]` links in `nav.hero-pieces` are placed over the pieces from `layout.json`. They are the keyboard and screen-reader route and the tap targets when only the poster shows. Each goes to `#proj-<id>`.
-- `hero.js` mounts over the poster only when: motion is allowed, WebGL2 exists, the device is not weak (coarse pointer under 768 px, under 4 GB or 4 cores), and the hero is within one viewport. It falls back to the poster on load failure, context loss, or a slow first 60 frames. `localStorage.heroForce = "1"` bypasses the weak-device test on localhost only.
+- `hero.js` mounts over the poster only when: motion is allowed, WebGL2 exists, the device is not weak (coarse pointer under 768 px, under 4 GB or 4 cores), and the hero is within one viewport. It falls back to the poster on load failure, context loss, or if six timed frames at mount average over 20 ms (measured 3.5 ms at 2160×1215 on an M1 Pro). `localStorage.heroForce = "1"` bypasses the weak-device test on localhost only.
 - Nothing is lit in the browser: baked colour + matcap sheen, one baked board texture, one depth-of-field pass. Hover lifts a piece and pulls focus to it; click (or second tap) scrolls to its chapter.
 - Colours are raw display values end to end in `hero.js` (textures `NoColorSpace`, linear output). Don't "fix" the colour management.
 
@@ -123,7 +123,7 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 
 - Preview harness can't drive keyboard/scroll in the `data:` frame. Verify scroll reveals by hand.
 - Mobile layout untested at depth. Phones get the still poster by design; the live scene on touch was only exercised with synthetic events.
-- Hero frame rate was not measured: the preview pane throttles hidden tabs. Check 60 fps by hand in a real browser.
+- Hero GPU cost was measured (3.5 ms a frame on an M1 Pro) but on-screen smoothness was not watched: the preview pane throttles hidden tabs. Check it by eye in a real browser.
 - The live hero in the Claude artifact is untested (binary supporting files).
 - The pieces are script-built. If one reads as a tech demo, hand-finish it in Blender and re-run `--stage all`.
 

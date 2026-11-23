@@ -452,7 +452,7 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     if (!gl) return;
     var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     var started = false;
-    function fallBack(){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); }
+    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
     function start(){
       if (started) return; started = true;
       import("./hero.js").then(function(m){

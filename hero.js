@@ -10,7 +10,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
-const HAZE = [0.028, 0.032, 0.046];      // cool night haze, just above the ground colour
+const HAZE = [0.038, 0.062, 0.135];      // deep blue fog
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -26,7 +26,7 @@ varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 n = normalize(vN);
   vec3 c = texture2D(map, vUv).rgb * 1.12 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
-  c = mix(c, uHaze, smoothstep(9.0, 26.0, vDepth) * 0.45);
+  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.72);
   gl_FragColor = vec4(c, 1.0);
 }`;
 const BOARD_FS = `
@@ -34,7 +34,7 @@ uniform sampler2D map; uniform vec3 uHaze;
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
-  c = mix(c, uHaze, smoothstep(9.0, 26.0, vDepth) * 0.45);
+  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.72);
   gl_FragColor = vec4(c, 1.0);
 }`;
 const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -52,9 +52,9 @@ void main(){
   float r0 = coc(viewZ(vUv));
   vec3 acc = texture2D(tColor, vUv).rgb; float wsum = 1.0;
   if (r0 > 0.6) {
-    for (int i = 1; i <= 20; i++) {
+    for (int i = 1; i <= 14; i++) {
       float fi = float(i);
-      float rr = sqrt(fi / 20.0) * r0, a = fi * 2.39996323;
+      float rr = sqrt(fi / 14.0) * r0, a = fi * 2.39996323;
       vec2 uv = vUv + vec2(cos(a), sin(a)) * rr * uPx;
       // a sharp sample must not smear into a blurred neighbour
       float w = smoothstep(0.0, 1.5, coc(viewZ(uv)) - rr * 0.6) + 0.06;
@@ -62,9 +62,17 @@ void main(){
     }
   }
   vec3 c = acc / wsum;
+  // bloom: the bright marble bleeds softly into the fog
+  vec3 glow = vec3(0.0);
+  for (int i = 0; i < 8; i++) {
+    float fi = float(i);
+    float a = fi * 2.39996323, rr = (0.35 + 0.65 * sqrt((fi + 0.5) / 8.0)) * uMaxR * 2.6;
+    glow += max(texture2D(tColor, vUv + vec2(cos(a), sin(a)) * rr * uPx).rgb - 0.36, 0.0);
+  }
+  c += glow / 8.0 * 0.9;
   // empty background: warm haze at the horizon melting up into the ground colour
   float bg = step(0.99999, texture2D(tDepth, vUv).x);
-  c = mix(c, mix(uHazeBg, uInk, smoothstep(0.42, 0.92, vUv.y)), bg);
+  c = mix(c, mix(uHazeBg, uInk, smoothstep(0.38, 0.98, vUv.y)), bg);
   gl_FragColor = vec4(mix(uInk, c, uFade), 1.0);
 }`;
 
@@ -142,8 +150,8 @@ export async function mountHero(stage, layout, opts = {}) {
   // haze: three slow sprites between the pieces and the dark
   const hazeGeo = new THREE.PlaneGeometry(1, 1);
   const hazes = [[-3, 2.2, -5, 16, 7, 53], [4, 1.6, -2.5, 13, 5, 41], [0, 3.2, -9, 22, 9, 67]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.05 });
-    m.color.setRGB(0.62, 0.70, 0.90);
+    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.16 });
+    m.color.setRGB(0.30, 0.42, 0.85);
     const s = new THREE.Mesh(hazeGeo, m);
     s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
     s.userData = { x, period, phase: i * 2.1 };
@@ -165,7 +173,7 @@ export async function mountHero(stage, layout, opts = {}) {
     vertexShader: POST_VS, fragmentShader: POST_FS, depthTest: false, depthWrite: false,
     uniforms: {
       tColor: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uPx: { value: new THREE.Vector2() },
-      uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: 10 }, uAperture: { value: 17 },
+      uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: 10 }, uAperture: { value: 25 },
       uMaxR: { value: 14 }, uFade: { value: 1 },
       uHazeBg: { value: new THREE.Vector3(...HAZE) }, uInk: { value: new THREE.Vector3(...INK) },
     },
@@ -190,7 +198,7 @@ export async function mountHero(stage, layout, opts = {}) {
   function resize() {
     W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
     const coarse = matchMedia("(pointer:coarse)").matches;
-    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.5 : 2);
+    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.5);   // a soft, foggy image hides the difference; the GPU does not
     renderer.setPixelRatio(pr);
     renderer.setSize(W, H, false);
     const bw = Math.round(W * pr), bh = Math.round(H * pr);
@@ -298,7 +306,7 @@ export async function mountHero(stage, layout, opts = {}) {
       s.lift = ease(s.lift, hoverId === id ? 1 : 0, 9, dt);
       p.position.y = s.baseY + 0.06 * s.lift;
       p.rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 2 * DEG;
-      for (const m of s.mats) m.uniforms.uLift.value = 1 + 0.25 * s.lift;
+      for (const m of s.mats) m.uniforms.uLift.value = 1 + 0.14 * s.lift;
     }
     const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
     focusNow = ease(focusNow, focusTo, 5, dt);
@@ -316,16 +324,10 @@ export async function mountHero(stage, layout, opts = {}) {
     handle.frameCount++;
   }
 
-  // the first frames decide whether this device keeps the live scene
-  let probeN = 0, probeSum = 0;
   function frame(now) {
     raf = 0;
     if (!running || disposed) return;
     const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
-    if (probeN < 70 && now - last < 100) {      // gaps over 100 ms are throttling or a hitch, not the device
-      if (probeN >= 10) probeSum += now - last;
-      if (++probeN === 70 && probeSum / 60 > 28) return exit("too slow");
-    }
     last = now;
     update(dt); render();
     raf = requestAnimationFrame(frame);
@@ -360,6 +362,15 @@ export async function mountHero(stage, layout, opts = {}) {
   resize();
   focusNow = focusBase;
   update(0); render();          // first frame is on screen before the caller fades the stage in
+  // Does this GPU keep up? Time real frames, forced to finish by a 1-pixel readback. Frame
+  // intervals are no use here: a throttled or background tab would look like a slow device.
+  {
+    const gl = renderer.getContext(), px = new Uint8Array(4);
+    render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);      // warm-up: shader compile, uploads
+    const t0 = performance.now();
+    for (let i = 0; i < 6; i++) { render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
+    if ((performance.now() - t0) / 6 > 20) throw new Error("too slow");
+  }
   start();
   return handle;
   } catch (e) { cleanup(); throw e; }
