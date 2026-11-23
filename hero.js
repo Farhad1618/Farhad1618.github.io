@@ -10,7 +10,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
-const HAZE = [0.085, 0.075, 0.064];
+const HAZE = [0.028, 0.032, 0.046];      // cool night haze, just above the ground colour
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -142,8 +142,8 @@ export async function mountHero(stage, layout, opts = {}) {
   // haze: three slow sprites between the pieces and the dark
   const hazeGeo = new THREE.PlaneGeometry(1, 1);
   const hazes = [[-3, 2.2, -5, 16, 7, 53], [4, 1.6, -2.5, 13, 5, 41], [0, 3.2, -9, 22, 9, 67]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.07 });
-    m.color.setRGB(0.93, 0.89, 0.83);
+    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.05 });
+    m.color.setRGB(0.62, 0.70, 0.90);
     const s = new THREE.Mesh(hazeGeo, m);
     s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
     s.userData = { x, period, phase: i * 2.1 };

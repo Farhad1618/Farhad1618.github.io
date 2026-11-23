@@ -9,7 +9,7 @@ from . import pieces
 
 # x, y (metres, +y is away from the camera), yaw in degrees
 PLACEMENT = {
-    "pearl": (0.0, 0.0, 28.0),
+    "pearl": (0.0, 0.0, -68.0),
     "cyrus": (-2.0, 2.0, -24.0),
     "onepharma": (1.35, 4.0, 15.0),
     "falah": (2.33, 1.2, -18.0),
@@ -153,7 +153,7 @@ def board_material():
     # stone: two near-blacks that separate mostly by reflection
     stone = N.new("ShaderNodeMixRGB")
     stone.inputs["Color1"].default_value = (0.006, 0.006, 0.007, 1)
-    stone.inputs["Color2"].default_value = (0.022, 0.019, 0.016, 1)
+    stone.inputs["Color2"].default_value = (0.05, 0.034, 0.02, 1)
     L.new(chk.outputs["Fac"], stone.inputs["Fac"])
     col = N.new("ShaderNodeMixRGB")
     col.inputs["Color2"].default_value = (0.62, 0.36, 0.10, 1)   # brass, toward --sig
@@ -162,8 +162,8 @@ def board_material():
     L.new(col.outputs["Color"], bsdf.inputs["Base Color"])
     L.new(mask.outputs[0], bsdf.inputs["Metallic"])
     rough = N.new("ShaderNodeMapRange")
-    rough.inputs["To Min"].default_value = 0.2
-    rough.inputs["To Max"].default_value = 0.36
+    rough.inputs["To Min"].default_value = 0.34
+    rough.inputs["To Max"].default_value = 0.5
     L.new(chk.outputs["Fac"], rough.inputs["Value"])
     L.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
     return mat
@@ -202,11 +202,16 @@ def fov_y_deg(which):
 
 def build_scene():
     sc = bpy.context.scene
-    pale = marble("marble-pale", (0.80, 0.76, 0.69), (0.60, 0.565, 0.51), vein_scale=1.1)
-    pale_text = marble("marble-text", (0.80, 0.76, 0.69), (0.60, 0.565, 0.51), vein_scale=1.1, text_bump=True)
+    # ivory with only a whisper of veining: the reference statues are almost plain
+    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45)
+    pale_text = marble("marble-text", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45, text_bump=True)
+    gem = bpy.data.materials.new("pearl-black")
+    gem.use_nodes = True
+    _set(gem.node_tree.nodes["Principled BSDF"], **{"Base Color": (0.006, 0.006, 0.009, 1), "Roughness": 0.08,
+                                                     "Coat Weight": 1.0, "Coat Roughness": 0.03})
     dark = marble("marble-dark", (0.012, 0.012, 0.014), (0.42, 0.40, 0.36), vein_scale=0.9, rough=0.16, sss=0.0)
     dark.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.025
-    plinth_mat = marble("plinth", (0.02, 0.019, 0.018), (0.09, 0.08, 0.07), vein_scale=1.0, rough=0.3, sss=0.0)
+    plinth_mat = marble("plinth", (0.02, 0.019, 0.018), (0.035, 0.032, 0.03), vein_scale=1.0, rough=0.3, sss=0.0)
 
     out = {"pieces": {}, "plinths": {}}
     for pid in pieces.PIECE_IDS:
@@ -217,7 +222,11 @@ def build_scene():
         ob = pieces.BUILDERS[pid]()
         ob.location = (x, y, PLINTH_H)
         ob.rotation_euler = (0, 0, math.radians(yaw))
-        ob.data.materials.append(dark if pid == "pearl" else pale_text if pid == "cyrus" else pale)
+        if pid == "pearl":
+            for m in (dark, pale, gem):
+                ob.data.materials.append(m)
+        else:
+            ob.data.materials.append(pale_text if pid == "cyrus" else pale)
         out["pieces"][pid], out["plinths"][pid] = ob, pl
 
     bpy.ops.mesh.primitive_plane_add(size=1, location=(BOARD_CENTER[0], BOARD_CENTER[1], 0))
@@ -235,15 +244,30 @@ def build_scene():
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.0015, 0.0015, 0.002, 1)
+    bg.inputs["Color"].default_value = (0.0006, 0.0008, 0.0016, 1)
     bg.inputs["Strength"].default_value = 1.0
     sc.world = world
 
-    out["lights"] = [
-        _area("key", (0.6, 3.2, 9.5), (0.0, 0.4, 0.9), 2300, 6.0, (1.0, 0.84, 0.66)),
-        _area("rim-l", (-6.5, 5.5, 3.2), (-1.5, 0.5, 1.0), 220, 3.0, (1.0, 0.86, 0.72)),
-        _area("fill", (-5.0, -8.0, 2.5), (0.0, 0.0, 1.0), 22, 6.0, (0.72, 0.80, 1.0)),
-    ]
+    # Each piece has its own soft spot from above and in front, so the marble glows out of
+    # the dark and the board is lit only in pools around the plinths. No broad key light.
+    lights = []
+    for pid in pieces.PIECE_IDS:
+        x, y, _yaw = PLACEMENT[pid]
+        ld = bpy.data.lights.new("spot-" + pid, "SPOT")
+        ld.energy = 1250 if pid == "pearl" else 850
+        ld.spot_size = math.radians(40)
+        ld.spot_blend = 0.9
+        ld.shadow_soft_size = 0.45
+        ld.color = (1.0, 0.87, 0.68)
+        lo = bpy.data.objects.new("spot-" + pid, ld)
+        lo.location = (x * 0.8 - 1.8, y - 2.8, 5.6)     # upper left, so each piece has a lit side and a shadow side
+        sc.collection.objects.link(lo)
+        _look_at(lo, (x, y, 1.0))
+        lo.visible_camera = False
+        lights.append(lo)
+    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.0, 1.0), 70, 5.0, (0.55, 0.66, 1.0)))   # cool rim from behind
+    lights.append(_area("fill", (0.0, -9.0, 3.0), (0.0, 0.0, 1.0), 10, 8.0, (0.60, 0.70, 1.0)))
+    out["lights"] = lights
 
     # haze: used for posters only (bakes hide it)
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 4))
@@ -255,8 +279,8 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Density"].default_value = 0.0022
-    vol.inputs["Color"].default_value = (0.9, 0.86, 0.8, 1)
+    vol.inputs["Density"].default_value = 0.0016
+    vol.inputs["Color"].default_value = (0.62, 0.70, 0.9, 1)
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)
     out["haze"] = haze

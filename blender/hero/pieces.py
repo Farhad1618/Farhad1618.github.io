@@ -89,6 +89,28 @@ def torus(bm, R, r, matrix, seg_major=28, seg_minor=10):
             bm.faces.new((a[j], b[j], b[k], a[k]))
 
 
+def shell(bm, R, depth, thick, matrix, ribs=13, na=30, nr=8):
+    """A ribbed fan-shaped half shell, hinge at the origin, opening along +X, concave up."""
+    def pt(i, j, off):
+        th = math.radians(-80 + 160 * i / na)
+        t = 0.07 + 0.93 * j / nr
+        rr = R * t * (0.80 + 0.20 * math.cos(th))
+        z = -depth * (4 * t * (1 - t)) ** 0.75 - 0.012 * t * math.cos(ribs * th) + off
+        return bm.verts.new(matrix @ Vector((rr * math.cos(th), rr * math.sin(th) * 0.92, z)))
+    top = [[pt(i, j, thick) for j in range(nr + 1)] for i in range(na + 1)]
+    bot = [[pt(i, j, 0.0) for j in range(nr + 1)] for i in range(na + 1)]
+    for i in range(na):
+        for j in range(nr):
+            bm.faces.new((top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]))
+            bm.faces.new((bot[i][j], bot[i][j + 1], bot[i + 1][j + 1], bot[i + 1][j]))
+    for j in range(nr):
+        bm.faces.new((top[0][j], top[0][j + 1], bot[0][j + 1], bot[0][j]))
+        bm.faces.new((top[na][j], bot[na][j], bot[na][j + 1], top[na][j + 1]))
+    for i in range(na):
+        bm.faces.new((top[i][nr], top[i + 1][nr], bot[i + 1][nr], bot[i][nr]))
+        bm.faces.new((top[i][0], bot[i][0], bot[i + 1][0], top[i + 1][0]))
+
+
 # ---------- finishing ----------
 
 def _finish(bm, name, bevel=0.006, bevel_angle=38.0, unwrap=True):
@@ -230,22 +252,33 @@ def build_onepharma():
 
 
 def build_pearl():
-    """A pearl half-milled out of a block; the roughing passes are left as terraces."""
+    """Black Pearl: a milled block (terraces from the roughing passes) holding an open shell and its pearl.
+    Material slots: 0 block, 1 shell, 2 pearl."""
     bm = bmesh.new()
-    box(bm, 0.70, 0.70, 0.60, (0, 0, 0.30))
-    # terraces: stepped rings closing in on the sphere
-    prof = [(0.0, 0.60)]
-    r, z = 0.335, 0.60
+    box(bm, 0.64, 0.64, 0.50, (0, 0, 0.25))
+    prof = [(0.0, 0.50)]
+    r, z = 0.305, 0.50
     prof.append((r, z))
-    for _ in range(7):
-        z += 0.024
+    for _ in range(5):
+        z += 0.02
         prof.append((r, z))
-        r -= 0.019
+        r -= 0.018
         prof.append((r, z))
     prof.append((0.0, z))
-    lathe(bm, prof, segs=64)
-    sphere(bm, 0.265, (0, 0, 0.60 + 0.24), u=48, v=28)
-    return _finish(bm, "piece-pearl", bevel=0.008, bevel_angle=50.0)
+    lathe(bm, prof, segs=56)
+    n0 = len(bm.faces)
+    hinge = (-0.27, 0, 0.715)
+    shell(bm, 0.54, 0.105, 0.016, _T(*hinge))
+    up = _T(hinge[0], 0, hinge[2] + 0.012) @ Matrix.Rotation(math.radians(-62), 4, "Y") @ Matrix.Diagonal((1, 1, -1, 1))
+    shell(bm, 0.54, 0.105, 0.016, up)
+    n1 = len(bm.faces)
+    sphere(bm, 0.135, (0.0, 0, 0.775), u=40, v=24)
+    bm.faces.ensure_lookup_table()
+    for f in bm.faces[n0:n1]:
+        f.material_index = 1
+    for f in bm.faces[n1:]:
+        f.material_index = 2
+    return _finish(bm, "piece-pearl", bevel=0.006, bevel_angle=50.0)
 
 
 def build_falah():
@@ -255,14 +288,15 @@ def build_falah():
                (0.032, 0.50), (0.045, 0.56), (0.03, 0.62), (0.026, 1.02), (0.0, 1.02)], segs=40)
     sphere(bm, 0.05, (0, 0, 1.08), u=20, v=12)
     lathe(bm, [(0.0, 1.11), (0.022, 1.12), (0.0, 1.19)], segs=16)
-    half = 0.36
-    box(bm, 2 * half + 0.05, 0.03, 0.045, (0, 0, 0.99))
+    half, tilt = 0.36, math.radians(13)
+    box(bm, 2 * half + 0.05, 0.03, 0.045, (0, 0, 0.99), rot=Matrix.Rotation(tilt, 4, "Y"))
     sphere(bm, 0.04, (0, 0, 0.99), u=16, v=10)
     for sx in (-1, 1):
-        x = sx * half
-        top = Vector((x, 0, 0.985))
+        # the beam tips: the left pan is weighed down, the right one rides up
+        x = sx * half * math.cos(tilt)
+        top = Vector((x, 0, 0.985 + sx * half * math.sin(tilt)))
         sphere(bm, 0.026, top, u=14, v=8)
-        pan_z = 0.47
+        pan_z = top.z - 0.50
         pr = 0.155
         lathe(bm, [(0.0, pan_z - 0.045), (pr * 0.55, pan_z - 0.04), (pr * 0.9, pan_z - 0.015), (pr, pan_z),
                    (pr - 0.012, pan_z), (pr * 0.86, pan_z - 0.008), (pr * 0.5, pan_z - 0.028), (0.0, pan_z - 0.032)],

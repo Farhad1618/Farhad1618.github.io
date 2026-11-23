@@ -122,7 +122,8 @@ def _bake(ob, size, glossy, from_camera=False):
     sc = bpy.context.scene
     img = bpy.data.images.new("bake-" + ob.name, size, size, alpha=False, float_buffer=True)
     img.colorspace_settings.name = "Non-Color"
-    _bake_target(ob.data.materials[0], img)
+    for m in ob.data.materials:
+        _bake_target(m, img)
     for o in bpy.context.view_layer.objects:
         o.select_set(False)
     ob.select_set(True)

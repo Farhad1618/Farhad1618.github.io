@@ -92,7 +92,7 @@ Key facts:
 
 Design: `docs/superpowers/specs/2026-11-23-chessboard-hero-design.md`. Mood reference is someone else's still, kept local and git-excluded; never commit it.
 
-- Pieces: Cyrus = the Cyrus Cylinder, Zagros = hex vault with five keys (three turned), OnePharma = graph lattice, Black Pearl = pearl milled from a block (dark marble, centre), Falah = balance scale, Network Intrusion Detection = watchtower.
+- Pieces: Cyrus = the Cyrus Cylinder, Zagros = hex vault with five keys (three turned), OnePharma = graph lattice, Black Pearl = a dark milled block holding an open ivory shell with a black pearl (centre), Falah = balance scale tilted, left pan down, Network Intrusion Detection = watchtower.
 - The poster (`poster.webp`, or `poster-portrait.webp` under `(orientation: portrait)`) is the first paint and the fallback. It always fits the width, so no piece is cropped.
 - Six `a[data-piece]` links in `nav.hero-pieces` are placed over the pieces from `layout.json`. They are the keyboard and screen-reader route and the tap targets when only the poster shows. Each goes to `#proj-<id>`.
 - `hero.js` mounts over the poster only when: motion is allowed, WebGL2 exists, the device is not weak (coarse pointer under 768 px, under 4 GB or 4 cores), and the hero is within one viewport. It falls back to the poster on load failure, context loss, or a slow first 60 frames. `localStorage.heroForce = "1"` bypasses the weak-device test on localhost only.

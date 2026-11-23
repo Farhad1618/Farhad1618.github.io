@@ -51,6 +51,8 @@ section{position:relative;padding:0 var(--g)}
 .hero-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
 .hero::before,.hero::after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
 .hero::before{top:0;height:34%;background:linear-gradient(180deg,var(--ink) 8%,transparent)}
+/* vignette: the edges fall away into the dark, the centre holds the light */
+.hero-view::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 58%,transparent 40%,rgba(8,8,11,.78) 100%)}
 .hero::after{bottom:0;height:18%;background:linear-gradient(0deg,var(--ink),transparent)}
 .hero-head{position:absolute;z-index:3;left:0;right:0;top:19%;pointer-events:none}
 .hero-title{font-family:var(--disp);font-weight:400;font-size:clamp(20px,2.6vw,40px);line-height:1.2;letter-spacing:.42em;text-transform:uppercase;color:var(--bone)}
