@@ -1,6 +1,6 @@
 // Static checks for site.html. Usage: node scripts/check-site.mjs [--all]
 // --all enables pending checks (those that need later tasks to pass).
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -123,11 +123,37 @@ check("hero and who copy present", () => {
   return need.filter((s) => !src.includes(s)).map((s) => `missing "${s}"`);
 });
 
+check("hero: chessboard poster, title and six project links", () => {
+  const errs = [], ids = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
+  if (!/<h1 class="hero-title"[^>]*>.*Farhad.*<\/h1>/.test(src)) errs.push("h1.hero-title with Farhad missing");
+  for (const gone of ["name-xl", 'id="field"', "data-hero-figure", "heroField", "Anton"]) if (src.includes(gone)) errs.push(`old hero remnant "${gone}"`);
+  const nav = (src.match(/<nav class="hero-pieces"[^>]*>(.*?)<\/nav>/s) || [])[1] || "";
+  if ((nav.match(/data-piece="/g) || []).length !== 6) errs.push("nav.hero-pieces must hold exactly six data-piece links");
+  for (const id of ids) {
+    if (!nav.includes(`data-piece="${id}" href="#proj-${id}"`)) errs.push(`link for ${id} missing`);
+    if (src.split(`id="proj-${id}"`).length !== 2) errs.push(`id="proj-${id}" must appear exactly once`);
+  }
+  if (!src.includes('src="assets/hero/poster.webp"')) errs.push("poster.webp not referenced");
+  if (!/<source media="\(orientation: portrait\)" srcset="assets\/hero\/poster-portrait\.webp">/.test(src)) errs.push("portrait poster source missing");
+  const head = src.slice(0, src.indexOf("<header"));
+  if (/<script[^>]+src="[^"]*three/.test(head)) errs.push("three.js must not load from a script tag in the head");
+  return errs;
+});
+
+check("hero: live scene is lazy and pinned", () => {
+  const errs = [], head = src.slice(0, src.indexOf("<header"));
+  if (!/<script type="importmap">[^<]*"three":\s*"https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//.test(head)) errs.push("importmap pinning three on jsdelivr missing before <header");
+  if (!src.includes('import("./hero.js")')) errs.push('import("./hero.js") missing');
+  if (/<script type="module" src/.test(src)) errs.push("no static module scripts");
+  const hp = join(root, "hero.js");
+  if (!existsSync(hp) || !readFileSync(hp, "utf8").includes("export async function mountHero")) errs.push("hero.js with mountHero missing");
+  return errs;
+});
+
 check("who copy: headline, photo slot, no origin line", () => {
   const errs = [];
   if (!src.includes("I'm Farhad. I turn chaos into systems that think.")) errs.push("who headline missing");
   if (!/<figure class="photo[^"]*" data-photo="">/.test(src)) errs.push('photo slot <figure class="photo" data-photo=""> missing');
-  if (!/function heroField\(g,\s*w,\s*h,\s*t\)/.test(src)) errs.push("heroField(g,w,h,t) missing");
   if (/origin (story|line)/i.test(src)) errs.push("origin text present");
   return errs;
 });

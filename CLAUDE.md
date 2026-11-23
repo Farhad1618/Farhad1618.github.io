@@ -11,6 +11,7 @@ Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so
 - v5 "Farsh" (Three.js Persian-tile scroll film) was live Oct 21 – Nov 16, 2026. Archived at `archive/farsh/` (its own `site.html`, `index.html` and `build.sh`, which splits at a `<!-- body -->` marker).
 - A separate v4 (GSAP + raw WebGL) is archived at `archive/v4/`. Design concepts live in `concepts/` (a-girih, b-index, c-cortex, d-farsh, e-hook).
 - v3 viewer (GSAP + OGL fixed viewer) archived at `archive/v3-viewer/` on Nov 17, 2026. It was the live build Nov 16-17, 2026.
+- The giant-name hero (branch `hero-name`) was replaced by the chessboard hero on Nov 23, 2026 (branch `chessboard-hero`).
 - Current build is the v6 story page (one scrolling page, see "Structure (v6, current)"), plus the research case study.
 
 ## Files
@@ -19,12 +20,19 @@ Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so
 |---|---|
 | `site.html` | **Source of truth.** Body-only HTML (no doctype/head/body) so it can be published as a Claude artifact directly. |
 | `build.sh` | Wraps `site.html` into `index.html` with doctype, meta, OG tags, favicon. Run after every edit. |
-| `index.html` | Deployable standalone build. One file, zero dependencies. Never edit by hand. |
+| `index.html` | Deployable build. Never edit by hand. Needs `hero.js` and `assets/hero/` beside it. |
+| `hero.js` | The live chessboard hero (Three.js 0.170.0, ES module, lazy-loaded). One export: `mountHero`. |
+| `assets/hero/` | Baked hero assets: two posters, `pieces.glb`, `board.webp`, `matcap.webp`, `haze.webp`, `layout.json` (cameras + piece screen boxes). About 1.1 MB. Generated; do not hand-edit. |
+| `blender/` | `build_hero.py` + `hero/` modules that build the pieces, render the posters and bake everything in `assets/hero/`. |
+| `scripts/check-hero-assets.mjs` | Asset contract and size budget (2.5 MB total, 150 KB per poster, 15k triangles per piece). |
 | `research.html` | Standalone case study for the botnet paper (scrolling page, GSAP + ScrollTrigger). Full HTML doc; published as an artifact supporting file. Linked from project 06 and the About research row. |
 | `research-model.js` | The NSL-KDD notebook CNN-RNN retrained (seed 42, all of KDDTrain+), float16 weights + plain-JS forward pass, 48 stratified KDDTest+ samples. Verdicts match Keras on all 22,544 test rows. Lazy-loaded by `research.html`. |
 | `archive/v1-scroll.html` | v1: long scrolling page with hero knowledge graph. Superseded; kept for reference. |
 
-Workflow: edit `site.html` → `./build.sh` → republish the artifact from `site.html`, passing `research.html` and `research-model.js` as `files`. Deploy all three plus `index.html`.
+Workflow: edit `site.html` → `./build.sh` → republish the artifact from `site.html`, passing `research.html`, `research-model.js`, `hero.js` and every file in `assets/hero/` as `files`. Deploy all of those plus `index.html`. If the artifact cannot fetch the binary assets it shows the poster only, which is accepted; GitHub Pages is the target.
+
+Rebuild hero assets (about 10 minutes, needs Blender, `cwebp` and `npx`):
+`blender --background --factory-startup --python blender/build_hero.py -- --stage all` (`--stage pieces` renders a clay contact sheet to `blender/out/`; `--draft` is fast and rough).
 Fonts load from Google Fonts; everything else is inline.
 
 ## Concept
@@ -58,14 +66,14 @@ Committed dark, single theme (deliberate, not an omission).
 
 The JS `C` palette object mirrors these and must stay in sync with `:root`.
 
-Type: **Bodoni Moda** (display: project titles, ledes), **Archivo** (body), **IBM Plex Mono** (labels, metrics, node names, uppercase + tracking).
+Type: **Bodoni Moda** (display: hero title, project titles, ledes), **Archivo** (body), **IBM Plex Mono** (labels, metrics, node names, uppercase + tracking).
 Avoid: Inter/Space Grotesk, purple gradients, emoji, badge soup, cards-everywhere.
 
 ## Structure (v6, current)
 
 One scrolling story page in `site.html`. Six chapters:
 
-1. Hero
+1. Hero: a dark marble chessboard, one piece per project (see "Hero" below)
 2. Who (01)
 3. What drives me (02)
 4. Work (03): six `.proj` chapters, one per project
@@ -73,12 +81,23 @@ One scrolling story page in `site.html`. Six chapters:
 6. Contact (05)
 
 Key facts:
-- One shared rAF drives all project plates; the hero has its own rAF.
+- One shared rAF drives all project plates; the hero has its own rAF inside `hero.js`.
 - GSAP + ScrollTrigger reveals are gated by `html.motion`.
 - `BOOKING_URL` (JS constant). Empty means the "Book a time" button is hidden.
 - Photo slot: `data-photo` on `figure.photo`. Empty means the FM monogram shows.
-- `node scripts/check-site.mjs --all` is the content/rules check. Run it with `./build.sh` before committing.
+- `node scripts/check-site.mjs --all` is the content/rules check and `node scripts/check-hero-assets.mjs` the asset check. Run both with `./build.sh` before committing.
 - Local preview: the `portfolio` server in `.claude/launch.json` (node static server).
+
+## Hero (chessboard)
+
+Design: `docs/superpowers/specs/2026-11-23-chessboard-hero-design.md`. Mood reference is someone else's still, kept local and git-excluded; never commit it.
+
+- Pieces: Cyrus = the Cyrus Cylinder, Zagros = hex vault with five keys (three turned), OnePharma = graph lattice, Black Pearl = pearl milled from a block (dark marble, centre), Falah = balance scale, Network Intrusion Detection = watchtower.
+- The poster (`poster.webp`, or `poster-portrait.webp` under `(orientation: portrait)`) is the first paint and the fallback. It always fits the width, so no piece is cropped.
+- Six `a[data-piece]` links in `nav.hero-pieces` are placed over the pieces from `layout.json`. They are the keyboard and screen-reader route and the tap targets when only the poster shows. Each goes to `#proj-<id>`.
+- `hero.js` mounts over the poster only when: motion is allowed, WebGL2 exists, the device is not weak (coarse pointer under 768 px, under 4 GB or 4 cores), and the hero is within one viewport. It falls back to the poster on load failure, context loss, or a slow first 60 frames. `localStorage.heroForce = "1"` bypasses the weak-device test on localhost only.
+- Nothing is lit in the browser: baked colour + matcap sheen, one baked board texture, one depth-of-field pass. Hover lifts a piece and pulls focus to it; click (or second tap) scrolls to its chapter.
+- Colours are raw display values end to end in `hero.js` (textures `NoColorSpace`, linear output). Don't "fix" the colour management.
 
 ## Projects (display name → real name / repo)
 
@@ -103,7 +122,10 @@ Contact: farhad.maleki1618@outlook.com · +971 58 558 1618 · github.com/Farhad1
 ## Known weaknesses (why the next step matters)
 
 - Preview harness can't drive keyboard/scroll in the `data:` frame. Verify scroll reveals by hand.
-- Mobile layout untested at depth.
+- Mobile layout untested at depth. Phones get the still poster by design; the live scene on touch was only exercised with synthetic events.
+- Hero frame rate was not measured: the preview pane throttles hidden tabs. Check 60 fps by hand in a real browser.
+- The live hero in the Claude artifact is untested (binary supporting files).
+- The pieces are script-built. If one reads as a tech demo, hand-finish it in Blender and re-run `--stage all`.
 
 ## Roadmap (agreed direction)
 

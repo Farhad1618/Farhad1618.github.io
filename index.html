@@ -23,7 +23,7 @@
 <title>Farhad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <style>
 /* ============================================================
@@ -34,7 +34,7 @@
 :root{
   --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
   --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --sig:#E9A03B; --trace:#5FA8B8;
-  --disp:'Bodoni Moda',serif; --name:'Anton','Impact',sans-serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
+  --disp:'Bodoni Moda',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
   --g:clamp(16px,4vw,56px);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -62,16 +62,31 @@ section{position:relative;padding:0 var(--g)}
 .chap{display:flex;gap:14px;align-items:center;margin-bottom:40px}
 .chap i{display:block;width:48px;height:1px;background:var(--rule)}
 
-/* 01 hero: the name, huge, with the field (and later a cut-out portrait) in front of it */
-.hero{height:100svh;min-height:560px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:0;text-align:center}
-.hero .glow{position:absolute;inset:0;background:radial-gradient(ellipse 60% 55% at 50% 52%,rgba(236,231,220,.07) 0%,transparent 70%)}
-.hero .name-xl{position:relative;z-index:1;font-family:var(--name);font-weight:400;font-size:min(33vw,62svh);line-height:.82;letter-spacing:-.01em;color:var(--bone);text-transform:uppercase;white-space:nowrap}
-.hero .name-xl .line{padding:.04em .02em 0;margin:0}
-#field{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
-.hero .figure{position:absolute;z-index:3;left:50%;bottom:0;height:92%;transform:translateX(-50%);object-fit:contain;filter:grayscale(1) contrast(1.15);pointer-events:none}
-.hero .figure[hidden]{display:none}
-.hero .sub{position:relative;z-index:4;margin-top:clamp(18px,3vh,32px);font-size:clamp(11px,1.1vw,14px);letter-spacing:.42em;color:var(--dim)}
+/* 01 hero: a marble chessboard, one piece per project. Poster first; hero.js mounts the live scene over it. */
+.hero{height:100svh;min-height:560px;overflow:hidden;padding:0;text-align:center;background:var(--ink)}
+.hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
+/* the poster always fits the width, so no piece is ever cropped out; top and bottom melt into the ground */
+.hero-poster img{position:absolute;left:0;top:50%;width:100%;height:auto;transform:translateY(-50%);display:block;
+  -webkit-mask-image:linear-gradient(180deg,transparent,#000 22%,#000 80%,transparent);mask-image:linear-gradient(180deg,transparent,#000 22%,#000 80%,transparent)}
+.hero-stage{opacity:0;transition:opacity .9s ease}
+.hero.live .hero-stage{opacity:1}
+.hero-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+.hero::before,.hero::after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
+.hero::before{top:0;height:34%;background:linear-gradient(180deg,var(--ink) 8%,transparent)}
+.hero::after{bottom:0;height:18%;background:linear-gradient(0deg,var(--ink),transparent)}
+.hero-head{position:absolute;z-index:3;left:0;right:0;top:19%;pointer-events:none}
+.hero-title{font-family:var(--disp);font-weight:400;font-size:clamp(20px,2.6vw,40px);line-height:1.2;letter-spacing:.42em;text-transform:uppercase;color:var(--bone)}
+.hero-title .line,.hero .sub.line{padding:0 0 .08em .42em;margin:0}
+.hero .sub{margin-top:clamp(10px,1.6vh,18px);font-size:clamp(10px,.9vw,12px);letter-spacing:.42em;color:var(--dim)}
 .hero .cue{position:absolute;z-index:4;left:0;right:0;bottom:4vh}
+/* the six project links: a hidden list until layout.json places them over the pieces */
+.hero-pieces{position:absolute;inset:0;z-index:3;pointer-events:none}
+.hero-pieces a{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;font-size:0;color:transparent}
+.hero-pieces.placed a{clip-path:none;pointer-events:auto;outline-offset:3px}
+.hero-pieces a:focus-visible{clip-path:none;outline:1px solid var(--sig)}
+.hero.live .hero-pieces a{pointer-events:none}
+.hero-label{position:absolute;z-index:4;left:0;top:0;transform:translate(-50%,-100%);padding-bottom:12px;color:var(--bone);white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
+.hero-label.on{opacity:1}
 .line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
@@ -178,6 +193,8 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
   html.motion .chroma::after{transform:none}
 }
 </style>
+<!-- three.js for hero.js; loaded only when the live hero mounts -->
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 
 </head>
 <body>
@@ -194,14 +211,19 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 
 <main>
   <section class="hero" id="top">
-    <div class="glow"></div>
-    <h1 class="name-xl" aria-label="Farhad"><span class="line" aria-hidden="true"><span>Farhad</span></span></h1>
-    <canvas id="field" aria-hidden="true"></canvas>
-    <!-- Cut-out portrait (transparent PNG) stands in front of the name. Set src to show it. -->
-    <img class="figure" data-hero-figure="" alt="" hidden>
-    <p class="mono sub line"><span>Software Developer</span></p>
+    <div class="hero-view">
+      <picture class="hero-poster"><source media="(orientation: portrait)" srcset="assets/hero/poster-portrait.webp"><img src="assets/hero/poster.webp" alt="" fetchpriority="high"></picture>
+      <div class="hero-stage"></div>
+    </div>
+    <div class="hero-head">
+      <h1 class="hero-title" aria-label="Farhad"><span class="line" aria-hidden="true"><span>Farhad</span></span></h1>
+      <p class="mono sub line"><span>Software Developer</span></p>
+    </div>
+    <nav class="hero-pieces" aria-label="Projects"><a data-piece="cyrus" href="#proj-cyrus">Cyrus</a><a data-piece="zagros" href="#proj-zagros">Zagros</a><a data-piece="onepharma" href="#proj-onepharma">OnePharma</a><a data-piece="pearl" href="#proj-pearl">Black Pearl</a><a data-piece="falah" href="#proj-falah">Falah</a><a data-piece="nids" href="#proj-nids">Network Intrusion Detection</a></nav>
+    <span class="mono hero-label" aria-hidden="true"></span>
     <span class="mono cue">Scroll &darr;</span>
   </section>
+
   <section class="who" id="who">
     <figure class="photo rv" data-photo="">
       <div class="ph"><span>F</span></div>
@@ -234,7 +256,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     <div class="rv"><div class="chap"><span class="mono sig">03</span><i></i><span class="mono">Proof</span></div><h2>The work.</h2></div>
     <p class="mono rv" style="max-width:34ch">Each plate is a live scene drawn in the project&rsquo;s own language. No stock imagery.</p>
   </section>
-  <section class="proj" data-i="0" data-id="cyrus">
+  <section class="proj" data-i="0" data-id="cyrus" id="proj-cyrus">
     <div class="plate"><canvas role="img" aria-label="Live scene for Cyrus"></canvas><div class="num" aria-hidden="true">01</div></div>
     <div class="txt rv">
       <span class="mono sig">Cyrus &middot; Ontology platform &middot; pharma first</span>
@@ -246,7 +268,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       </div>
     </div>
   </section>
-  <section class="proj" data-i="1" data-id="zagros">
+  <section class="proj" data-i="1" data-id="zagros" id="proj-zagros">
     <div class="plate"><canvas role="img" aria-label="Live scene for Zagros"></canvas><div class="num" aria-hidden="true">02</div></div>
     <div class="txt rv">
       <span class="mono sig">Zagros &middot; Identity &amp; governance platform</span>
@@ -258,7 +280,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       </div>
     </div>
   </section>
-  <section class="proj" data-i="2" data-id="onepharma">
+  <section class="proj" data-i="2" data-id="onepharma" id="proj-onepharma">
     <div class="plate"><canvas role="img" aria-label="Live scene for OnePharma"></canvas><div class="num" aria-hidden="true">03</div></div>
     <div class="txt rv">
       <span class="mono sig">OnePharma &middot; Pharmaceutical intelligence</span>
@@ -270,7 +292,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       </div>
     </div>
   </section>
-  <section class="proj" data-i="3" data-id="pearl">
+  <section class="proj" data-i="3" data-id="pearl" id="proj-pearl">
     <div class="plate"><canvas role="img" aria-label="Live scene for Black Pearl"></canvas><div class="num" aria-hidden="true">04</div></div>
     <div class="txt rv">
       <span class="mono sig">Black Pearl &middot; Machine control &amp; visualization</span>
@@ -282,7 +304,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       </div>
     </div>
   </section>
-  <section class="proj" data-i="4" data-id="falah">
+  <section class="proj" data-i="4" data-id="falah" id="proj-falah">
     <div class="plate"><canvas role="img" aria-label="Live scene for Falah"></canvas><div class="num" aria-hidden="true">05</div></div>
     <div class="txt rv">
       <span class="mono sig">Falah &middot; Full-stack budgeting app</span>
@@ -294,7 +316,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       </div>
     </div>
   </section>
-  <section class="proj" data-i="5" data-id="nids">
+  <section class="proj" data-i="5" data-id="nids" id="proj-nids">
     <div class="plate"><canvas role="img" aria-label="Live scene for Network Intrusion Detection"></canvas><div class="num" aria-hidden="true">06</div></div>
     <div class="txt rv">
       <span class="mono sig">Network Intrusion Detection &middot; Applied research</span>
@@ -358,62 +380,93 @@ function rgba(hex,a){
 function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 
 /* ============================================================
-   HERO FIELD: drifting nodes, teal links, amber links to the cursor.
-   Stateless in t (positions are a function of time), so a still frame is just t=0.
+   HERO: the chessboard. The poster is the first paint and the fallback.
+   Six project links sit over the pieces (positions from assets/hero/layout.json).
+   hero.js mounts the live scene over the poster when the device can take it.
    ============================================================ */
-var heroPts = null, heroKey = "";
-function heroField(g,w,h,t){
-  var key = w+"x"+h;
-  if (heroKey !== key) {
-    var r = mk(1618), n = Math.round(w*h/14000), i;
-    heroPts = [];
-    for (i=0;i<n;i++) heroPts.push({ x:r()*w, y:r()*h, ax:8+r()*26, ay:8+r()*26,
-      sx:.12+r()*.22, sy:.12+r()*.22, px:r()*TAU, py:r()*TAU, a:r()<.07 });
-    heroKey = key;
-  }
-  var L = 140, M = L*1.6, P = heroPts, i, j, a, b, d, dm;
-  for (i=0;i<P.length;i++){ a=P[i]; a.cx = a.x + Math.sin(t*a.sx+a.px)*a.ax; a.cy = a.y + Math.sin(t*a.sy+a.py)*a.ay; }
-  g.clearRect(0,0,w,h);
-  g.lineWidth = .6;
-  for (i=0;i<P.length;i++){
-    a = P[i];
-    for (j=i+1;j<P.length;j++){
-      b = P[j]; d = Math.hypot(a.cx-b.cx, a.cy-b.cy);
-      if (d < L){ g.strokeStyle = rgba(C.trace,(1-d/L)*.22); g.beginPath(); g.moveTo(a.cx,a.cy); g.lineTo(b.cx,b.cy); g.stroke(); }
-    }
-    dm = Math.hypot(a.cx-heroMouse.x, a.cy-heroMouse.y);
-    if (dm < M){ g.strokeStyle = rgba(C.sig,(1-dm/M)*.55); g.beginPath(); g.moveTo(a.cx,a.cy); g.lineTo(heroMouse.x,heroMouse.y); g.stroke(); }
-    g.fillStyle = a.a ? C.sig : rgba(C.bone,.5);
-    g.beginPath(); g.arc(a.cx,a.cy,a.a?2.2:1.2,0,TAU); g.fill();
-  }
+window.heroLayout = null; window.heroLive = null;
+function heroOrientation(){ return matchMedia("(orientation: portrait)").matches ? "portrait" : "landscape"; }
+/* where the poster lands in the hero: full width, centred vertically (cropped or letterboxed) */
+function heroCover(aspect){
+  var s = document.getElementById("top"), W = s.clientWidth, H = s.clientHeight, h = W/aspect;
+  return { w:W, h:h, dx:0, dy:(H-h)/2 };
 }
-var heroMouse = { x:-1e4, y:-1e4 };
+window.heroOrientation = heroOrientation; window.heroCover = heroCover;
 (function(){
-  var sec = document.getElementById("top"), cv = document.getElementById("field");
-  if (!sec || !cv || !cv.getContext) return;
-  var g = cv.getContext("2d"), dpr = Math.min(window.devicePixelRatio||1, 2);
-  var w = 0, h = 0, raf = 0, onScreen = true, t0 = performance.now();
-  function size(){
-    var r = cv.getBoundingClientRect(); w = Math.max(1,Math.round(r.width)); h = Math.max(1,Math.round(r.height));
-    cv.width = w*dpr; cv.height = h*dpr; g.setTransform(dpr,0,0,dpr,0,0);
+  var sec = document.getElementById("top"), nav = sec && sec.querySelector(".hero-pieces");
+  if (!nav) return;
+  var links = nav.querySelectorAll("a[data-piece]"), label = sec.querySelector(".hero-label"), stage = sec.querySelector(".hero-stage");
+  function go(id){
+    var t = document.getElementById("proj-"+id);
+    if (t) t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block:"start" });
   }
-  function frame(now){ raf = 0; heroField(g,w,h,(now-t0)/1000); if (onScreen && !document.hidden) raf = requestAnimationFrame(frame); }
-  function run(){ if (!raf && onScreen && !document.hidden && !reduced) raf = requestAnimationFrame(frame); }
-  function still(){ heroField(g,w,h,0); }
-  size(); still();
-  addEventListener("resize", function(){ size(); if (reduced) still(); });
-  sec.addEventListener("pointermove", function(e){ var r = cv.getBoundingClientRect(); heroMouse.x = e.clientX-r.left; heroMouse.y = e.clientY-r.top; });
-  sec.addEventListener("pointerleave", function(){ heroMouse.x = heroMouse.y = -1e4; });
-  if (reduced) return;
-  if ("IntersectionObserver" in window) new IntersectionObserver(function(es){ onScreen = es[0].isIntersecting; run(); }).observe(sec);
-  document.addEventListener("visibilitychange", run);
-  run();
-})();
+  function showLabel(id, x, y){
+    if (!id) { label.classList.remove("on"); stage.style.cursor = ""; return; }
+    var a = nav.querySelector('a[data-piece="'+id+'"]');
+    label.textContent = a ? a.textContent : "";
+    label.style.left = x+"px"; label.style.top = y+"px";
+    label.classList.add("on"); stage.style.cursor = "pointer";
+  }
+  function place(){
+    var L = window.heroLayout; if (!L) return;
+    var v = L[heroOrientation()], c = heroCover(v.aspect);
+    links.forEach(function(a){
+      var b = v.pieces[a.getAttribute("data-piece")]; if (!b) return;
+      a.style.left = (c.dx + (b.cx-b.w/2)*c.w)+"px"; a.style.top = (c.dy + (b.cy-b.h/2)*c.h)+"px";
+      a.style.width = (b.w*c.w)+"px"; a.style.height = (b.h*c.h)+"px";
+    });
+    nav.classList.add("placed");
+    window.dispatchEvent(new CustomEvent("hero-layout"));
+  }
+  links.forEach(function(a){
+    var id = a.getAttribute("data-piece");
+    function on(){
+      if (!nav.classList.contains("placed")) return;
+      showLabel(id, a.offsetLeft + a.offsetWidth/2, a.offsetTop);
+      if (window.heroLive) window.heroLive.setHover(id);
+    }
+    function off(){ showLabel(null); if (window.heroLive) window.heroLive.setHover(null); }
+    a.addEventListener("pointerenter", on); a.addEventListener("pointerleave", off);
+    a.addEventListener("focus", on); a.addEventListener("blur", off);
+    a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
+  });
+  addEventListener("resize", place);
+  if (!window.fetch) return;
+  fetch("assets/hero/layout.json").then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(L){ window.heroLayout = L; place(); boot(); })
+    .catch(function(){ /* links stay a hidden, focusable list */ });
 
-/* Hero figure: a URL in data-hero-figure shows the cut-out portrait in front of the name. */
-(function(){
-  var im = document.querySelector("img[data-hero-figure]"), u = im && im.getAttribute("data-hero-figure");
-  if (u) { im.src = u; im.hidden = false; }
+  /* live scene: only when motion is allowed, WebGL2 exists and the device is not weak */
+  function weak(){
+    return (matchMedia("(pointer:coarse)").matches && Math.min(screen.width, screen.height) < 768)
+      || navigator.deviceMemory < 4 || navigator.hardwareConcurrency < 4;
+  }
+  function forced(){
+    try { return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){ return false; }
+  }
+  function boot(){
+    if (reduced || (weak() && !forced())) return;
+    var probe = document.createElement("canvas"), gl = probe.getContext("webgl2");
+    if (!gl) return;
+    var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
+    var started = false;
+    function fallBack(){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); }
+    function start(){
+      if (started) return; started = true;
+      import("./hero.js").then(function(m){
+        return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack });
+      }).then(function(h){
+        window.heroLive = h; sec.classList.add("live");
+      }).catch(function(e){ fallBack(); console.warn("hero: live scene unavailable, showing the poster.", e); });
+    }
+    function near(){
+      if (!("IntersectionObserver" in window)) return start();
+      var io = new IntersectionObserver(function(es){ if (es[0].isIntersecting) { io.disconnect(); start(); } }, { rootMargin:"100% 0px" });
+      io.observe(sec);
+    }
+    function idle(){ if (window.requestIdleCallback) requestIdleCallback(near, { timeout:1500 }); else setTimeout(near, 300); }
+    if (document.readyState === "complete") idle(); else addEventListener("load", idle);
+  }
 })();
 
 /* Portrait slot: a URL in data-photo swaps the monogram for a graded <img>. */
@@ -901,7 +954,9 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   document.documentElement.classList.add("motion");
   var EASE = "expo.out";
   gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
-  gsap.to(".hero .name-xl", { yPercent:18, opacity:.25, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true } });
+  gsap.to(".hero-head", { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top", end:"60% top", scrub:true } });
+  gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true,
+    onUpdate:function(st){ if (window.heroLive) window.heroLive.setScroll(st.progress); } } });
   ScrollTrigger.batch(".rv", {
     start:"top 88%", once:true,
     onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
