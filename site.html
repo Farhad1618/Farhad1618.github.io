@@ -71,10 +71,6 @@ body::after{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:50;
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-5%)}100%{transform:translate(0,0)}}
 
 /* top bar */
-header.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:20px var(--g);background:linear-gradient(180deg,rgba(12,12,14,.7),transparent)}
-header.topbar .name{font-family:var(--disp);font-size:20px;letter-spacing:.01em;color:var(--bone);text-decoration:none}
-header.topbar nav{display:flex;gap:28px}
-header.topbar nav a{color:var(--bone);text-decoration:none;font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase}
 .progress{position:fixed;top:0;left:0;height:2px;width:100%;background:var(--sig);z-index:45;transform:scaleX(0);transform-origin:left}
 
 section{position:relative;padding:0 var(--g)}
@@ -207,8 +203,6 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 @media (max-width:1023px){.moments{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.moments{grid-template-columns:1fr}}
 @media (max-width:860px){
-  header.topbar nav{gap:0}
-  header.topbar nav a:not([href="#contact"]){display:none}
   .who{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
@@ -219,15 +213,6 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 </style>
 
 
-<header class="topbar">
-  <a class="name" href="#top">Farhad</a>
-  <nav>
-    <a href="#who">About</a>
-    <a href="#work">Work</a>
-    <a href="#paper">Research</a>
-    <a href="#contact">Contact</a>
-  </nav>
-</header>
 <div class="progress" id="progress"></div>
 
 <main>
