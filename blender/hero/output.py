@@ -1,6 +1,7 @@
 """Posters, layout.json, bakes and the GLB export."""
 import json
 import os
+import subprocess
 
 import bpy
 from bpy_extras.object_utils import world_to_camera_view
@@ -11,17 +12,15 @@ from . import pieces, scene
 POSTER_MAX = 150 * 1024
 
 
-def _save_webp(png_path, webp_path, max_bytes=None, start=88):
-    img = bpy.data.images.load(png_path)
-    img.file_format = "WEBP"
+def _save_webp(png_path, webp_path, max_bytes=None, start=86, extra=()):
+    """Encode with cwebp (Blender's own WebP writer ignores the format when saving a loaded image)."""
     q = start
     while True:
-        img.save(filepath=webp_path, quality=q)
+        subprocess.run(["cwebp", "-quiet", "-m", "6", "-q", str(q), *extra, png_path, "-o", webp_path], check=True)
         size = os.path.getsize(webp_path)
         if not max_bytes or size <= max_bytes or q <= 30:
             break
-        q -= 6
-    bpy.data.images.remove(img)
+        q -= 5
     print(f"wrote {os.path.basename(webp_path)} q={q} {size} bytes")
 
 
@@ -73,3 +72,205 @@ def write_layout(objs, assets_dir):
     with open(os.path.join(assets_dir, "layout.json"), "w") as f:
         json.dump(data, f, indent=1)
     print("wrote layout.json")
+
+
+# ---------------------------------------------------------------- bakes
+
+import math  # noqa: E402
+
+import numpy as np  # noqa: E402
+
+EXPOSURE = 0.85
+INK_LIN = 0.0037            # --ink #0C0C0E in linear
+
+
+def _tonemap(lin):
+    """Scene-linear -> display sRGB, a filmic curve close to the posters' AgX look."""
+    x = np.clip(lin * EXPOSURE, 0, None)
+    y = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)
+    y = np.clip(y, 0, 1)
+    return np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(y, 1 / 2.4) - 0.055)
+
+
+def _write_png(arr, path):
+    """arr: (h, w, 3 or 4) display-encoded floats, row 0 = bottom."""
+    h, w, c = arr.shape
+    px = np.ones((h, w, 4), dtype=np.float32)
+    px[..., :c] = arr
+    img = bpy.data.images.new("out", w, h, alpha=(c == 4))
+    img.colorspace_settings.name = "Non-Color"
+    img.alpha_mode = "STRAIGHT"
+    img.pixels.foreach_set(np.clip(px, 0, 1).ravel())
+    img.filepath_raw = path
+    img.file_format = "PNG"
+    img.save()
+    bpy.data.images.remove(img)
+
+
+def _bake_target(mat, img):
+    N = mat.node_tree.nodes
+    node = N.get("BAKE") or N.new("ShaderNodeTexImage")
+    node.name = "BAKE"
+    node.image = img
+    for n in N:
+        n.select = False
+    node.select = True
+    N.active = node
+
+
+def _bake(ob, size, glossy, from_camera=False):
+    sc = bpy.context.scene
+    img = bpy.data.images.new("bake-" + ob.name, size, size, alpha=False, float_buffer=True)
+    img.colorspace_settings.name = "Non-Color"
+    _bake_target(ob.data.materials[0], img)
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    b = sc.render.bake
+    b.use_pass_direct = b.use_pass_indirect = True
+    b.use_pass_diffuse = b.use_pass_emit = b.use_pass_transmission = True
+    b.use_pass_glossy = glossy
+    b.margin = 16
+    b.view_from = "ACTIVE_CAMERA" if from_camera else "ABOVE_SURFACE"
+    b.use_selected_to_active = False
+    sc.cycles.bake_type = "COMBINED"
+    bpy.ops.object.bake(type="COMBINED")
+    px = np.empty(size * size * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    bpy.data.images.remove(img)
+    return px.reshape(size, size, 4)[..., :3]
+
+
+def _box_blur(a, r):
+    if r < 1:
+        return a
+    for axis in (0, 1):
+        pad = [(0, 0)] * a.ndim
+        pad[axis] = (r + 1, r)
+        c = np.cumsum(np.pad(a, pad, mode="edge"), axis=axis, dtype=np.float64)
+        n = a.shape[axis]
+        hi = np.take(c, np.arange(2 * r + 1, 2 * r + 1 + n), axis=axis)
+        lo = np.take(c, np.arange(0, n), axis=axis)
+        a = ((hi - lo) / (2 * r + 1)).astype(np.float32)
+    return a
+
+
+def _swap_to_baked(ob, png):
+    img = bpy.data.images.load(png)
+    mat = bpy.data.materials.new("baked-" + ob.name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    bsdf = nt.nodes["Principled BSDF"]
+    nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    bsdf.inputs["Roughness"].default_value = 1.0
+    ob.data.materials.clear()
+    ob.data.materials.append(mat)
+
+
+def _matcap(path, size=256):
+    v, u = np.mgrid[0:size, 0:size].astype(np.float32)
+    x = u / (size - 1) * 2 - 1
+    y = v / (size - 1) * 2 - 1
+    rr = x * x + y * y
+    inside = rr <= 1.0
+    z = np.sqrt(np.clip(1 - rr, 0, 1))
+
+    def lobe(d, power, gain):
+        d = np.array(d, dtype=np.float32)
+        d /= np.linalg.norm(d)
+        # reflection of the view vector (0,0,1) about the normal
+        rx, ry, rz = 2 * z * x, 2 * z * y, 2 * z * z - 1
+        return gain * np.power(np.clip(rx * d[0] + ry * d[1] + rz * d[2], 0, 1), power)
+
+    warm = np.array([1.0, 0.86, 0.70], dtype=np.float32)
+    cool = np.array([0.72, 0.80, 1.0], dtype=np.float32)
+    s = (lobe((0.1, 0.9, 0.35), 5, 0.16) + lobe((0.1, 0.9, 0.35), 40, 0.55) + lobe((-0.9, 0.35, 0.1), 8, 0.12))
+    rim = np.power(1 - z, 4) * 0.22
+    out = (s + rim)[..., None] * warm + lobe((-0.5, -0.4, 0.75), 6, 0.035)[..., None] * cool
+    out *= inside[..., None]
+    _write_png(np.clip(out, 0, 1) ** (1 / 2.2), path)
+
+
+def _haze(path, size=512):
+    rng = np.random.default_rng(3)
+    v, u = np.mgrid[0:size, 0:size].astype(np.float32)
+    x = u / (size - 1) * 2 - 1
+    y = v / (size - 1) * 2 - 1
+    r = np.sqrt(x * x + y * y)
+    n = np.zeros((size, size), dtype=np.float32)
+    for octave, amp in ((4, 0.5), (8, 0.3), (16, 0.2)):
+        g = rng.random((octave + 1, octave + 1)).astype(np.float32)
+        gy = np.linspace(0, octave, size, endpoint=False)
+        iy = gy.astype(int)
+        fy = (gy - iy)[:, None]
+        fy = fy * fy * (3 - 2 * fy)
+        fx = fy.T
+        a = g[iy][:, iy]
+        b = g[iy][:, iy + 1]
+        c = g[iy + 1][:, iy]
+        d = g[iy + 1][:, iy + 1]
+        n += amp * ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy)
+    alpha = np.clip(1 - r, 0, 1) ** 1.6 * (0.35 + 0.65 * n)
+    out = np.ones((size, size, 4), dtype=np.float32)
+    out[..., 3] = np.clip(alpha, 0, 1)
+    _write_png(out, path)
+
+
+def bake_and_export(objs, assets_dir, out_dir, draft):
+    sc = bpy.context.scene
+    objs["haze"].hide_render = True
+    scene.set_camera(objs, "landscape")
+
+    # board: full shading as seen from the landscape camera, so reflections are in the texture
+    size = 1024 if draft else 2048
+    lin = _bake(objs["board"], size, glossy=True, from_camera=True)
+    # blur grows away from the focal line (world y = 0); rows run along world y
+    y0 = scene.BOARD_CENTER[1] - scene.BOARD_SIZE[1] / 2
+    wy = y0 + (np.arange(size) + 0.5) / size * scene.BOARD_SIZE[1]
+    t = np.clip((np.abs(wy) - 1.5) / 6.0, 0, 1)[:, None, None]
+    soft = _box_blur(lin, max(1, size // 340))
+    softer = _box_blur(lin, max(2, size // 150))
+    lin = np.where(t < 0.5, lin * (1 - t * 2) + soft * (t * 2), soft * (2 - t * 2) + softer * (t * 2 - 1))
+    # fade the outer 15% to ink
+    e = np.linspace(0, 1, size)
+    edge = np.minimum(np.minimum(e, 1 - e)[:, None], np.minimum(e, 1 - e)[None, :])
+    k = np.clip(edge / 0.15, 0, 1)[..., None]
+    k = k * k * (3 - 2 * k)
+    lin = lin * k + INK_LIN * (1 - k)
+    png = os.path.join(out_dir, "board.png")
+    _write_png(_tonemap(lin), png)
+    _save_webp(png, os.path.join(assets_dir, "board.webp"), 520 * 1024, start=84)
+
+    # pieces and plinths: view-independent light only; the sheen is a matcap in the browser
+    baked = []
+    for pid in pieces.PIECE_IDS:
+        for ob, s in ((objs["pieces"][pid], 512 if draft else 1024), (objs["plinths"][pid], 256 if draft else 512)):
+            lin = _bake(ob, s, glossy=False)
+            png = os.path.join(out_dir, ob.name + ".png")
+            _write_png(_tonemap(lin), png)
+            baked.append((ob, png))
+    for ob, png in baked:
+        _swap_to_baked(ob, png)
+
+    _matcap(os.path.join(out_dir, "matcap.png"))
+    _save_webp(os.path.join(out_dir, "matcap.png"), os.path.join(assets_dir, "matcap.webp"), start=90)
+    _haze(os.path.join(out_dir, "haze.png"))
+    _save_webp(os.path.join(out_dir, "haze.png"), os.path.join(assets_dir, "haze.webp"), start=80,
+               extra=("-alpha_q", "80"))
+
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    for ob, _png in baked:
+        ob.select_set(True)
+    raw = os.path.join(out_dir, "pieces.raw.glb")
+    bpy.ops.export_scene.gltf(filepath=raw, export_format="GLB", use_selection=True, export_yup=True,
+                              export_apply=True, export_normals=True, export_tangents=False,
+                              export_cameras=False, export_lights=False, export_materials="EXPORT")
+    mid = os.path.join(out_dir, "pieces.webp.glb")
+    cli = ["npx", "--yes", "@gltf-transform/cli@4.1.0"]
+    subprocess.run(cli + ["webp", raw, mid, "--quality", "82"], check=True)
+    subprocess.run(cli + ["meshopt", mid, os.path.join(assets_dir, "pieces.glb")], check=True)
+    print("wrote pieces.glb", os.path.getsize(os.path.join(assets_dir, "pieces.glb")), "bytes")

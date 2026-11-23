@@ -24,9 +24,9 @@ PLINTH_H = pieces.PLINTH_SIZE[2]
 CAMERAS = {
     # position, target, lens (mm), resolution
     "landscape": ((0.0, -10.0, 1.3), (0.0, 0.0, 1.05), 45.0, (1920, 1080)),
-    "portrait": ((0.0, -17.0, 2.1), (0.0, 0.0, 1.9), 40.0, (1080, 1920)),
+    "portrait": ((0.0, -13.0, 1.9), (0.0, 0.0, 1.45), 30.0, (1080, 1920)),
 }
-FSTOP = 1.1
+FSTOP = 0.4
 
 
 def _nodes(mat):
@@ -64,7 +64,7 @@ def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=Fals
     ramp = N.new("ShaderNodeValToRGB")
     ramp.color_ramp.elements[0].position = 0.0
     ramp.color_ramp.elements[0].color = (*vein, 1)
-    ramp.color_ramp.elements[1].position = 0.16
+    ramp.color_ramp.elements[1].position = 0.07
     ramp.color_ramp.elements[1].color = (*base, 1)
     L.new(wave.outputs["Fac"], ramp.inputs["Fac"])
     L.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
@@ -180,6 +180,7 @@ def _area(name, loc, target, energy, size, color):
     ob.location = loc
     bpy.context.scene.collection.objects.link(ob)
     _look_at(ob, target)
+    ob.visible_camera = False
     return ob
 
 
@@ -201,10 +202,10 @@ def fov_y_deg(which):
 
 def build_scene():
     sc = bpy.context.scene
-    pale = marble("marble-pale", (0.80, 0.76, 0.69), (0.42, 0.39, 0.35))
-    pale_text = marble("marble-text", (0.80, 0.76, 0.69), (0.42, 0.39, 0.35), text_bump=True)
-    dark = marble("marble-dark", (0.012, 0.012, 0.014), (0.55, 0.52, 0.47), vein_scale=1.3, rough=0.16, sss=0.0)
-    dark.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.035
+    pale = marble("marble-pale", (0.80, 0.76, 0.69), (0.60, 0.565, 0.51), vein_scale=1.1)
+    pale_text = marble("marble-text", (0.80, 0.76, 0.69), (0.60, 0.565, 0.51), vein_scale=1.1, text_bump=True)
+    dark = marble("marble-dark", (0.012, 0.012, 0.014), (0.42, 0.40, 0.36), vein_scale=0.9, rough=0.16, sss=0.0)
+    dark.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.025
     plinth_mat = marble("plinth", (0.02, 0.019, 0.018), (0.09, 0.08, 0.07), vein_scale=1.0, rough=0.3, sss=0.0)
 
     out = {"pieces": {}, "plinths": {}}
@@ -234,14 +235,14 @@ def build_scene():
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.004, 0.004, 0.005, 1)
+    bg.inputs["Color"].default_value = (0.0015, 0.0015, 0.002, 1)
     bg.inputs["Strength"].default_value = 1.0
     sc.world = world
 
     out["lights"] = [
-        _area("key", (0.6, 3.2, 6.5), (0.0, 0.4, 0.9), 2600, 4.5, (1.0, 0.84, 0.66)),
-        _area("rim-l", (-6.5, 5.5, 3.2), (-1.5, 0.5, 1.0), 500, 3.0, (1.0, 0.86, 0.72)),
-        _area("fill", (-5.0, -8.0, 2.5), (0.0, 0.0, 1.0), 70, 6.0, (0.72, 0.80, 1.0)),
+        _area("key", (0.6, 3.2, 9.5), (0.0, 0.4, 0.9), 2300, 6.0, (1.0, 0.84, 0.66)),
+        _area("rim-l", (-6.5, 5.5, 3.2), (-1.5, 0.5, 1.0), 220, 3.0, (1.0, 0.86, 0.72)),
+        _area("fill", (-5.0, -8.0, 2.5), (0.0, 0.0, 1.0), 22, 6.0, (0.72, 0.80, 1.0)),
     ]
 
     # haze: used for posters only (bakes hide it)
@@ -254,7 +255,7 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Density"].default_value = 0.014
+    vol.inputs["Density"].default_value = 0.0022
     vol.inputs["Color"].default_value = (0.9, 0.86, 0.8, 1)
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)

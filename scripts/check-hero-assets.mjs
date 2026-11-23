@@ -52,7 +52,7 @@ check("layout shape", () => {
     if (typeof v.aspect !== "number") errs.push(`${o}.aspect not a number`);
     const c = v.camera || {};
     if (!isNums(c.position, 3) || !isNums(c.target, 3)) errs.push(`${o}.camera.position/target must be 3-number arrays`);
-    if (!(c.fovY >= 10 && c.fovY <= 60)) errs.push(`${o}.camera.fovY ${c.fovY} outside 10..60`);
+    if (!(c.fovY >= 10 && c.fovY <= 70)) errs.push(`${o}.camera.fovY ${c.fovY} outside 10..70`);
     const ids = Object.keys(v.pieces || {}).sort();
     if (ids.join() !== [...IDS].sort().join()) errs.push(`${o}.pieces ids are [${ids}]`);
     for (const id of ids) {
