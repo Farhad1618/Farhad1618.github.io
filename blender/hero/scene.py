@@ -9,13 +9,14 @@ from . import pieces
 
 # x, y (metres, +y is away from the camera), yaw in degrees
 PLACEMENT = {
-    "pearl": (0.0, 0.0, -68.0),
-    "cyrus": (-2.0, 2.0, -24.0),
+    "cyrus": (0.0, 0.0, 14.0),          # centre: the piece everything else stands around
+    "pearl": (-2.0, 2.0, -62.0),
     "onepharma": (1.35, 4.0, 15.0),
     "falah": (2.33, 1.2, -18.0),
-    "nids": (2.9, -1.2, 30.0),
+    "nids": (2.9, -1.2, -22.0),
     "zagros": (-2.5, -2.2, 12.0),
 }
+FOCUS_ID = "cyrus"
 BOARD_CENTER = (0.0, -2.0)
 BOARD_SIZE = (20.0, 20.0)
 TILE = 1.5
@@ -41,7 +42,7 @@ def _set(bsdf, **kw):
             bsdf.inputs[k].default_value = v
 
 
-def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=False):
+def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=False, aged=False):
     mat = bpy.data.materials.new(name)
     nt, N, L, bsdf = _nodes(mat)
     tc = N.new("ShaderNodeTexCoord")
@@ -67,7 +68,70 @@ def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=Fals
     ramp.color_ramp.elements[1].position = 0.07
     ramp.color_ramp.elements[1].color = (*base, 1)
     L.new(wave.outputs["Fac"], ramp.inputs["Fac"])
-    L.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    col_out = ramp.outputs["Color"]
+    normal_out = None
+    if aged:
+        # nothing here is new: grime sits in the hollows, the surface is mottled and pitted,
+        # and a few hairline cracks run through it
+        mott = N.new("ShaderNodeTexNoise")
+        mott.inputs["Scale"].default_value = 2.6
+        mott.inputs["Detail"].default_value = 3.0
+        L.new(tc.outputs["Object"], mott.inputs["Vector"])
+        mr = N.new("ShaderNodeMapRange")
+        mr.inputs["From Min"].default_value = 0.3
+        mr.inputs["From Max"].default_value = 0.7
+        mr.inputs["To Min"].default_value = 0.74
+        mr.inputs["To Max"].default_value = 1.0
+        L.new(mott.outputs["Fac"], mr.inputs["Value"])
+        m1 = N.new("ShaderNodeMixRGB")
+        m1.blend_type = "MULTIPLY"
+        m1.inputs["Fac"].default_value = 1.0
+        L.new(col_out, m1.inputs["Color1"])
+        L.new(mr.outputs["Result"], m1.inputs["Color2"])
+        ao = N.new("ShaderNodeAmbientOcclusion")
+        ao.samples = 8
+        ao.inputs["Distance"].default_value = 0.16
+        ar = N.new("ShaderNodeMapRange")
+        ar.inputs["From Min"].default_value = 0.35
+        ar.inputs["From Max"].default_value = 0.92
+        ar.inputs["To Min"].default_value = 0.85
+        ar.inputs["To Max"].default_value = 0.0
+        L.new(ao.outputs["AO"], ar.inputs["Value"])
+        m2 = N.new("ShaderNodeMixRGB")
+        m2.inputs["Color2"].default_value = (0.20, 0.155, 0.10, 1)
+        L.new(ar.outputs["Result"], m2.inputs["Fac"])
+        L.new(m1.outputs["Color"], m2.inputs["Color1"])
+        vor = N.new("ShaderNodeTexVoronoi")
+        vor.feature = "DISTANCE_TO_EDGE"
+        vor.inputs["Scale"].default_value = 2.3
+        L.new(warp.outputs["Color"], vor.inputs["Vector"])
+        cr = N.new("ShaderNodeMapRange")
+        cr.inputs["From Min"].default_value = 0.0
+        cr.inputs["From Max"].default_value = 0.007
+        cr.inputs["To Min"].default_value = 1.0
+        cr.inputs["To Max"].default_value = 0.0
+        L.new(vor.outputs["Distance"], cr.inputs["Value"])
+        m3 = N.new("ShaderNodeMixRGB")
+        m3.inputs["Color2"].default_value = (0.36, 0.30, 0.23, 1)
+        L.new(cr.outputs["Result"], m3.inputs["Fac"])
+        L.new(m2.outputs["Color"], m3.inputs["Color1"])
+        col_out = m3.outputs["Color"]
+        pit = N.new("ShaderNodeTexNoise")
+        pit.inputs["Scale"].default_value = 55.0
+        pit.inputs["Detail"].default_value = 2.0
+        L.new(tc.outputs["Object"], pit.inputs["Vector"])
+        hsum = N.new("ShaderNodeMath")
+        hsum.operation = "SUBTRACT"
+        L.new(pit.outputs["Fac"], hsum.inputs[0])
+        L.new(cr.outputs["Result"], hsum.inputs[1])
+        b1 = N.new("ShaderNodeBump")
+        b1.inputs["Strength"].default_value = 0.22
+        b1.inputs["Distance"].default_value = 0.012
+        L.new(hsum.outputs[0], b1.inputs["Height"])
+        normal_out = b1.outputs["Normal"]
+        L.new(normal_out, bsdf.inputs["Normal"])
+        rough += 0.12
+    L.new(col_out, bsdf.inputs["Base Color"])
     _set(bsdf, Roughness=rough)
     if sss:
         _set(bsdf, **{"Subsurface Weight": sss, "Subsurface Scale": 0.04})
@@ -87,6 +151,8 @@ def marble(name, base, vein, vein_scale=2.2, rough=0.35, sss=0.3, text_bump=Fals
         bump.inputs["Distance"].default_value = 0.01
         bump.invert = True
         L.new(brick.outputs["Fac"], bump.inputs["Height"])
+        if normal_out is not None:
+            L.new(normal_out, bump.inputs["Normal"])
         L.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
     return mat
 
@@ -203,8 +269,8 @@ def fov_y_deg(which):
 def build_scene():
     sc = bpy.context.scene
     # ivory with only a whisper of veining: the reference statues are almost plain
-    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45)
-    pale_text = marble("marble-text", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45, text_bump=True)
+    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.4, aged=True)
+    pale_text = marble("marble-text", (0.80, 0.73, 0.61), (0.62, 0.55, 0.45), vein_scale=0.9, sss=0.3, text_bump=True, aged=True)
     gem = bpy.data.materials.new("pearl-black")
     gem.use_nodes = True
     _set(gem.node_tree.nodes["Principled BSDF"], **{"Base Color": (0.006, 0.006, 0.009, 1), "Roughness": 0.08,
@@ -254,7 +320,7 @@ def build_scene():
     for pid in pieces.PIECE_IDS:
         x, y, _yaw = PLACEMENT[pid]
         ld = bpy.data.lights.new("spot-" + pid, "SPOT")
-        ld.energy = 1250 if pid == "pearl" else 850
+        ld.energy = 1200 if pid == FOCUS_ID else 850
         ld.spot_size = math.radians(40)
         ld.spot_blend = 0.9
         ld.shadow_soft_size = 0.45
@@ -265,7 +331,7 @@ def build_scene():
         _look_at(lo, (x, y, 1.0))
         lo.visible_camera = False
         lights.append(lo)
-    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.0, 1.0), 70, 5.0, (0.55, 0.66, 1.0)))   # cool rim from behind
+    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.5, 0.6), 440, 7.0, (0.50, 0.63, 1.0)))   # moonlight from behind: it is what makes the fog banks show from behind
     lights.append(_area("fill", (0.0, -9.0, 3.0), (0.0, 0.0, 1.0), 10, 8.0, (0.60, 0.70, 1.0)))
     out["lights"] = lights
 
@@ -279,8 +345,43 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Density"].default_value = 0.0048
-    vol.inputs["Color"].default_value = (0.42, 0.55, 1.0, 1)
+    vol.inputs["Color"].default_value = (0.50, 0.62, 1.0, 1)
+    # Not an even haze: banks of low fog that lie between the pieces, thick in places, thin in others.
+    # The box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
+    htc = hn.nodes.new("ShaderNodeTexCoord")
+    hmap = hn.nodes.new("ShaderNodeMapping")
+    hmap.inputs["Scale"].default_value = (21.0, 23.0, 6.0)
+    hmap.inputs["Location"].default_value = (3.1, 0.7, 0.0)
+    hn.links.new(htc.outputs["Object"], hmap.inputs["Vector"])
+    hnoise = hn.nodes.new("ShaderNodeTexNoise")
+    hnoise.inputs["Scale"].default_value = 1.0
+    hnoise.inputs["Detail"].default_value = 5.0
+    hnoise.inputs["Roughness"].default_value = 0.6
+    hnoise.inputs["Distortion"].default_value = 0.9
+    hn.links.new(hmap.outputs["Vector"], hnoise.inputs["Vector"])
+    bank = hn.nodes.new("ShaderNodeMapRange")
+    bank.interpolation_type = "SMOOTHSTEP"
+    bank.inputs["From Min"].default_value = 0.50
+    bank.inputs["From Max"].default_value = 0.66
+    hn.links.new(hnoise.outputs["Fac"], bank.inputs["Value"])
+    sep = hn.nodes.new("ShaderNodeSeparateXYZ")
+    hn.links.new(htc.outputs["Object"], sep.inputs["Vector"])
+    low = hn.nodes.new("ShaderNodeMapRange")          # 1 at the board, 0 about 2.6 m up
+    low.interpolation_type = "SMOOTHSTEP"
+    low.inputs["From Min"].default_value = -0.5
+    low.inputs["From Max"].default_value = -0.175
+    low.inputs["To Min"].default_value = 1.0
+    low.inputs["To Max"].default_value = 0.0
+    hn.links.new(sep.outputs["Z"], low.inputs["Value"])
+    mul = hn.nodes.new("ShaderNodeMath")
+    mul.operation = "MULTIPLY"
+    hn.links.new(bank.outputs["Result"], mul.inputs[0])
+    hn.links.new(low.outputs["Result"], mul.inputs[1])
+    dens = hn.nodes.new("ShaderNodeMapRange")
+    dens.inputs["To Min"].default_value = 0.0013        # the thin air everywhere
+    dens.inputs["To Max"].default_value = 0.24         # the thick of a bank
+    hn.links.new(mul.outputs[0], dens.inputs["Value"])
+    hn.links.new(dens.outputs["Result"], vol.inputs["Density"])
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)
     out["haze"] = haze
@@ -291,7 +392,7 @@ def build_scene():
         cd.sensor_width = 36.0
         cd.sensor_fit = "AUTO"
         cd.dof.use_dof = True
-        cd.dof.focus_object = out["pieces"]["pearl"]
+        cd.dof.focus_object = out["pieces"][FOCUS_ID]
         cd.dof.aperture_fstop = FSTOP
         cam = bpy.data.objects.new("cam-" + which, cd)
         cam.location = pos

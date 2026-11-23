@@ -25,8 +25,8 @@ uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform f
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 n = normalize(vN);
-  vec3 c = texture2D(map, vUv).rgb * 1.12 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
-  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.72);
+  vec3 c = texture2D(map, vUv).rgb * 0.94 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
+  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.55);
   gl_FragColor = vec4(c, 1.0);
 }`;
 const BOARD_FS = `
@@ -34,13 +34,14 @@ uniform sampler2D map; uniform vec3 uHaze;
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
-  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.72);
+  c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
+  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.55);
   gl_FragColor = vec4(c, 1.0);
 }`;
 const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 const POST_FS = `
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uPx; uniform float uNear; uniform float uFar;
-uniform float uFocus; uniform float uAperture; uniform float uMaxR; uniform float uFade; uniform vec3 uHazeBg; uniform vec3 uInk;
+uniform float uFocus; uniform float uAperture; uniform float uMaxR; uniform float uFade; uniform vec3 uInk;
 varying vec2 vUv;
 float viewZ(vec2 uv){
   float d = texture2D(tDepth, uv).x * 2.0 - 1.0;
@@ -67,12 +68,9 @@ void main(){
   for (int i = 0; i < 8; i++) {
     float fi = float(i);
     float a = fi * 2.39996323, rr = (0.35 + 0.65 * sqrt((fi + 0.5) / 8.0)) * uMaxR * 2.6;
-    glow += max(texture2D(tColor, vUv + vec2(cos(a), sin(a)) * rr * uPx).rgb - 0.36, 0.0);
+    glow += max(texture2D(tColor, vUv + vec2(cos(a), sin(a)) * rr * uPx).rgb - 0.52, 0.0);
   }
-  c += glow / 8.0 * 0.9;
-  // empty background: warm haze at the horizon melting up into the ground colour
-  float bg = step(0.99999, texture2D(tDepth, vUv).x);
-  c = mix(c, mix(uHazeBg, uInk, smoothstep(0.38, 0.98, vUv.y)), bg);
+  c += glow / 8.0 * 0.7;
   gl_FragColor = vec4(mix(uInk, c, uFade), 1.0);
 }`;
 
@@ -116,6 +114,20 @@ export async function mountHero(stage, layout, opts = {}) {
   scene.add(board);
   disposables.push(boardGeo, boardMat);
 
+  // backdrop: the night behind the board, fog-blue at the horizon melting up into the ground colour.
+  // It is drawn in the scene (not in the post pass) so the fog banks show in front of it.
+  const backGeo = new THREE.PlaneGeometry(2, 2);
+  const backMat = new THREE.ShaderMaterial({
+    depthTest: false, depthWrite: false,
+    uniforms: { uHaze: hazeU, uInk: { value: new THREE.Vector3(...INK) } },
+    vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }",
+    fragmentShader: "uniform vec3 uHaze; uniform vec3 uInk; varying vec2 vUv; void main(){ gl_FragColor = vec4(mix(uHaze, uInk, smoothstep(0.36, 0.98, vUv.y)), 1.0); }",
+  });
+  const back = new THREE.Mesh(backGeo, backMat);
+  back.frustumCulled = false; back.renderOrder = -10;
+  scene.add(back);
+  disposables.push(backGeo, backMat);
+
   // pieces and plinths: swap the exported materials for the unlit baked shader
   const pieces = {}, state = {};
   scene.add(gltf.scene);
@@ -127,7 +139,7 @@ export async function mountHero(stage, layout, opts = {}) {
     const isPearl = /pearl/.test(o.name) || /pearl/.test(o.parent && o.parent.name || "");
     o.material = new THREE.ShaderMaterial({
       vertexShader: PIECE_VS, fragmentShader: PIECE_FS,
-      uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: isPearl ? 0.62 : 0.34 }, uLift: { value: 1 }, uHaze: hazeU },
+      uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: isPearl ? 0.55 : 0.22 }, uLift: { value: 1 }, uHaze: hazeU },
     });
     disposables.push(o.geometry, o.material, map);
     src.dispose();
@@ -149,9 +161,11 @@ export async function mountHero(stage, layout, opts = {}) {
 
   // haze: three slow sprites between the pieces and the dark
   const hazeGeo = new THREE.PlaneGeometry(1, 1);
-  const hazes = [[-3, 2.2, -5, 16, 7, 53], [4, 1.6, -2.5, 13, 5, 41], [0, 3.2, -9, 22, 9, 67]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.16 });
-    m.color.setRGB(0.30, 0.42, 0.85);
+  // banks of low fog lying between the rows of pieces, each drifting at its own pace
+  const hazes = [[-1.5, 1.0, 1.0, 11, 3.2, 47], [2.5, 0.9, -0.6, 10, 2.8, 61], [-3.0, 1.2, -1.6, 12, 3.6, 53],
+    [1.0, 1.1, -3.0, 14, 4.0, 71], [0, 1.7, -6.5, 26, 6.5, 83], [-4.0, 0.8, 3.2, 9, 2.4, 43]].map(([x, y, z, w, h, period], i) => {
+    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.34 });
+    m.color.setRGB(0.36, 0.47, 0.82);
     const s = new THREE.Mesh(hazeGeo, m);
     s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
     s.userData = { x, period, phase: i * 2.1 };
@@ -175,7 +189,7 @@ export async function mountHero(stage, layout, opts = {}) {
       tColor: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uPx: { value: new THREE.Vector2() },
       uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: 10 }, uAperture: { value: 25 },
       uMaxR: { value: 14 }, uFade: { value: 1 },
-      uHazeBg: { value: new THREE.Vector3(...HAZE) }, uInk: { value: new THREE.Vector3(...INK) },
+      uInk: { value: new THREE.Vector3(...INK) },
     },
   });
   const postGeo = new THREE.PlaneGeometry(2, 2);
@@ -312,7 +326,7 @@ export async function mountHero(stage, layout, opts = {}) {
     focusNow = ease(focusNow, focusTo, 5, dt);
     postMat.uniforms.uFocus.value = focusNow;
     for (const h of hazes) {
-      h.position.x = h.userData.x + Math.sin((t / h.userData.period) * Math.PI * 2 + h.userData.phase) * 2.2;
+      h.position.x = h.userData.x + Math.sin((t / h.userData.period) * Math.PI * 2 + h.userData.phase) * 2.6;
       h.quaternion.copy(camera.quaternion);
     }
   }

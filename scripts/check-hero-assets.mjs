@@ -44,7 +44,7 @@ check("budget", () => {
 check("layout shape", () => {
   if (!has("layout.json")) return ["missing layout.json"];
   const L = readLayout(), errs = [];
-  if (L.focusId !== "pearl") errs.push('focusId must be "pearl"');
+  if (!IDS.includes(L.focusId)) errs.push("focusId must be one of the six piece ids");
   if (!L.board || !isNums(L.board.center, 2) || !isNums(L.board.size, 2)) errs.push("board.center / board.size must be 2-number arrays");
   for (const o of ["landscape", "portrait"]) {
     const v = L[o];

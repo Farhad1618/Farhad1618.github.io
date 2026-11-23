@@ -67,7 +67,7 @@ def _gltf(v):
 def write_layout(objs, assets_dir):
     sc = bpy.context.scene
     data = {
-        "focusId": "pearl",
+        "focusId": scene.FOCUS_ID,
         "board": {"center": [scene.BOARD_CENTER[0], -scene.BOARD_CENTER[1]], "size": list(scene.BOARD_SIZE)},
     }
     for which in ("landscape", "portrait"):
@@ -235,7 +235,9 @@ def _haze(path, size=512):
         c = g[iy + 1][:, iy]
         d = g[iy + 1][:, iy + 1]
         n += amp * ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy)
-    alpha = np.clip(1 - r, 0, 1) ** 1.6 * (0.35 + 0.65 * n)
+    # a torn bank of fog, not a round puff: the noise decides where it is thick and where it is gone
+    k = np.clip((n - 0.40) / 0.30, 0, 1)
+    alpha = np.clip(1 - r, 0, 1) ** 1.2 * (k * k * (3 - 2 * k))
     out = np.ones((size, size, 4), dtype=np.float32)
     out[..., 3] = np.clip(alpha, 0, 1)
     _write_png(out, path)

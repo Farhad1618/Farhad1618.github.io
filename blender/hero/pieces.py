@@ -8,7 +8,7 @@ import random
 
 import bmesh
 import bpy
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, noise
 
 PIECE_IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"]
 PLINTH_SIZE = (0.9, 0.9, 0.35)
@@ -189,7 +189,23 @@ def build_cyrus():
             prof.append((r, x))
     prof += [(rend, L / 2 - 0.02), (rend * 0.72, L / 2), (0.0, L / 2)]
     cz = 0.48 + 0.10 + 0.275
+    v0 = len(bm.verts)
     lathe(bm, prof, segs=40, matrix=_T(0, 0, cz) @ Matrix.Rotation(math.pi / 2, 4, "Y"))
+    # Age it. The real cylinder is cracked and has lost a piece: the surface is uneven and
+    # one end is broken away in a rough bite.
+    bm.verts.ensure_lookup_table()
+    for v in bm.verts[v0:]:
+        ry, rz = v.co.y, v.co.z - cz
+        rad = math.hypot(ry, rz)
+        if rad < 1e-5:
+            continue
+        ang = math.atan2(rz, ry)
+        k = 1.0 + 0.018 * noise.noise(v.co * 7.0) + 0.008 * noise.noise(v.co * 23.0)
+        fx = min(1.0, max(0.0, (v.co.x - 0.16) / 0.22))
+        fa = min(1.0, max(0.0, 1.0 - abs(ang - math.radians(118)) / math.radians(62)))
+        bite = (fx * fx * (3 - 2 * fx)) * (fa * fa * (3 - 2 * fa))
+        k *= 1.0 - 0.46 * bite * (0.75 + 0.25 * noise.noise(v.co * 15.0))
+        v.co.y, v.co.z = ry * k, cz + rz * k
     return _finish(bm, "piece-cyrus", bevel=0.005, bevel_angle=55.0)
 
 
@@ -289,13 +305,13 @@ def build_falah():
     sphere(bm, 0.05, (0, 0, 1.08), u=20, v=12)
     lathe(bm, [(0.0, 1.11), (0.022, 1.12), (0.0, 1.19)], segs=16)
     half, tilt = 0.36, math.radians(13)
-    box(bm, 2 * half + 0.05, 0.03, 0.045, (0, 0, 0.99), rot=Matrix.Rotation(tilt, 4, "Y"))
+    box(bm, 2 * half + 0.06, 0.04, 0.058, (0, 0, 0.99), rot=Matrix.Rotation(tilt, 4, "Y"))
     sphere(bm, 0.04, (0, 0, 0.99), u=16, v=10)
     for sx in (-1, 1):
         # the beam tips: the left pan is weighed down, the right one rides up
         x = sx * half * math.cos(tilt)
         top = Vector((x, 0, 0.985 + sx * half * math.sin(tilt)))
-        sphere(bm, 0.026, top, u=14, v=8)
+        sphere(bm, 0.034, top, u=14, v=8)
         pan_z = top.z - 0.50
         pr = 0.155
         lathe(bm, [(0.0, pan_z - 0.045), (pr * 0.55, pan_z - 0.04), (pr * 0.9, pan_z - 0.015), (pr, pan_z),
@@ -304,36 +320,46 @@ def build_falah():
         for k in range(3):
             a = math.radians(90 + 120 * k)
             rim = Vector((x + (pr - 0.008) * math.cos(a), (pr - 0.008) * math.sin(a), pan_z))
-            rod(bm, top, rim, 0.006, segs=6)
+            rod(bm, top, rim, 0.0115, segs=8)
+        if sx < 0:
+            # the heavy pan: coins, stacked a little carelessly
+            for i in range(6):
+                prism(bm, 0.052, 0.052, 0.013, (x - 0.035 + 0.008 * math.sin(i * 2.1), 0.02 + 0.008 * math.cos(i * 1.7),
+                                               pan_z - 0.034 + i * 0.0135), segs=20)
+            for i in range(3):
+                prism(bm, 0.045, 0.045, 0.013, (x + 0.065, -0.045 + 0.006 * i, pan_z - 0.03 + i * 0.0135), segs=20)
     return _finish(bm, "piece-falah", bevel=0.004)
 
 
 def build_nids():
-    """A watchtower with a lantern top."""
+    """Network Intrusion Detection: a round shield that has taken arrows. The attack that did not get through.
+    The shield faces -Y and leans back on a prop."""
     bm = bmesh.new()
-    lathe(bm, [(0.0, 0.0), (0.31, 0.0), (0.31, 0.05), (0.275, 0.07), (0.265, 0.10),
-               (0.235, 0.40), (0.245, 0.41), (0.245, 0.43), (0.232, 0.44),
-               (0.205, 0.74), (0.24, 0.78), (0.285, 0.80), (0.285, 0.86), (0.235, 0.86),
-               (0.235, 0.845), (0.0, 0.845)], segs=48)
-    # crenellations
+    box(bm, 0.66, 0.40, 0.07, (0, 0.06, 0.035))
+    box(bm, 0.52, 0.30, 0.05, (0, 0.06, 0.095))
+    M = _T(0, 0, 0.12) @ Matrix.Rotation(math.radians(-13), 4, "X") @ _T(0, 0, 0.49) @ Matrix.Rotation(math.pi / 2, 4, "X")
+    lathe(bm, [(0.0, -0.035), (0.455, -0.035), (0.478, -0.012), (0.478, 0.014), (0.452, 0.024), (0.44, 0.014),
+               (0.315, 0.040), (0.308, 0.054), (0.290, 0.054), (0.283, 0.044),
+               (0.165, 0.066), (0.135, 0.072), (0.125, 0.10), (0.085, 0.135), (0.0, 0.152)], segs=56, matrix=M)
     for k in range(10):
         a = 2 * math.pi * k / 10
-        box(bm, 0.075, 0.05, 0.06, (0.26 * math.cos(a), 0.26 * math.sin(a), 0.885),
-            rot=Matrix.Rotation(a + math.pi / 2, 4, "Z"))
-    # arrow slits and door as proud frames
-    for k, z in ((0, 0.26), (2, 0.58), (4, 0.26)):
-        a = math.radians(20 + 72 * k)
-        rr = 0.235 - (z - 0.40) * 0.09 if z > 0.40 else 0.265 - z * 0.075
-        box(bm, 0.03, 0.03, 0.13, (rr * math.cos(a), rr * math.sin(a), z), rot=Matrix.Rotation(a, 4, "Z"))
-    # lantern: drum, four posts, lamp, roof, finial
-    lathe(bm, [(0.0, 0.845), (0.16, 0.845), (0.16, 0.90), (0.0, 0.90)], segs=32)
-    for k in range(4):
-        a = math.radians(45 + 90 * k)
-        rod(bm, (0.125 * math.cos(a), 0.125 * math.sin(a), 0.90), (0.125 * math.cos(a), 0.125 * math.sin(a), 1.08), 0.018)
-    sphere(bm, 0.065, (0, 0, 0.985), u=20, v=12)
-    lathe(bm, [(0.0, 1.07), (0.20, 1.07), (0.20, 1.09), (0.10, 1.17), (0.03, 1.235), (0.0, 1.24)], segs=32)
-    sphere(bm, 0.022, (0, 0, 1.255), u=12, v=8)
-    return _finish(bm, "piece-nids", bevel=0.005)
+        sphere(bm, 0.019, M @ Vector((0.385 * math.cos(a), 0.385 * math.sin(a), 0.030)), u=10, v=6)
+    rod(bm, (0, 0.24, 0.12), M @ Vector((0, 0.16, -0.035)), 0.026)
+    # arrows: where they struck (on the face), where they came from, how much shaft is left
+    for (hx, hy), d, length, whole in (((0.13, 0.17), (-0.28, -1.0, 0.36), 0.56, True),
+                                       ((-0.21, -0.04), (0.30, -1.0, 0.16), 0.50, True),
+                                       ((0.04, -0.23), (0.10, -1.0, 0.50), 0.17, False)):
+        d = Vector(d).normalized()
+        p = M @ Vector((hx, hy, 0.02))
+        end = p + d * length
+        rod(bm, p - d * 0.03, end, 0.016, segs=8)
+        if not whole:
+            continue                                  # snapped off: no fletching
+        Q = d.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        for k in range(3):
+            R = Q @ Matrix.Rotation(2 * math.pi * k / 3, 4, "Z")
+            box(bm, 0.05, 0.005, 0.13, (end - d * 0.08) + (R @ Vector((0.03, 0, 0))), rot=R)
+    return _finish(bm, "piece-nids", bevel=0.004)
 
 
 def build_plinth(piece_id):
