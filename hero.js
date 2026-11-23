@@ -10,7 +10,13 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
-const HAZE = [0.040, 0.046, 0.062];      // smoke-grey fog with a little blue
+const HAZE = [0.016, 0.021, 0.036];      // what distance fades to: blue-black
+// The one light in blender/hero/scene.py, hidden behind the Cyrus Cylinder at the barrel's height.
+// Blender (0, 1.5, 0.34 + 0.35 + 0.80) in this scene's axes (x, z, -y). The backdrop glows around it
+// and the fog banks are lit by how close they drift to it.
+const LIGHT = [0, 1.49, -1.5];
+const FOG_LIT = [0.85, 0.82, 0.77];       // a bank right by the light: warm smoke
+const FOG_DARK = [0.07, 0.09, 0.15];      // a bank out at the sides: barely there, cold
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -108,14 +114,23 @@ export async function mountHero(stage, layout, opts = {}) {
   const scene = new THREE.Scene();
   const hazeU = { value: new THREE.Vector3(...HAZE) };
 
-  // backdrop: the night behind the board, fog-blue at the horizon melting up into the ground colour.
-  // It is drawn in the scene (not in the post pass) so the fog banks show in front of it.
+  // backdrop: blue-black, glowing only around the hidden light, so the cylinder stands dark against it.
+  // It is drawn in the scene (not in the post pass) so the pieces and fog banks show in front of it.
   const backGeo = new THREE.PlaneGeometry(2, 2);
   const backMat = new THREE.ShaderMaterial({
     depthTest: false, depthWrite: false,
-    uniforms: { uHaze: hazeU, uInk: { value: new THREE.Vector3(...INK) } },
+    uniforms: { uHaze: hazeU, uInk: { value: new THREE.Vector3(...INK) },
+      uLight: { value: new THREE.Vector2(0.5, 0.55) }, uAspect: { value: 16 / 9 } },
     vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }",
-    fragmentShader: "uniform vec3 uHaze; uniform vec3 uInk; varying vec2 vUv; void main(){ gl_FragColor = vec4(mix(uHaze, uInk, smoothstep(0.36, 0.98, vUv.y)), 1.0); }",
+    fragmentShader: `uniform vec3 uHaze; uniform vec3 uInk; uniform vec2 uLight; uniform float uAspect; varying vec2 vUv;
+void main(){
+  vec3 c = mix(uHaze, uInk * 0.85, smoothstep(0.3, 0.95, vUv.y));
+  vec2 d = (vUv - uLight) * vec2(uAspect, 1.0);
+  float r2 = dot(d, d);
+  c += vec3(1.0, 0.93, 0.82) * 0.55 * exp(-r2 / 0.02);       // the light itself, behind the cylinder
+  c += vec3(0.62, 0.66, 0.74) * 0.16 * exp(-r2 / 0.12);      // its halo in the air
+  gl_FragColor = vec4(c, 1.0);
+}`,
   });
   const back = new THREE.Mesh(backGeo, backMat);
   back.frustumCulled = false; back.renderOrder = -10;
@@ -171,8 +186,8 @@ export async function mountHero(stage, layout, opts = {}) {
   // banks of low fog lying between the rows of pieces, each drifting at its own pace
   const hazes = [[-1.5, 1.0, 1.0, 11, 3.2, 47], [2.5, 0.9, -0.6, 10, 2.8, 61], [-3.0, 1.2, -1.6, 12, 3.6, 53],
     [1.0, 1.1, -3.0, 14, 4.0, 71], [0, 1.7, -6.5, 26, 6.5, 83], [-4.0, 0.8, 3.2, 9, 2.4, 43]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.5 });
-    m.color.setRGB(0.50, 0.54, 0.64);
+    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.55 });
+    m.color.setRGB(...FOG_DARK);
     const s = new THREE.Mesh(hazeGeo, m);
     s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
     s.userData = { x, period, phase: i * 2.1 };
@@ -184,6 +199,7 @@ export async function mountHero(stage, layout, opts = {}) {
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 60);
   const camBase = new THREE.Vector3(), camTarget = new THREE.Vector3();
+  const lightP = new THREE.Vector3();
   let focusBase = 10;
 
   // post: depth of field
@@ -335,7 +351,15 @@ export async function mountHero(stage, layout, opts = {}) {
     for (const h of hazes) {
       h.position.x = h.userData.x + Math.sin((t / h.userData.period) * Math.PI * 2 + h.userData.phase) * 2.6;
       h.quaternion.copy(camera.quaternion);
+      // lit by the one light: bright as it drifts past it, dark and cold out at the sides
+      const dx = h.position.x - LIGHT[0], dz = h.position.z - LIGHT[2];
+      const k = Math.exp(-(dx * dx + dz * dz) / 9);
+      h.material.color.setRGB(FOG_DARK[0] + (FOG_LIT[0] - FOG_DARK[0]) * k,
+        FOG_DARK[1] + (FOG_LIT[1] - FOG_DARK[1]) * k, FOG_DARK[2] + (FOG_LIT[2] - FOG_DARK[2]) * k);
     }
+    lightP.set(...LIGHT).project(camera);
+    backMat.uniforms.uLight.value.set(lightP.x * 0.5 + 0.5, lightP.y * 0.5 + 0.5);
+    backMat.uniforms.uAspect.value = camera.aspect;
   }
   function render() {
     renderer.setRenderTarget(rt);
