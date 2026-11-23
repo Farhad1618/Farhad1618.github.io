@@ -3,8 +3,8 @@
     blender --background --factory-startup --python blender/build_hero.py -- --stage <pieces|stills|export|all> [--draft]
 
 pieces  clay contact sheet of the six pieces  -> blender/out/pieces-sheet.png
-stills  posters + layout.json + atmos        -> assets/hero/
-atmos   the fog on its own (atmos*.webp)      -> assets/hero/
+stills  posters + layout.json                 -> assets/hero/
+atmos   the fog on its own (atmos*.webp)      -> assets/hero/  (not used by the site; for comparison)
 export  baked textures, sprites, pieces.glb   -> assets/hero/
 all     stills + export
 """
@@ -140,7 +140,7 @@ def main():
             use_cycles(64 if args.draft else 256)
             output.render_posters(objs, args.draft, ASSETS)
             output.write_layout(objs, ASSETS)
-        if args.stage in ("stills", "atmos", "all"):
+        if args.stage == "atmos":
             use_cycles(48 if args.draft else 128)
             output.render_atmosphere(objs, args.draft, ASSETS)
         if args.stage in ("export", "all"):
