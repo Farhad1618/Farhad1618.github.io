@@ -10,13 +10,14 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
-const HAZE = [0.038, 0.062, 0.135];      // deep blue fog
+const HAZE = [0.040, 0.046, 0.062];      // smoke-grey fog with a little blue
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
-varying vec2 vUv; varying vec3 vN; varying float vDepth;
+varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
 void main(){
   vUv = uv; vN = normalize(normalMatrix * normal);
+  vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vDepth = -mv.z; gl_Position = projectionMatrix * mv;
 }`;
@@ -30,12 +31,15 @@ void main(){
   gl_FragColor = vec4(c, 1.0);
 }`;
 const BOARD_FS = `
-uniform sampler2D map; uniform vec3 uHaze;
-varying vec2 vUv; varying vec3 vN; varying float vDepth;
+uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf;
+varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
   c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
   c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.55);
+  // the board has no edge: its outer blocks sink into the fog
+  vec2 e = abs(vWorld.xz - uCentre) / uHalf;
+  c = mix(c, uHaze, smoothstep(0.72, 0.97, max(e.x, e.y)));
   gl_FragColor = vec4(c, 1.0);
 }`;
 const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -88,31 +92,21 @@ export async function mountHero(stage, layout, opts = {}) {
   const listeners = [];
   const on = (t, e, f, o) => { t.addEventListener(e, f, o); listeners.push([t, e, f, o]); };
 
-  let gltf, boardTex, matcapTex, hazeTex;
+  let gltf, matcapTex, hazeTex;
   try {
     const tl = new THREE.TextureLoader();
     const gl = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    [gltf, boardTex, matcapTex, hazeTex] = await Promise.all([
-      gl.loadAsync(BASE + "pieces.glb"), tl.loadAsync(BASE + "board.webp"),
-      tl.loadAsync(BASE + "matcap.webp"), tl.loadAsync(BASE + "haze.webp"),
+    [gltf, matcapTex, hazeTex] = await Promise.all([
+      gl.loadAsync(BASE + "pieces.glb"), tl.loadAsync(BASE + "matcap.webp"), tl.loadAsync(BASE + "haze.webp"),
     ]);
   } catch (e) { renderer.dispose(); throw e; }
   let cleanup = () => { for (const d of disposables) { try { d.dispose(); } catch (_) { /* gone */ } } canvas.remove(); };
   try {
-  [boardTex, matcapTex, hazeTex].forEach(raw);
-  boardTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  disposables.push(boardTex, matcapTex, hazeTex);
+  [matcapTex, hazeTex].forEach(raw);
+  disposables.push(matcapTex, hazeTex);
 
   const scene = new THREE.Scene();
   const hazeU = { value: new THREE.Vector3(...HAZE) };
-
-  // board
-  const boardGeo = new THREE.PlaneGeometry(layout.board.size[0], layout.board.size[1]).rotateX(-Math.PI / 2);
-  const boardMat = new THREE.ShaderMaterial({ vertexShader: PIECE_VS, fragmentShader: BOARD_FS, uniforms: { map: { value: boardTex }, uHaze: hazeU } });
-  const board = new THREE.Mesh(boardGeo, boardMat);
-  board.position.set(layout.board.center[0], 0, layout.board.center[1]);
-  scene.add(board);
-  disposables.push(boardGeo, boardMat);
 
   // backdrop: the night behind the board, fog-blue at the horizon melting up into the ground colour.
   // It is drawn in the scene (not in the post pass) so the fog banks show in front of it.
@@ -135,6 +129,19 @@ export async function mountHero(stage, layout, opts = {}) {
   gltf.scene.traverse(o => {
     if (!o.isMesh) return;
     const src = o.material, map = raw(src.map);
+    if (o.name === "board") {
+      // blocks of stone at uneven heights, one baked texture (reflections included)
+      map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      o.material = new THREE.ShaderMaterial({
+        vertexShader: PIECE_VS, fragmentShader: BOARD_FS,
+        uniforms: { map: { value: map }, uHaze: hazeU,
+          uCentre: { value: new THREE.Vector2(layout.board.center[0], layout.board.center[1]) },
+          uHalf: { value: new THREE.Vector2(layout.board.size[0] / 2, layout.board.size[1] / 2) } },
+      });
+      disposables.push(o.geometry, o.material, map);
+      src.dispose();
+      return;
+    }
     map.anisotropy = 4;
     const isPearl = /pearl/.test(o.name) || /pearl/.test(o.parent && o.parent.name || "");
     o.material = new THREE.ShaderMaterial({
@@ -164,8 +171,8 @@ export async function mountHero(stage, layout, opts = {}) {
   // banks of low fog lying between the rows of pieces, each drifting at its own pace
   const hazes = [[-1.5, 1.0, 1.0, 11, 3.2, 47], [2.5, 0.9, -0.6, 10, 2.8, 61], [-3.0, 1.2, -1.6, 12, 3.6, 53],
     [1.0, 1.1, -3.0, 14, 4.0, 71], [0, 1.7, -6.5, 26, 6.5, 83], [-4.0, 0.8, 3.2, 9, 2.4, 43]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.34 });
-    m.color.setRGB(0.36, 0.47, 0.82);
+    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.5 });
+    m.color.setRGB(0.50, 0.54, 0.64);
     const s = new THREE.Mesh(hazeGeo, m);
     s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
     s.userData = { x, period, phase: i * 2.1 };

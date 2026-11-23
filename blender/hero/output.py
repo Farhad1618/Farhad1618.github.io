@@ -248,28 +248,14 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
     objs["haze"].hide_render = True
     scene.set_camera(objs, "landscape")
 
+    baked = []
     # board: full shading as seen from the landscape camera, so reflections are in the texture
-    size = 1024 if draft else 2048
-    lin = _bake(objs["board"], size, glossy=True, from_camera=True)
-    # blur grows away from the focal line (world y = 0); rows run along world y
-    y0 = scene.BOARD_CENTER[1] - scene.BOARD_SIZE[1] / 2
-    wy = y0 + (np.arange(size) + 0.5) / size * scene.BOARD_SIZE[1]
-    t = np.clip((np.abs(wy) - 1.5) / 6.0, 0, 1)[:, None, None]
-    soft = _box_blur(lin, max(1, size // 340))
-    softer = _box_blur(lin, max(2, size // 150))
-    lin = np.where(t < 0.5, lin * (1 - t * 2) + soft * (t * 2), soft * (2 - t * 2) + softer * (t * 2 - 1))
-    # fade the outer 15% to ink
-    e = np.linspace(0, 1, size)
-    edge = np.minimum(np.minimum(e, 1 - e)[:, None], np.minimum(e, 1 - e)[None, :])
-    k = np.clip(edge / 0.15, 0, 1)[..., None]
-    k = k * k * (3 - 2 * k)
-    lin = lin * k + INK_LIN * (1 - k)
+    lin = _bake(objs["board"], 1024 if draft else 2048, glossy=True, from_camera=True)
     png = os.path.join(out_dir, "board.png")
     _write_png(_tonemap(lin), png)
-    _save_webp(png, os.path.join(assets_dir, "board.webp"), 520 * 1024, start=84)
+    baked.append((objs["board"], png))
 
     # pieces and plinths: view-independent light only; the sheen is a matcap in the browser
-    baked = []
     for pid in pieces.PIECE_IDS:
         for ob, s in ((objs["pieces"][pid], 512 if draft else 1024), (objs["plinths"][pid], 256 if draft else 512)):
             lin = _bake(ob, s, glossy=False)

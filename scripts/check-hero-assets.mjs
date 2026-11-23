@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "assets", "hero");
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
-const FILES = ["poster.webp", "poster-portrait.webp", "pieces.glb", "board.webp", "matcap.webp", "haze.webp", "layout.json"];
+const FILES = ["poster.webp", "poster-portrait.webp", "pieces.glb", "matcap.webp", "haze.webp", "layout.json"];
 const BUDGET = 2621440, POSTER_MAX = 153600, TRI_MAX = 15000;
 
 const checks = [];
@@ -82,6 +82,7 @@ check("glb nodes", () => {
   if (!has("pieces.glb")) return ["missing pieces.glb"];
   const g = readGlb(), errs = [], names = (g.nodes || []).map(n => n.name);
   for (const id of IDS) for (const k of ["piece-", "plinth-"]) if (!names.includes(k + id)) errs.push(`node ${k}${id} missing`);
+  if (!names.includes("board")) errs.push("node board missing");
   for (const e of ["EXT_meshopt_compression", "EXT_texture_webp"]) if (!(g.extensionsUsed || []).includes(e)) errs.push(`${e} not used`);
   return errs;
 });

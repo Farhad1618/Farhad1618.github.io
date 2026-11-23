@@ -1,6 +1,9 @@
 """Board, materials, lights and the two cameras for the chessboard hero."""
 import math
 
+import random
+
+import bmesh
 import bpy
 import numpy as np
 from mathutils import Vector
@@ -17,6 +20,10 @@ PLACEMENT = {
     "zagros": (-2.5, -2.2, 12.0),
 }
 FOCUS_ID = "cyrus"
+# The board is not a flat floor: every tile is its own block, standing at its own height.
+# Each piece stands on a platform of tiles raised to the height given here.
+PLATFORM = {"cyrus": 0.34, "pearl": 0.20, "onepharma": 0.26, "falah": 0.14, "nids": 0.22, "zagros": 0.10}
+TILE_GAP = 0.05
 BOARD_CENTER = (0.0, -2.0)
 BOARD_SIZE = (20.0, 20.0)
 TILE = 1.5
@@ -219,10 +226,10 @@ def board_material():
     # stone: two near-blacks that separate mostly by reflection
     stone = N.new("ShaderNodeMixRGB")
     stone.inputs["Color1"].default_value = (0.006, 0.006, 0.007, 1)
-    stone.inputs["Color2"].default_value = (0.05, 0.034, 0.02, 1)
+    stone.inputs["Color2"].default_value = (0.10, 0.058, 0.028, 1)     # warm carved tiles, as in the reference
     L.new(chk.outputs["Fac"], stone.inputs["Fac"])
     col = N.new("ShaderNodeMixRGB")
-    col.inputs["Color2"].default_value = (0.62, 0.36, 0.10, 1)   # brass, toward --sig
+    col.inputs["Color2"].default_value = (0.85, 0.52, 0.16, 1)   # brass, toward --sig
     L.new(mask.outputs[0], col.inputs["Fac"])
     L.new(stone.outputs["Color"], col.inputs["Color1"])
     L.new(col.outputs["Color"], bsdf.inputs["Base Color"])
@@ -233,6 +240,55 @@ def board_material():
     L.new(chk.outputs["Fac"], rough.inputs["Value"])
     L.new(rough.outputs["Result"], bsdf.inputs["Roughness"])
     return mat
+
+
+def build_board():
+    """Blocks of stone at uneven heights. Tops carry the inlay; sides are plain dark stone.
+    UVs: tops are a straight top-down projection in the upper 80% of the map, the visible
+    sides (front, left, right) are packed into a strip along the bottom."""
+    rng = random.Random(11)
+    x0, y0 = BOARD_CENTER[0] - BOARD_SIZE[0] / 2, BOARD_CENTER[1] - BOARD_SIZE[1] / 2
+    kx = range(int(math.floor(x0 / TILE)), int(math.ceil((x0 + BOARD_SIZE[0]) / TILE)) + 1)
+    ky = range(int(math.floor(y0 / TILE)), int(math.ceil((y0 + BOARD_SIZE[1]) / TILE)) + 1)
+    W, D = len(kx) * TILE, len(ky) * TILE
+    ox, oy = (kx[0] - 0.5) * TILE, (ky[0] - 0.5) * TILE
+    reach = TILE / 2 + pieces.PLINTH_SIZE[0] / 2
+    bm = bmesh.new()
+    uv = bm.loops.layers.uv.new("UVMap")
+    sides = []
+    for i in kx:
+        for j in ky:
+            cx, cy = i * TILE, j * TILE
+            h = rng.choice((0.0, 0.0, 0.05, 0.09, 0.14, 0.2, 0.28))
+            for pid, (px, py, _yaw) in PLACEMENT.items():
+                if abs(cx - px) < reach and abs(cy - py) < reach:
+                    h = PLATFORM[pid]
+            a = TILE / 2 - TILE_GAP / 2
+            lo = -0.6
+            c = [(cx - a, cy - a), (cx + a, cy - a), (cx + a, cy + a), (cx - a, cy + a)]
+            top = bm.faces.new([bm.verts.new((x, y, h)) for x, y in c])
+            for loop in top.loops:
+                loop[uv].uv = ((loop.vert.co.x - ox) / W, 0.2 + 0.8 * (loop.vert.co.y - oy) / D)
+            for e in ((0, 1), (1, 2), (3, 0)):          # front, right, left; the back is never seen
+                p, q = c[e[0]], c[e[1]]
+                f = bm.faces.new([bm.verts.new((p[0], p[1], lo)), bm.verts.new((q[0], q[1], lo)),
+                                  bm.verts.new((q[0], q[1], h)), bm.verts.new((p[0], p[1], h))])
+                f.material_index = 1
+                sides.append(f)
+    cols = 64
+    rows = -(-len(sides) // cols)
+    cw, ch = 1.0 / cols, 0.19 / rows
+    for n, f in enumerate(sides):
+        u0, v0 = (n % cols) * cw, (n // cols) * ch
+        for loop, (du, dv) in zip(f.loops, ((0.1, 0.1), (0.9, 0.1), (0.9, 0.9), (0.1, 0.9))):
+            loop[uv].uv = (u0 + du * cw, v0 + dv * ch)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    me = bpy.data.meshes.new("board")
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new("board", me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
 
 
 def _look_at(ob, target):
@@ -283,10 +339,10 @@ def build_scene():
     for pid in pieces.PIECE_IDS:
         x, y, yaw = PLACEMENT[pid]
         pl = pieces.build_plinth(pid)
-        pl.location = (x, y, 0)
+        pl.location = (x, y, PLATFORM[pid])
         pl.data.materials.append(plinth_mat)
         ob = pieces.BUILDERS[pid]()
-        ob.location = (x, y, PLINTH_H)
+        ob.location = (x, y, PLATFORM[pid] + PLINTH_H)
         ob.rotation_euler = (0, 0, math.radians(yaw))
         if pid == "pearl":
             for m in (dark, pale, gem):
@@ -295,22 +351,16 @@ def build_scene():
             ob.data.materials.append(pale_text if pid == "cyrus" else pale)
         out["pieces"][pid], out["plinths"][pid] = ob, pl
 
-    bpy.ops.mesh.primitive_plane_add(size=1, location=(BOARD_CENTER[0], BOARD_CENTER[1], 0))
-    board = bpy.context.object
-    board.name = "board"
-    board.scale = (BOARD_SIZE[0], BOARD_SIZE[1], 1)
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    # object coords are offset by the board centre; shift the pattern back onto world tiles
-    bm = board_material()
-    bm.node_tree.nodes["Mapping"].inputs["Location"].default_value = (
-        0.5 + BOARD_CENTER[0] / TILE, 0.5 + BOARD_CENTER[1] / TILE, 0)
-    board.data.materials.append(bm)
+    board = build_board()
+    bmat = board_material()        # the mesh is in world coordinates, so tiles are centred on multiples of TILE
+    board.data.materials.append(bmat)
+    board.data.materials.append(marble("tile-side", (0.012, 0.011, 0.010), (0.03, 0.027, 0.024), vein_scale=1.0, rough=0.45, sss=0.0))
     out["board"] = board
 
     world = bpy.data.worlds.new("world")
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.0025, 0.005, 0.016, 1)    # deep blue night: this is what lights the fog
+    bg.inputs["Color"].default_value = (0.0013, 0.0019, 0.0042, 1)    # deep blue night: this is what lights the fog
     bg.inputs["Strength"].default_value = 1.0
     sc.world = world
 
@@ -331,7 +381,7 @@ def build_scene():
         _look_at(lo, (x, y, 1.0))
         lo.visible_camera = False
         lights.append(lo)
-    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.5, 0.6), 440, 7.0, (0.50, 0.63, 1.0)))   # moonlight from behind: it is what makes the fog banks show from behind
+    lights.append(_area("moon", (-3.0, 9.0, 5.0), (0.0, 0.5, 0.6), 300, 7.0, (0.66, 0.74, 0.95)))   # moonlight from behind: it is what makes the fog banks show from behind
     lights.append(_area("fill", (0.0, -9.0, 3.0), (0.0, 0.0, 1.0), 10, 8.0, (0.60, 0.70, 1.0)))
     out["lights"] = lights
 
@@ -345,7 +395,7 @@ def build_scene():
     hn = hm.node_tree
     hn.nodes.remove(hn.nodes["Principled BSDF"])
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
-    vol.inputs["Color"].default_value = (0.50, 0.62, 1.0, 1)
+    vol.inputs["Color"].default_value = (0.74, 0.80, 0.95, 1)     # smoke-grey with a little blue, not blue
     # Not an even haze: banks of low fog that lie between the pieces, thick in places, thin in others.
     # The box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
     htc = hn.nodes.new("ShaderNodeTexCoord")
@@ -361,7 +411,7 @@ def build_scene():
     hn.links.new(hmap.outputs["Vector"], hnoise.inputs["Vector"])
     bank = hn.nodes.new("ShaderNodeMapRange")
     bank.interpolation_type = "SMOOTHSTEP"
-    bank.inputs["From Min"].default_value = 0.50
+    bank.inputs["From Min"].default_value = 0.44
     bank.inputs["From Max"].default_value = 0.66
     hn.links.new(hnoise.outputs["Fac"], bank.inputs["Value"])
     sep = hn.nodes.new("ShaderNodeSeparateXYZ")
@@ -369,7 +419,7 @@ def build_scene():
     low = hn.nodes.new("ShaderNodeMapRange")          # 1 at the board, 0 about 2.6 m up
     low.interpolation_type = "SMOOTHSTEP"
     low.inputs["From Min"].default_value = -0.5
-    low.inputs["From Max"].default_value = -0.175
+    low.inputs["From Max"].default_value = -0.14
     low.inputs["To Min"].default_value = 1.0
     low.inputs["To Max"].default_value = 0.0
     hn.links.new(sep.outputs["Z"], low.inputs["Value"])
@@ -379,7 +429,7 @@ def build_scene():
     hn.links.new(low.outputs["Result"], mul.inputs[1])
     dens = hn.nodes.new("ShaderNodeMapRange")
     dens.inputs["To Min"].default_value = 0.0013        # the thin air everywhere
-    dens.inputs["To Max"].default_value = 0.24         # the thick of a bank
+    dens.inputs["To Max"].default_value = 0.36         # the thick of a bank
     hn.links.new(mul.outputs[0], dens.inputs["Value"])
     hn.links.new(dens.outputs["Result"], vol.inputs["Density"])
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
