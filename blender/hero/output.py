@@ -277,10 +277,13 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
     _write_png(_tonemap(lin), png)
     baked.append((objs["board"], png))
 
-    # pieces and plinths: view-independent light only; the sheen is a matcap in the browser
+    # pieces and plinths: baked like the board, full shading as seen from the landscape camera, so the
+    # subsurface glow through thin alabaster and ivory, the specular sheen and the true depth of the
+    # shadows are in the texture exactly as the poster shows them (hero.js adds only a faint matcap glint,
+    # uSheen 0.06 on every piece). Baked from the landscape camera only: portrait views reuse these highlights.
     for pid in pieces.PIECE_IDS:
         for ob, s in ((objs["pieces"][pid], 512 if draft else 1024), (objs["plinths"][pid], 256 if draft else 512)):
-            lin = _bake(ob, s, glossy=False)
+            lin = _bake(ob, s, glossy=True, from_camera=True)
             png = os.path.join(out_dir, ob.name + ".png")
             _write_png(_tonemap(lin), png)
             baked.append((ob, png))

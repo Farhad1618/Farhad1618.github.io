@@ -1,8 +1,11 @@
-// Chessboard hero: the live scene that mounts over the poster.
-// Everything is baked in Blender (blender/build_hero.py). Nothing here is lit:
-// pieces are a baked colour texture plus a matcap sheen, the board is one baked
-// texture, and depth of field is a single post pass. Colours are handled as raw
-// display values end to end, so the scene matches the bakes exactly.
+// Chessboard hero: the live scene. On capable devices it is the first thing shown (the poster is only the
+// fallback). Everything is baked in Blender (blender/build_hero.py) from the camera's point of view, so the
+// light, shadows, sheen and the glow of thin alabaster and ivory are in the textures. Nothing here is lit:
+// pieces are their baked texture plus a faint matcap sheen, the board is one baked texture. The light is
+// fixed and nothing moves it, hover included, so it can be faked as convincingly as possible.
+// Frame: scene (4x MSAA) -> fog, shadowed per step by the pieces (a third of the size) -> depth of field +
+// fog composite (depth-aware upsample) -> bloom (a quarter and an eighth of the size) -> FXAA + bloom +
+// dither to the screen. Colours are raw display values end to end, so the scene matches the bakes exactly.
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -14,8 +17,10 @@ const HAZE = [0.016, 0.021, 0.036];      // what distance fades to: blue-black
 // The one light in blender/hero/scene.py, hidden behind the Cyrus Cylinder at the barrel's height.
 // Blender (0, 1.5, 0.34 + 0.35 + 0.80) in this scene's axes (x, z, -y). The fog is lit by it, live.
 const LIGHT = [0, 1.49, -1.5];
-const LIGHT_COL = [8.0, 7.3, 6.3];        // warm, as in the posters
-const FOG_AMB = [0.10, 0.125, 0.19];      // what the fog shows away from the light: cold, dim
+const LIGHT_COL = [8.6, 8.6, 8.9];        // near white: in the posters the smoke round the light is grey, not gold
+const FOG_AMB = [0.020, 0.027, 0.045];    // what the fog shows away from the light: almost nothing, a cold edge
+const FOG_DIV = 3;                         // fog is marched at 1/FOG_DIV of the size
+const MAX_PIXELS = 3.0e6;                  // backing buffer cap: every pass but the scene scales with pixels
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -27,11 +32,12 @@ void main(){
   vDepth = -mv.z; gl_Position = projectionMatrix * mv;
 }`;
 const PIECE_FS = `
-uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform float uLift; uniform vec3 uHaze;
+uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform vec3 uHaze;
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 n = normalize(vN);
-  vec3 c = texture2D(map, vUv).rgb * 1.08 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
+  // the bake already holds the view's sheen and translucency: the matcap only adds a faint live glint
+  vec3 c = texture2D(map, vUv).rgb + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
   gl_FragColor = vec4(c, 1.0);
 }`;
 const BOARD_FS = `
@@ -45,41 +51,53 @@ void main(){
   c = mix(c, uHaze, smoothstep(0.72, 0.97, max(e.x, e.y)));
   gl_FragColor = vec4(c, 1.0);
 }`;
-// Light shafts: from each pixel, look along the screen toward the light and count how much of the way is
-// clear. A piece standing in front of the light blocks it, so it throws a dark streak through the fog;
-// the gaps between pieces let rays through. Lifting a piece moves its streak with it.
-const SHAFT_FS = `
-uniform sampler2D tDepth; uniform vec2 uLightUV; uniform float uLightZ; uniform float uNear; uniform float uFar;
-varying vec2 vUv;
-float viewZ(vec2 uv){
-  float d = texture2D(tDepth, uv).x * 2.0 - 1.0;
-  return 2.0 * uNear * uFar / (uFar + uNear - d * (uFar - uNear));
-}
-void main(){
-  vec2 d = uLightUV - vUv;
-  float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-  float vis = 0.0;
-  for (int i = 0; i < 28; i++) {
-    vec2 uv = vUv + d * ((float(i) + jit) / 28.0);
-    bool inside = uv.x > 0.0 && uv.x < 1.0 && uv.y > 0.0 && uv.y < 1.0;
-    vis += inside ? step(uLightZ - 0.25, viewZ(uv)) : 1.0;
-  }
-  gl_FragColor = vec4(vis / 28.0);
-}`;
 // Fog: a short march from the eye to whatever the pixel shows, through a field of drifting noise.
 // Density pools low and in banks; the one light behind the Cyrus Cylinder lights them, strongly when you
 // look toward it (fog scatters forward), and each bank shades itself. Output: rgb = sqrt(light scattered
 // toward the eye), a = how much of the scene behind still gets through.
+// Light shafts come from the march itself: at every step the way to the light is tested against the six
+// pieces (each a soft upright footprint of its bounding box, up to its top), so a piece throws its shadow
+// through the fog in front of it and only there. Fog beside or behind a piece, and above it, stays lit.
+// Each fog pixel marches to the depth of one exact full-size pixel (texelFetch at px * DIV + DIV / 2), so
+// the composite can tell, for every full-size pixel, which fog texels saw the same surface.
+// The banks drift like smoke in still air: the broad shapes one way, the fine detail another, and the fine
+// detail is pushed around by the broad shapes, so the fog churns slowly instead of sliding as one sheet.
 const FOG_FS = `
 precision highp sampler3D;
-uniform sampler2D tDepth; uniform sampler2D tShaft; uniform sampler3D tNoise;
-uniform mat4 uInvProj; uniform mat4 uCamWorld;
-uniform float uNear; uniform float uFar; uniform float uTime;
+uniform sampler2D tDepth; uniform sampler3D tNoise;
+uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uFull;
+uniform float uNear; uniform float uFar; uniform float uTime; uniform float uDrift;
 uniform vec3 uP[6]; uniform vec3 uLight; uniform vec3 uLightCol; uniform vec3 uAmb;
+uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor;
 varying vec2 vUv;
 const int STEPS = 16;
+// how much of the light reaches p past the pieces. uOcc = footprint centre (x, z) and half size; uOccY = bottom
+// and top. Where the segment p -> light passes closest to a footprint, is it inside it, and below the top?
+float lightVis(vec3 p){
+  float v = 1.0;
+  for (int k = 0; k < 6; k++) {
+    vec2 u = (p.xz - uOcc[k].xy) / uOcc[k].zw, w = (uLight.xz - p.xz) / uOcc[k].zw;
+    float s = clamp(-dot(u, w) / max(dot(w, w), 1e-6), 0.0, 1.0);
+    float y = p.y + (uLight.y - p.y) * s;
+    float occ = (1.0 - smoothstep(0.7, 1.1, length(u + w * s)))
+              * (1.0 - smoothstep(uOccY[k].y - 0.15, uOccY[k].y + 0.1, y)) * smoothstep(uOccY[k].x - 0.1, uOccY[k].x, y)
+              * smoothstep(0.0, 0.05, s);         // fog on the light's side of a piece is not behind it
+    v *= 1.0 - occ;
+  }
+  return v;
+}
 const float TOP = 3.2;          // no fog above this height
-float low(vec3 p){ return texture(tNoise, p * 0.060 + vec3(uTime * 0.0050, 0.0, uTime * 0.0016)).r; }
+// broad banks: about 0.17 units a second along x, a little toward the eye, a slow rise and fall
+float low(vec3 p){
+  float tt = uTime * uDrift;
+  return texture(tNoise, p * 0.060 + vec3(tt * 0.0105, 0.012 * sin(tt * 0.045), tt * 0.0042)).r;
+}
+// fine detail: the other way across, drifting back and rising, warped by the broad banks
+float fine(vec3 p, float lo){
+  float tt = uTime * uDrift;
+  vec3 w = vec3(lo - 0.5, 0.0, 0.5 - lo) * 1.6;
+  return texture(tNoise, p * vec3(0.26, 0.40, 0.26) + w + vec3(-tt * 0.020, tt * 0.0095, 0.37 - tt * 0.031)).r;
+}
 float bank(vec3 p, float lo, float hi){
   float top = 0.35 + 2.4 * smoothstep(0.40, 0.72, lo);      // a thick bank also stands taller
   float h = 1.0 - smoothstep(0.0, top, p.y);
@@ -87,8 +105,11 @@ float bank(vec3 p, float lo, float hi){
   return smoothstep(0.47, 0.62, lo * 0.66 + hi * 0.34) * h * h * mix(0.14, 1.0, smoothstep(6.0, -1.5, p.z));
 }
 void main(){
-  float d = texture2D(tDepth, vUv).x;
-  vec4 v = uInvProj * vec4(vUv * 2.0 - 1.0, 1.0, 1.0);
+  ivec2 lp = ivec2(gl_FragCoord.xy);
+  ivec2 fp = min(lp * DIV + DIV / 2, ivec2(uFull) - 1);
+  vec2 uv = (vec2(fp) + 0.5) / uFull;
+  float d = texelFetch(tDepth, fp, 0).x;
+  vec4 v = uInvProj * vec4(uv * 2.0 - 1.0, 1.0, 1.0);
   vec3 dv = normalize(v.xyz / v.w);
   vec3 rd = normalize((uCamWorld * vec4(dv, 0.0)).xyz);
   vec3 ro = uCamWorld[3].xyz;
@@ -98,7 +119,8 @@ void main(){
   else if (ro.y > TOP) t0 = rd.y < -1e-4 ? (TOP - ro.y) / rd.y : tEnd;
   vec3 Sa = vec3(0.0), Sl = vec3(0.0); float T = 1.0;
   if (tEnd > t0) {
-    float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    // jitter that moves on every frame (golden-ratio steps), so what the upsample leaves is grain, not a fixed grid
+    float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + floor(uTime * 60.0) * 0.6180339);
     float dt = (tEnd - t0) / float(STEPS);
     for (int i = 0; i < STEPS; i++) {
       vec3 p = ro + rd * (t0 + (float(i) + jit) * dt);
@@ -106,7 +128,7 @@ void main(){
       for (int k = 0; k < 6; k++) { vec3 q = p - uP[k]; float w = 1.0 / (1.0 + dot(q.xz, q.xz) * 1.6); part += w * w; }
       // two scales moving at different speeds, so banks change shape as they drift instead of sliding
       float lo = low(p);
-      float hi = texture(tNoise, p * vec3(0.26, 0.40, 0.26) + vec3(uTime * 0.0110, -uTime * 0.0045, 0.37)).r;
+      float hi = fine(p, lo);
       // fog thins where it meets a piece, as it does around anything standing in moving air
       float b = bank(p, lo, hi) * (1.0 - 0.55 * min(part, 1.0));
       vec3 q = uLight - p; float d2 = dot(q, q); vec3 ld = q * inversesqrt(d2);
@@ -117,32 +139,64 @@ void main(){
       vec3 ps = p + ld * 0.6;
       float shade = exp(-bank(ps, low(ps), hi) * 3.2);        // the bank's own thickness shades it
       float a = 1.0 - exp(-sigma * dt);
-      Sl += T * a * ph * shade / (0.6 + d2);
+      Sl += T * a * ph * shade * mix(uShadowFloor, 1.0, lightVis(p)) / (1.3 + d2);   // a soft core: a sharper one turns the march jitter into sparkle by the light
       Sa += T * a * (0.45 + 0.55 * shade);
       T *= 1.0 - a;
       if (T < 0.03) break;
     }
   }
-  // what the pieces in front of the light hold back from the rays
-  float vis = texture2D(tShaft, vUv).r;
-  vec3 S = uAmb * Sa + uLightCol * Sl * mix(0.12, 1.0, vis * vis);
+  // fog in a piece's shadow is near black, as in Blender: the dim ambient is almost all that is left there
+  vec3 S = uAmb * Sa + uLightCol * Sl;
   gl_FragColor = vec4(sqrt(S), T);
 }`;
 const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
 const POST_FS = `
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uPx; uniform float uNear; uniform float uFar;
 uniform float uFocus; uniform float uAperture; uniform float uMaxR; uniform float uFade; uniform vec3 uInk;
-uniform sampler2D tFog;
+uniform sampler2D tFog; uniform vec2 uFogSize; uniform vec2 uFull; uniform float uDepthTol;
 varying vec2 vUv;
-float viewZ(vec2 uv){
-  float d = texture2D(tDepth, uv).x * 2.0 - 1.0;
-  return 2.0 * uNear * uFar / (uFar + uNear - d * (uFar - uNear));
-}
+float linZ(float d){ d = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - d * (uFar - uNear)); }
+float viewZ(vec2 uv){ return linZ(texture2D(tDepth, uv).x); }
 // the near field is capped lower, so the foreground softens without smearing
 float coc(float z){ float d = 1.0 / uFocus - 1.0 / z; return clamp(abs(d) * uAperture, 0.0, d < 0.0 ? 0.6 : 1.0) * uMaxR; }
+// Depth-aware upsample of the fog. For this full-size pixel, look at the 3x3 fog texels around the nearest
+// one; each was marched to the depth of a known full-size pixel (texel tc at pixel tc * DIV + DIV / 2), so
+// weight it by how close it sits and by how alike that depth is to this pixel's. Fog never bleeds across a
+// silhouette, and the jittered march is smoothed on each side of it. If no texel saw this surface (a thin
+// edge), take the one whose depth is nearest. Positions come from the pixel index, the same mapping the fog
+// pass used, so they line up at any buffer size, not only multiples of DIV.
+vec4 fogAt(vec2 uv, float z){
+  vec2 f = (uv * uFull - 0.5 - float(DIV / 2)) / float(DIV), b = floor(f), fr = f - b;
+  ivec2 full = ivec2(uFull) - 1, lim = ivec2(uFogSize) - 1;
+  vec4 sum = vec4(0.0), best = vec4(0.0, 0.0, 0.0, 1.0); float wsum = 0.0, bestD = 1e9;
+  // a 4x4 soft kernel: wide enough to average away the march jitter, which a 3x3 left as a dot grid
+  for (int j = -1; j <= 2; j++) for (int i = -1; i <= 2; i++) {
+    ivec2 tc = clamp(ivec2(b) + ivec2(i, j), ivec2(0), lim);
+    float zi = linZ(texelFetch(tDepth, min(tc * DIV + DIV / 2, full), 0).x);
+    vec4 fi = texelFetch(tFog, tc, 0);
+    vec2 dd = vec2(float(i), float(j)) - fr;
+    float rel = abs(zi - z) / z;
+    float w = exp(-dot(dd, dd) * 0.42) * exp(-rel * rel * uDepthTol);
+    sum += fi * w; wsum += w;
+    float dz = rel + dot(dd, dd) * 1e-3;
+    if (dz < bestD) { bestD = dz; best = fi; }
+  }
+  return (sum + best * 1e-4) / (wsum + 1e-4);
+}
 void main(){
-  float r0 = coc(viewZ(vUv));
-  vec3 acc = texture2D(tColor, vUv).rgb; float wsum = 1.0;
+  float z = viewZ(vUv), r0 = coc(z);
+  // A pixel on a silhouette is a resolved blend of a piece and what lies behind it, but its depth is one or
+  // the other. Where the depth says "behind" and a nearer, sharper piece is next to it (P, at offset o), blur
+  // the background at its full strength and then lay the piece's share of the pixel back on top, so the
+  // smooth MSAA edge survives without leaving a sharp ring of background around the piece.
+  vec2 dx = vec2(uPx.x, 0.0), dy = vec2(0.0, uPx.y), o = vec2(0.0); float zn = z, zk;
+  zk = viewZ(vUv + dx); if (zk < zn) { zn = zk; o = dx; }
+  zk = viewZ(vUv - dx); if (zk < zn) { zn = zk; o = -dx; }
+  zk = viewZ(vUv + dy); if (zk < zn) { zn = zk; o = dy; }
+  zk = viewZ(vUv - dy); if (zk < zn) { zn = zk; o = -dy; }
+  bool edge = zn < z * 0.97 && coc(zn) + 1.0 < r0;
+  vec3 C = texture2D(tColor, vUv).rgb, G = edge ? texture2D(tColor, vUv - o).rgb : C;
+  vec3 acc = G; float wsum = 1.0;
   if (r0 > 0.6) {
     for (int i = 1; i <= 14; i++) {
       float fi = float(i);
@@ -154,18 +208,92 @@ void main(){
     }
   }
   vec3 c = acc / wsum;
-  // the fog was marched at a third of the size with a jittered start: average the neighbours to smooth the
-  // jitter, but not across the outline of a piece, where the amount of fog really does jump
-  vec4 f0 = texture2D(tFog, vUv), fog = f0; float fw = 1.0;
-  for (int i = 0; i < 8; i++) {
-    float a = float(i) * 0.78539816;
-    vec4 f = texture2D(tFog, vUv + vec2(cos(a), sin(a)) * uPx * (mod(float(i), 2.0) < 0.5 ? 3.0 : 4.24));
-    float w = exp(-abs(f.a - f0.a) * 14.0);
-    fog += f * w; fw += w;
+  if (edge) {
+    // the piece's share: where this pixel sits between its unblurred background G and the piece P
+    vec3 P = texture2D(tColor, vUv + o).rgb, d = P - G;
+    c = mix(c, P, clamp(dot(C - G, d) / max(dot(d, d), 1e-6), 0.0, 1.0));
   }
-  fog /= fw;
+  vec4 fog = fogAt(vUv, z);
   c = c * fog.a + fog.rgb * fog.rgb;
   c = mix(uInk, c, uFade);
+#ifdef DITHER_POST
+  // 8-bit frame buffer (no half float): dither here too, before the composite is rounded
+  c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
+#endif
+  gl_FragColor = vec4(c, 1.0);
+}`;
+// Bloom, as the posters have it (output.py _glow): everything above 0.38 bleeds into the fog, a wide soft
+// glow plus a tight one. Bright pass at a quarter of the size (tight), an eighth (wide), blurred there.
+// Each output texel averages four bilinear taps, so a 2x step down sees every source pixel.
+const DOWN_FS = `
+uniform sampler2D tIn; uniform vec2 uSrcPx; uniform float uThresh;
+varying vec2 vUv;
+vec3 tap(vec2 o){ return max(texture2D(tIn, vUv + o * uSrcPx).rgb - uThresh, 0.0); }
+void main(){ gl_FragColor = vec4((tap(vec2(-1.0, -1.0)) + tap(vec2(1.0, -1.0)) + tap(vec2(-1.0, 1.0)) + tap(vec2(1.0, 1.0))) * 0.25, 1.0); }`;
+const BLUR_FS = `
+uniform sampler2D tIn; uniform vec2 uStep;
+varying vec2 vUv;
+void main(){
+  vec3 s = vec3(0.0); float ws = 0.0;
+  for (int i = -7; i <= 7; i++) { float x = float(i) * 0.4, w = exp(-0.5 * x * x); s += texture2D(tIn, vUv + uStep * float(i)).rgb * w; ws += w; }
+  gl_FragColor = vec4(s / ws, 1.0);
+}`;
+// Last pass: FXAA (after Lottes, 3.11 quality, trimmed) over the finished frame, then bloom and dither. The depth-driven
+// passes above decide per pixel, from a depth that is one sample, so they can put back a stair step on an
+// outline that MSAA had smoothed; this finds edges by contrast and blends along them. Luma is taken on
+// sqrt(colour) so the dark edges against the fog are found too.
+const FXAA_FS = `
+uniform sampler2D tIn; uniform vec2 uPx; uniform float uSubpix; uniform float uEdge; uniform float uEdgeMin;
+uniform sampler2D tTight; uniform sampler2D tWide; uniform vec2 uTightPx; uniform float uTightK; uniform float uWideK;
+varying vec2 vUv;
+float lum(vec2 uv){ return sqrt(max(dot(texture2D(tIn, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0)); }
+vec3 fxaa(){
+  vec3 cM = texture2D(tIn, vUv).rgb;
+  float lM = sqrt(max(dot(cM, vec3(0.299, 0.587, 0.114)), 0.0));
+  float lN = lum(vUv + vec2(0.0, uPx.y)), lS = lum(vUv - vec2(0.0, uPx.y));
+  float lE = lum(vUv + vec2(uPx.x, 0.0)), lW = lum(vUv - vec2(uPx.x, 0.0));
+  float lMax = max(lM, max(max(lN, lS), max(lE, lW))), lMin = min(lM, min(min(lN, lS), min(lE, lW)));
+  float range = lMax - lMin;
+  if (range < max(uEdgeMin, lMax * uEdge)) return cM;
+  float lNE = lum(vUv + uPx), lSW = lum(vUv - uPx);
+  float lNW = lum(vUv + vec2(-uPx.x, uPx.y)), lSE = lum(vUv + vec2(uPx.x, -uPx.y));
+  float avg = (2.0 * (lN + lS + lE + lW) + lNE + lNW + lSE + lSW) / 12.0;
+  float sub = smoothstep(0.0, 1.0, clamp(abs(avg - lM) / range, 0.0, 1.0));
+  sub = sub * sub * uSubpix;
+  float eH = abs(lNW + lSW - 2.0 * lW) + 2.0 * abs(lN + lS - 2.0 * lM) + abs(lNE + lSE - 2.0 * lE);
+  float eV = abs(lSW + lSE - 2.0 * lS) + 2.0 * abs(lW + lE - 2.0 * lM) + abs(lNW + lNE - 2.0 * lN);
+  bool horz = eH >= eV;
+  float l1 = horz ? lS : lW, l2 = horz ? lN : lE;
+  float g1 = abs(l1 - lM), g2 = abs(l2 - lM);
+  bool neg = g1 >= g2;
+  float grad = 0.25 * max(g1, g2);
+  float stp = horz ? uPx.y : uPx.x;
+  float lLocal = 0.5 * ((neg ? l1 : l2) + lM);
+  if (neg) stp = -stp;
+  vec2 cur = vUv + (horz ? vec2(0.0, stp * 0.5) : vec2(stp * 0.5, 0.0));
+  vec2 off = horz ? vec2(uPx.x, 0.0) : vec2(0.0, uPx.y);
+  vec2 u1 = cur - off, u2 = cur + off;
+  float e1 = lum(u1) - lLocal, e2 = lum(u2) - lLocal;
+  bool r1 = abs(e1) >= grad, r2 = abs(e2) >= grad;
+  for (int i = 0; i < 10; i++) {
+    if (r1 && r2) break;
+    float q = i < 3 ? 1.0 : (i < 6 ? 1.5 : (i < 8 ? 2.0 : 4.0));
+    if (!r1) { u1 -= off * q; e1 = lum(u1) - lLocal; r1 = abs(e1) >= grad; }
+    if (!r2) { u2 += off * q; e2 = lum(u2) - lLocal; r2 = abs(e2) >= grad; }
+  }
+  float d1 = horz ? vUv.x - u1.x : vUv.y - u1.y, d2 = horz ? u2.x - vUv.x : u2.y - vUv.y;
+  bool near1 = d1 < d2;
+  float pix = 0.5 - min(d1, d2) / (d1 + d2);
+  bool good = ((near1 ? e1 : e2) < 0.0) != (lM < lLocal);
+  float o = max(good ? pix : 0.0, sub);
+  return texture2D(tIn, vUv + (horz ? vec2(0.0, o * stp) : vec2(o * stp, 0.0))).rgb;
+}
+void main(){
+  vec3 c = fxaa();
+  // bloom: the tight glow gets four more taps, so it is round and as wide as the posters' (~h/300)
+  vec3 tight = texture2D(tTight, vUv + uTightPx * vec2(-1.5, -1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, -1.5)).rgb
+             + texture2D(tTight, vUv + uTightPx * vec2(-1.5, 1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, 1.5)).rgb;
+  c += texture2D(tWide, vUv).rgb * uWideK + tight * 0.25 * uTightK;
   // dark, smooth fog on an 8-bit screen: break the bands up with a little noise
   c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
   gl_FragColor = vec4(c, 1.0);
@@ -273,10 +401,10 @@ export async function mountHero(stage, layout, opts = {}) {
       return;
     }
     map.anisotropy = 4;
-    const isPearl = /pearl/.test(o.name) || /pearl/.test(o.parent && o.parent.name || "");
     o.material = new THREE.ShaderMaterial({
       vertexShader: PIECE_VS, fragmentShader: PIECE_FS,
-      uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: isPearl ? 0.55 : 0.22 }, uLift: { value: 1 }, uHaze: hazeU },
+      // the pearl's gloss is baked like everything else, so it gets the same faint glint, not a second highlight
+    uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: 0.06 }, uHaze: hazeU },
     });
     disposables.push(o.geometry, o.material, map);
     src.dispose();
@@ -286,10 +414,8 @@ export async function mountHero(stage, layout, opts = {}) {
     if (!p || !pl) throw new Error("pieces.glb is missing " + id);
     pieces[id] = p;
     const box = new THREE.Box3().setFromObject(p).union(new THREE.Box3().setFromObject(pl));
-    const mats = [];
-    p.traverse(o => { if (o.isMesh) mats.push(o.material); });
     state[id] = {
-      box, mats, baseY: p.position.y, baseRot: p.rotation.y, lift: 0,
+      box, baseRot: p.rotation.y,
       period: 11 + (IDS.indexOf(id) * 8) / 5, phase: IDS.indexOf(id) * 1.7,
       top: new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2),
       centre: box.getCenter(new THREE.Vector3()),
@@ -299,47 +425,76 @@ export async function mountHero(stage, layout, opts = {}) {
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 60);
   const camBase = new THREE.Vector3(), camTarget = new THREE.Vector3();
-  const lightP = new THREE.Vector3();
   let focusBase = 10;
 
-  // post: depth of field
+  // the scene: 4x MSAA. Three resolves colour (smooth outlines) and depth (one sample) into textures.
   const rt = new THREE.WebGLRenderTarget(4, 4, { samples: 4, depthBuffer: true });
   rt.depthTexture = new THREE.DepthTexture(4, 4);
   rt.texture.minFilter = rt.texture.magFilter = THREE.LinearFilter;
+  const ext = renderer.extensions;
+  const halfFloat = ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float");
+  const plainRT = filter => {
+    const r = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false, type: halfFloat ? THREE.HalfFloatType : THREE.UnsignedByteType });
+    r.texture.minFilter = r.texture.magFilter = filter;
+    return r;
+  };
+  // post: depth of field + fog composite into a full-size buffer, then FXAA + bloom + dither to the screen
+  const frameRT = plainRT(THREE.LinearFilter);
   const postMat = new THREE.ShaderMaterial({
     vertexShader: POST_VS, fragmentShader: POST_FS, depthTest: false, depthWrite: false,
+    defines: halfFloat ? { DIV: FOG_DIV } : { DIV: FOG_DIV, DITHER_POST: 1 },
     uniforms: {
       tColor: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uPx: { value: new THREE.Vector2() },
       uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: 10 }, uAperture: { value: 25 },
       uMaxR: { value: 14 }, uFade: { value: 1 },
       uInk: { value: new THREE.Vector3(...INK) },
-      tFog: { value: null },
+      tFog: { value: null }, uFogSize: { value: new THREE.Vector2(1, 1) }, uFull: { value: new THREE.Vector2(1, 1) },
+      uDepthTol: { value: 600 },        // 1/tol^2: fog texels more than ~4% off this pixel's depth barely count
     },
   });
-  const postGeo = new THREE.PlaneGeometry(2, 2);
-  const postScene = new THREE.Scene(), postCam = new THREE.Camera();
-  postScene.add(new THREE.Mesh(postGeo, postMat));
-  disposables.push(rt, rt.depthTexture, postMat, postGeo);
-
-  // light shafts and fog: both marched at a third of the size (they have no fine detail)
-  const ext = renderer.extensions;
-  const lowRT = () => {
-    const r = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: false,
-      type: ext.has("EXT_color_buffer_float") || ext.has("EXT_color_buffer_half_float") ? THREE.HalfFloatType : THREE.UnsignedByteType });
-    r.texture.minFilter = r.texture.magFilter = THREE.LinearFilter;
-    return r;
-  };
-  const shaftRT = lowRT(), fogRT = lowRT();
-  const shaftMat = new THREE.ShaderMaterial({
-    vertexShader: POST_VS, fragmentShader: SHAFT_FS, depthTest: false, depthWrite: false,
-    uniforms: { tDepth: { value: rt.depthTexture }, uLightUV: { value: new THREE.Vector2(0.5, 0.5) }, uLightZ: { value: 10 },
-      uNear: { value: camera.near }, uFar: { value: camera.far } },
+  // bloom: bright pass at a quarter of the size (the tight glow), down to an eighth, blurred both ways there
+  const tightRT = plainRT(THREE.LinearFilter), wideRT = plainRT(THREE.LinearFilter), wideTmp = plainRT(THREE.LinearFilter);
+  const downMat = (src, thresh) => new THREE.ShaderMaterial({
+    vertexShader: POST_VS, fragmentShader: DOWN_FS, depthTest: false, depthWrite: false,
+    uniforms: { tIn: { value: src }, uSrcPx: { value: new THREE.Vector2() }, uThresh: { value: thresh } },
   });
+  const brightMat = downMat(frameRT.texture, 0.38), down8Mat = downMat(tightRT.texture, 0);
+  const blurMat = new THREE.ShaderMaterial({
+    vertexShader: POST_VS, fragmentShader: BLUR_FS, depthTest: false, depthWrite: false,
+    uniforms: { tIn: { value: null }, uStep: { value: new THREE.Vector2() } },
+  });
+  const fxaaMat = new THREE.ShaderMaterial({
+    vertexShader: POST_VS, fragmentShader: FXAA_FS, depthTest: false, depthWrite: false,
+    uniforms: { tIn: { value: frameRT.texture }, uPx: { value: new THREE.Vector2() },
+      uSubpix: { value: 0.5 }, uEdge: { value: 0.125 }, uEdgeMin: { value: 0.03 },
+      tTight: { value: tightRT.texture }, tWide: { value: wideRT.texture }, uTightPx: { value: new THREE.Vector2() },
+      uTightK: { value: 0.0 }, uWideK: { value: 0.25 } },           // no tight glow: it rings each piece (Farhad asked for none); only a faint wide one
+  });
+  const postGeo = new THREE.PlaneGeometry(2, 2);
+  const postCam = new THREE.Camera();
+  const pass = mat => { const sc = new THREE.Scene(); sc.add(new THREE.Mesh(postGeo, mat)); return sc; };
+  const postScene = pass(postMat), fxaaScene = pass(fxaaMat);
+  const brightScene = pass(brightMat), down8Scene = pass(down8Mat), blurScene = pass(blurMat);
+  let wideSigma = 1;            // the wide glow's sigma, in eighth-size texels
+  disposables.push(rt, rt.depthTexture, frameRT, postMat, fxaaMat, postGeo,
+    tightRT, wideRT, wideTmp, brightMat, down8Mat, blurMat);
+
+  // fog: marched at 1/FOG_DIV of the size (it has no fine detail). Read texel by texel (texelFetch), so no
+  // filtering is needed. Each piece shadows it through a soft footprint of its bounding box (piece + plinth).
+  const fogRT = plainRT(THREE.NearestFilter);
+  const occ = IDS.map(id => { const b = state[id].box;
+    return new THREE.Vector4((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, (b.max.x - b.min.x) * 0.375, (b.max.z - b.min.z) * 0.375); });
+  const occY = IDS.map(id => new THREE.Vector2(state[id].box.min.y, state[id].box.max.y));
   const noiseTex = noiseVolume();
   const fogMat = new THREE.ShaderMaterial({
     vertexShader: POST_VS, fragmentShader: FOG_FS, depthTest: false, depthWrite: false,
+    defines: { DIV: FOG_DIV },
     uniforms: {
-      tDepth: { value: rt.depthTexture }, tShaft: { value: shaftRT.texture }, tNoise: { value: noiseTex },
+      uFull: postMat.uniforms.uFull,
+      uDrift: { value: 1 },            // 0 holds the fog still, 2 doubles its drift
+      tDepth: { value: rt.depthTexture }, tNoise: { value: noiseTex },
+      uOcc: { value: occ }, uOccY: { value: occY },
+      uShadowFloor: { value: 0.02 },   // what a piece's shadow lets through: near black, as in Blender
       uInvProj: { value: camera.projectionMatrixInverse }, uCamWorld: { value: camera.matrixWorld },
       uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 },
       uP: { value: IDS.map(id => state[id].centre) },
@@ -348,11 +503,9 @@ export async function mountHero(stage, layout, opts = {}) {
       uAmb: { value: new THREE.Vector3(...FOG_AMB) },
     },
   });
-  const shaftScene = new THREE.Scene(), fogScene = new THREE.Scene();
-  shaftScene.add(new THREE.Mesh(postGeo, shaftMat));
-  fogScene.add(new THREE.Mesh(postGeo, fogMat));
+  const fogScene = pass(fogMat);
   postMat.uniforms.tFog.value = fogRT.texture;
-  disposables.push(shaftRT, fogRT, shaftMat, noiseTex, fogMat);
+  disposables.push(fogRT, noiseTex, fogMat);
 
   let W = 1, H = 1, current = null;
   function setOrientation(o) {
@@ -369,23 +522,35 @@ export async function mountHero(stage, layout, opts = {}) {
   function resize() {
     W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
     const coarse = matchMedia("(pointer:coarse)").matches;
-    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.5);   // a soft, foggy image hides the difference; the GPU does not
+    // a soft, foggy image hides the difference; the GPU does not. Cap the pixel ratio, and the total pixel
+    // count too, so a big window or a 4K screen costs no more than ~2160x1390.
+    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.5, Math.sqrt(MAX_PIXELS / (W * H)));
     renderer.setPixelRatio(pr);
     renderer.setSize(W, H, false);
     const bw = Math.round(W * pr), bh = Math.round(H * pr);
     rt.setSize(bw, bh);
-    shaftRT.setSize(Math.ceil(bw / 3), Math.ceil(bh / 3));
-    fogRT.setSize(Math.ceil(bw / 3), Math.ceil(bh / 3));
+    frameRT.setSize(bw, bh);
+    const lw = Math.ceil(bw / FOG_DIV), lh = Math.ceil(bh / FOG_DIV);
+    fogRT.setSize(lw, lh);
+    const qw = Math.ceil(bw / 4), qh = Math.ceil(bh / 4), ew = Math.ceil(bw / 8), eh = Math.ceil(bh / 8);
+    tightRT.setSize(qw, qh); wideRT.setSize(ew, eh); wideTmp.setSize(ew, eh);
+    brightMat.uniforms.uSrcPx.value.set(1 / bw, 1 / bh);
+    down8Mat.uniforms.uSrcPx.value.set(1 / qw, 1 / qh);
+    fxaaMat.uniforms.uTightPx.value.set(1 / qw, 1 / qh);
+    wideSigma = bh / 60 / 8;          // the posters' wide glow: sigma ~ h/60
+    postMat.uniforms.uFogSize.value.set(lw, lh);
+    postMat.uniforms.uFull.value.set(bw, bh);
     postMat.uniforms.uPx.value.set(1 / bw, 1 / bh);
+    fxaaMat.uniforms.uPx.value.set(1 / bw, 1 / bh);
     postMat.uniforms.uMaxR.value = (bh / 1080) * 13;
     setOrientation(orientation());
     if (typeof hoverFromPointer === "function" && hoverId) { touchHover = null; hoverFromPointer(null); }
   }
 
   // ---- behaviour state
-  const pointer = new THREE.Vector2(), drift = new THREE.Vector2(), ndc = new THREE.Vector2();
+  const ndc = new THREE.Vector2();
   const ray = new THREE.Raycaster(), hit = new THREE.Vector3(), tmp = new THREE.Vector3();
-  let hoverId = null, focusNow = 10, scrollP = 0, touchHover = null, touchTimer = 0;
+  let hoverId = null, scrollP = 0, touchHover = null, touchTimer = 0;
   let running = false, raf = 0, last = 0, t = 0, disposed = false, visible = true;
   const handle = { canvas, pieces, camera, frameCount: 0 };
 
@@ -416,15 +581,9 @@ export async function mountHero(stage, layout, opts = {}) {
   }
   function clearTouch() { clearTimeout(touchTimer); touchHover = null; hoverFromPointer(null); }
 
-  const fine = () => matchMedia("(pointer:fine)").matches;
   let down = null;
-  on(canvas, "pointermove", e => {
-    if (e.pointerType !== "mouse") return;
-    const r = canvas.getBoundingClientRect();
-    pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
-    hoverFromPointer(pick(e));
-  });
-  on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") { pointer.set(0, 0); hoverFromPointer(null); } });
+  on(canvas, "pointermove", e => { if (e.pointerType === "mouse") hoverFromPointer(pick(e)); });
+  on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") hoverFromPointer(null); });
   on(canvas, "pointerdown", e => {
     if (e.button !== 0 || e.isPrimary === false) { down = null; return; }
     down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType };
@@ -444,7 +603,7 @@ export async function mountHero(stage, layout, opts = {}) {
     if (id) touchTimer = setTimeout(clearTouch, 4000);
   });
   on(canvas, "pointercancel", () => { down = null; });
-  on(window, "blur", () => { pointer.set(0, 0); clearTouch(); });
+  on(window, "blur", clearTouch);
   on(window, "scroll", () => { if (touchHover) clearTouch(); }, { passive: true });
   on(window, "resize", resize);
 
@@ -455,51 +614,46 @@ export async function mountHero(stage, layout, opts = {}) {
   }
   on(canvas, "webglcontextlost", e => { e.preventDefault(); exit("context lost"); });
 
-  const ease = (cur, to, rate, dt) => cur + (to - cur) * (1 - Math.exp(-rate * dt));
   function update(dt) {
     t += dt;
-    // camera: small arc with the pointer, sinking as the hero scrolls away
-    const canDrift = fine();
-    drift.x = ease(drift.x, canDrift ? pointer.x : 0, 3.5, dt);
-    drift.y = ease(drift.y, canDrift ? pointer.y : 0, 3.5, dt);
-    tmp.copy(camBase).sub(camTarget);
-    const radius = tmp.length();
-    const yaw = Math.atan2(tmp.x, tmp.z) - drift.x * 2.5 * DEG;
-    const pitch = Math.asin(tmp.y / radius) + drift.y * 1.0 * DEG;
-    camera.position.set(
-      camTarget.x + radius * Math.cos(pitch) * Math.sin(yaw),
-      camTarget.y + radius * Math.sin(pitch) - 0.5 * scrollP,
-      camTarget.z + radius * Math.cos(pitch) * Math.cos(yaw));
+    // camera: fixed where the bakes were made from; it only sinks as the hero scrolls away. The pointer never
+    // moves it, so the light, its halo and the shadows in the fog hold still while you look around.
+    camera.position.copy(camBase); camera.position.y -= 0.5 * scrollP;
     tmp.copy(camTarget); tmp.y += 0.35 * scrollP;
     camera.lookAt(tmp);
     camera.updateMatrixWorld();
 
+    // Pieces stay on their marks: hover only names a piece. It never lifts or brightens it, moves the camera
+    // or pulls focus off Cyrus, so the light, the shadows in the fog and the glow round the light never
+    // change. The idle sway is one degree, too little to move the baked light visibly.
     for (const id of IDS) {
-      const s = state[id], p = pieces[id];
-      s.lift = ease(s.lift, hoverId === id ? 1 : 0, 9, dt);
-      p.position.y = s.baseY + 0.06 * s.lift;
-      p.rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 2 * DEG;
-      for (const m of s.mats) m.uniforms.uLift.value = 1 + 0.14 * s.lift;
+      const s = state[id];
+      pieces[id].rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 1 * DEG;
     }
-    const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
-    focusNow = ease(focusNow, focusTo, 5, dt);
-    postMat.uniforms.uFocus.value = focusNow;
-    // where the light is on screen, and how far, for the shafts
-    lightP.set(...LIGHT).applyMatrix4(camera.matrixWorldInverse);
-    shaftMat.uniforms.uLightZ.value = -lightP.z;
-    lightP.set(...LIGHT).project(camera);
-    shaftMat.uniforms.uLightUV.value.set(lightP.x * 0.5 + 0.5, lightP.y * 0.5 + 0.5);
+    postMat.uniforms.uFocus.value = focusBase;
     fogMat.uniforms.uTime.value = t;
   }
   function render() {
     renderer.setRenderTarget(rt);
     renderer.render(scene, camera);
-    renderer.setRenderTarget(shaftRT);
-    renderer.render(shaftScene, postCam);
     renderer.setRenderTarget(fogRT);
     renderer.render(fogScene, postCam);
-    renderer.setRenderTarget(null);
+    renderer.setRenderTarget(frameRT);
     renderer.render(postScene, postCam);
+    // bloom
+    renderer.setRenderTarget(tightRT);
+    renderer.render(brightScene, postCam);
+    renderer.setRenderTarget(wideRT);
+    renderer.render(down8Scene, postCam);
+    const bu = blurMat.uniforms, k = wideSigma * 0.4;
+    bu.tIn.value = wideRT.texture; bu.uStep.value.set(k / wideRT.width, 0);
+    renderer.setRenderTarget(wideTmp);
+    renderer.render(blurScene, postCam);
+    bu.tIn.value = wideTmp.texture; bu.uStep.value.set(0, k / wideRT.height);
+    renderer.setRenderTarget(wideRT);
+    renderer.render(blurScene, postCam);
+    renderer.setRenderTarget(null);
+    renderer.render(fxaaScene, postCam);
     handle.frameCount++;
   }
 
@@ -535,11 +689,13 @@ export async function mountHero(stage, layout, opts = {}) {
     canvas.remove();
   }
 
-  Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize, fog: fogMat.uniforms });
+  // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
+  // weights uTightK, uWideK), .bright (bloom threshold uThresh)
+  Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize,
+    fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
 
   stage.appendChild(canvas);
   resize();
-  focusNow = focusBase;
   update(0); render();          // first frame is on screen before the caller fades the stage in
   // Does this GPU keep up? Time real frames, forced to finish by a 1-pixel readback. Frame
   // intervals are no use here: a throttled or background tab would look like a slow device.

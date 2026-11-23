@@ -1,4 +1,45 @@
 <title>Farhad</title>
+<!-- three.js for hero.js; loaded only when the live hero mounts -->
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+<script>
+/* Hero, before first paint: will this device try the live scene? The same test as boot() below (motion
+   allowed, not weak unless forced on localhost, WebGL2, fetch). If so, hide the poster from the start so the
+   picture never flashes; the hero stays dark until the scene fades in. heroPosterBack() brings the poster back
+   on any failure, and if the scene still is not up 6 s after first paint (before the mount starts) or 8 s
+   after the mount starts. Everyone else sees the poster from first paint.
+   This runs first in the page, before the font stylesheet can block it, and after the import map: where the
+   scene will be tried it asks for hero.js, three.js and pieces.glb straight away, ahead of the poster. */
+(function(){
+  window.heroTry = false;
+  try {
+    var m = function(q){ return matchMedia(q).matches; }, n = navigator, forced = false;
+    var weak = (m("(pointer:coarse)") && Math.min(screen.width, screen.height) < 768) || n.deviceMemory < 4 || n.hardwareConcurrency < 4;
+    try { forced = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){}
+    if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) return posterFirst();
+    var html = document.documentElement;
+    window.heroPosterBack = function(){ clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait"); };
+    html.classList.add("hero-wait"); window.heroTry = true;
+    window.heroWaitTimer = setTimeout(window.heroPosterBack, 6000);
+    var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
+    [["modulepreload", "hero.js"], ["modulepreload", j + "build/three.module.js"],
+     ["modulepreload", j + "examples/jsm/loaders/GLTFLoader.js"], ["modulepreload", j + "examples/jsm/libs/meshopt_decoder.module.js"],
+     ["preload", "assets/hero/pieces.glb"]].forEach(function(r){
+      var l = document.createElement("link"); l.rel = r[0]; l.href = r[1];
+      if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
+      head.appendChild(l);
+    });
+  } catch(e){ document.documentElement.classList.remove("hero-wait"); window.heroTry = false; posterFirst(); }
+  /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
+     on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
+  function posterFirst(){
+    try {
+      var l = document.createElement("link"); l.rel = "preload"; l.as = "image"; l.setAttribute("fetchpriority", "high");
+      l.href = matchMedia("(orientation: portrait)").matches ? "assets/hero/poster-portrait.webp" : "assets/hero/poster.webp";
+      (document.head || document.documentElement).appendChild(l);
+    } catch(e){}
+  }
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -40,12 +81,15 @@ section{position:relative;padding:0 var(--g)}
 .chap{display:flex;gap:14px;align-items:center;margin-bottom:40px}
 .chap i{display:block;width:48px;height:1px;background:var(--rule)}
 
-/* 01 hero: a marble chessboard, one piece per project. Poster first; hero.js mounts the live scene over it. */
+/* 01 hero: a marble chessboard, one piece per project. Where the live scene (hero.js) will be tried, the hero
+   starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback. */
 .hero{height:100svh;min-height:560px;overflow:hidden;padding:0;text-align:center;background:var(--ink)}
 .hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
 /* the poster always fits the width, so no piece is ever cropped out; top and bottom melt into the ground */
 .hero-poster img{position:absolute;left:0;top:50%;width:100%;height:auto;transform:translateY(-50%);display:block;
   -webkit-mask-image:linear-gradient(180deg,transparent,#000 22%,#000 80%,transparent);mask-image:linear-gradient(180deg,transparent,#000 22%,#000 80%,transparent)}
+.hero-poster{transition:opacity .9s ease}
+html.hero-wait .hero-poster{opacity:0}
 .hero-stage{opacity:0;transition:opacity .9s ease}
 .hero.live .hero-stage{opacity:1}
 .hero-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
@@ -173,8 +217,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
   html.motion .chroma::after{transform:none}
 }
 </style>
-<!-- three.js for hero.js; loaded only when the live hero mounts -->
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+
 
 <header class="topbar">
   <a class="name" href="#top">Farhad</a>
@@ -190,7 +233,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 <main>
   <section class="hero" id="top">
     <div class="hero-view">
-      <picture class="hero-poster"><source media="(orientation: portrait)" srcset="assets/hero/poster-portrait.webp"><img src="assets/hero/poster.webp" alt="" fetchpriority="high"></picture>
+      <picture class="hero-poster"><source media="(orientation: portrait)" srcset="assets/hero/poster-portrait.webp"><img src="assets/hero/poster.webp" alt=""></picture>
       <div class="hero-stage"></div>
     </div>
     <div class="hero-head">
@@ -358,9 +401,10 @@ function rgba(hex,a){
 function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 
 /* ============================================================
-   HERO: the chessboard. The poster is the first paint and the fallback.
+   HERO: the chessboard. Where the device can take it, hero.js mounts the live scene and fades it in over a
+   dark hero (the poster is hidden from first paint, see the script before <header>). The poster is the
+   fallback: weak devices, phones, reduced motion, no WebGL2, load failure, context loss, or a slow start.
    Six project links sit over the pieces (positions from assets/hero/layout.json).
-   hero.js mounts the live scene over the poster when the device can take it.
    ============================================================ */
 window.heroLayout = null; window.heroLive = null;
 function heroOrientation(){ return matchMedia("(orientation: portrait)").matches ? "portrait" : "landscape"; }
@@ -409,32 +453,28 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
   });
   addEventListener("resize", place);
-  if (!window.fetch) return;
+  function posterBack(){ if (window.heroPosterBack) window.heroPosterBack(); }
+  if (!window.fetch) return posterBack();
   fetch("assets/hero/layout.json").then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(L){ window.heroLayout = L; place(); boot(); })
-    .catch(function(){ /* links stay a hidden, focusable list */ });
+    .catch(function(){ posterBack(); /* links stay a hidden, focusable list */ });
 
-  /* live scene: only when motion is allowed, WebGL2 exists and the device is not weak */
-  function weak(){
-    return (matchMedia("(pointer:coarse)").matches && Math.min(screen.width, screen.height) < 768)
-      || navigator.deviceMemory < 4 || navigator.hardwareConcurrency < 4;
-  }
-  function forced(){
-    try { return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){ return false; }
-  }
+  /* live scene: only where the first-paint test said to try it (motion allowed, not weak, WebGL2) */
   function boot(){
-    if (reduced || (weak() && !forced())) return;
+    if (!window.heroTry) return posterBack();
     var probe = document.createElement("canvas"), gl = probe.getContext("webgl2");
-    if (!gl) return;
+    if (!gl) return posterBack();
     var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     var started = false;
-    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
+    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); posterBack(); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
     function start(){
       if (started) return; started = true;
+      /* the stall timer now counts from here: a slow first visit gets 8 s for the mount itself */
+      clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(posterBack, 8000);
       import("./hero.js").then(function(m){
         return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack });
       }).then(function(h){
-        window.heroLive = h; sec.classList.add("live");
+        window.heroLive = h; clearTimeout(window.heroWaitTimer); sec.classList.add("live");
       }).catch(function(e){ fallBack(); console.warn("hero: live scene unavailable, showing the poster.", e); });
     }
     function near(){
@@ -442,8 +482,9 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
       var io = new IntersectionObserver(function(es){ if (es[0].isIntersecting) { io.disconnect(); start(); } }, { rootMargin:"100% 0px" });
       io.observe(sec);
     }
-    function idle(){ if (window.requestIdleCallback) requestIdleCallback(near, { timeout:1500 }); else setTimeout(near, 300); }
-    if (document.readyState === "complete") idle(); else addEventListener("load", idle);
+    /* no waiting for window load (fonts, GSAP, images): on these devices the scene is the first paint, the hero
+       is dark until it is up, and hero.js, three.js and pieces.glb were already asked for in the head */
+    near();
   }
 })();
 
