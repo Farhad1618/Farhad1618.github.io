@@ -59,6 +59,55 @@ def render_posters(objs, draft, assets_dir, out_dir=None):
     sc.render.resolution_percentage = 100
 
 
+def _smooth_rgba(png_path, r):
+    """Fog has no fine detail: blur away the render grain (alpha is never denoised), premultiplied."""
+    import numpy as np
+    img = bpy.data.images.load(png_path)
+    img.colorspace_settings.name = "Non-Color"
+    w, h = img.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    img.pixels.foreach_get(px)
+    bpy.data.images.remove(img)
+    a = px.reshape(h, w, 4)
+    pre = np.concatenate([a[..., :3] * a[..., 3:], a[..., 3:]], axis=-1)
+    for _ in range(2):
+        pre = _box_blur(pre, r)
+    al = pre[..., 3:]
+    out = np.concatenate([pre[..., :3] / np.maximum(al, 1e-4), al], axis=-1)
+    _write_png(np.clip(out, 0, 1), png_path)
+
+
+def render_atmosphere(objs, draft, assets_dir, out_dir=None):
+    """The scene with every solid thing cut out, for the live scene to lay over its own pieces. Pieces, plinths
+    and board are holdouts: the camera sees through them, but they still block the light, so their shadows
+    stay in the fog. Where nothing solid stands, the pixel is the full background (night and fog, alpha 1);
+    over a solid thing it is only the fog in front of it (alpha = how much it hides)."""
+    sc = bpy.context.scene
+    out_dir = out_dir or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "out")
+    solid = [*objs["pieces"].values(), *objs["plinths"].values(), objs["board"]]
+    for ob in solid:
+        ob.is_holdout = True
+    sc.render.film_transparent = False
+    samples = sc.cycles.samples
+    sc.cycles.samples = 48 if draft else 128
+    for which, name in (("landscape", "atmos"), ("portrait", "atmos-portrait")):
+        scene.set_camera(objs, which)
+        sc.render.resolution_percentage = 50
+        sc.render.image_settings.file_format = "PNG"
+        sc.render.image_settings.color_mode = "RGBA"
+        png = os.path.join(out_dir, name + ".png")
+        sc.render.filepath = png
+        bpy.ops.render.render(write_still=True)
+        _smooth_rgba(png, max(1, sc.render.resolution_y * sc.render.resolution_percentage // 100 // 360))
+        _save_webp(png, os.path.join(assets_dir, name + ".webp"), 90 * 1024, start=80,
+                   extra=("-alpha_q", "70", "-resize", "800" if which == "landscape" else "450", "0"))
+    for ob in solid:
+        ob.is_holdout = False
+    sc.render.film_transparent = False
+    sc.cycles.samples = samples
+    sc.render.resolution_percentage = 100
+
+
 def _gltf(v):
     """Blender (x, y, z) -> glTF (x, z, -y)."""
     return [round(v[0], 4), round(v[2], 4), round(-v[1], 4)]
@@ -216,33 +265,6 @@ def _matcap(path, size=256):
     _write_png(np.clip(out, 0, 1) ** (1 / 2.2), path)
 
 
-def _haze(path, size=512):
-    rng = np.random.default_rng(3)
-    v, u = np.mgrid[0:size, 0:size].astype(np.float32)
-    x = u / (size - 1) * 2 - 1
-    y = v / (size - 1) * 2 - 1
-    r = np.sqrt(x * x + y * y)
-    n = np.zeros((size, size), dtype=np.float32)
-    for octave, amp in ((4, 0.5), (8, 0.3), (16, 0.2)):
-        g = rng.random((octave + 1, octave + 1)).astype(np.float32)
-        gy = np.linspace(0, octave, size, endpoint=False)
-        iy = gy.astype(int)
-        fy = (gy - iy)[:, None]
-        fy = fy * fy * (3 - 2 * fy)
-        fx = fy.T
-        a = g[iy][:, iy]
-        b = g[iy][:, iy + 1]
-        c = g[iy + 1][:, iy]
-        d = g[iy + 1][:, iy + 1]
-        n += amp * ((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy)
-    # a torn bank of fog, not a round puff: the noise decides where it is thick and where it is gone
-    k = np.clip((n - 0.40) / 0.30, 0, 1)
-    alpha = np.clip(1 - r, 0, 1) ** 1.2 * (k * k * (3 - 2 * k))
-    out = np.ones((size, size, 4), dtype=np.float32)
-    out[..., 3] = np.clip(alpha, 0, 1)
-    _write_png(out, path)
-
-
 def bake_and_export(objs, assets_dir, out_dir, draft):
     sc = bpy.context.scene
     objs["haze"].hide_render = True
@@ -267,9 +289,6 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
 
     _matcap(os.path.join(out_dir, "matcap.png"))
     _save_webp(os.path.join(out_dir, "matcap.png"), os.path.join(assets_dir, "matcap.webp"), start=90)
-    _haze(os.path.join(out_dir, "haze.png"))
-    _save_webp(os.path.join(out_dir, "haze.png"), os.path.join(assets_dir, "haze.webp"), start=80,
-               extra=("-alpha_q", "80"))
 
     for o in bpy.context.view_layer.objects:
         o.select_set(False)

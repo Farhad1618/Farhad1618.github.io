@@ -22,7 +22,7 @@ Repo: github.com/Farhad1618/Farhad1618.github.io. GitHub Pages serves `main`, so
 | `build.sh` | Wraps `site.html` into `index.html` with doctype, meta, OG tags, favicon. Run after every edit. |
 | `index.html` | Deployable build. Never edit by hand. Needs `hero.js` and `assets/hero/` beside it. |
 | `hero.js` | The live chessboard hero (Three.js 0.170.0, ES module, lazy-loaded). One export: `mountHero`. |
-| `assets/hero/` | Baked hero assets: two posters, `pieces.glb` (six pieces, plinths and the board), `matcap.webp`, `haze.webp`, `layout.json` (cameras + piece screen boxes). About 1.1 MB. Generated; do not hand-edit. |
+| `assets/hero/` | Baked hero assets: two posters, `pieces.glb` (six pieces, plinths and the board), `matcap.webp`, two fog layers (`atmos.webp`, `atmos-portrait.webp`), `layout.json` (cameras + piece screen boxes). About 1.1 MB. Generated; do not hand-edit. |
 | `blender/` | `build_hero.py` + `hero/` modules that build the pieces, render the posters and bake everything in `assets/hero/`. |
 | `scripts/check-hero-assets.mjs` | Asset contract and size budget (2.5 MB total, 150 KB per poster, 15k triangles per piece). |
 | `research.html` | Standalone case study for the botnet paper (scrolling page, GSAP + ScrollTrigger). Full HTML doc; published as an artifact supporting file. Linked from project 06 and the About research row. |
@@ -94,7 +94,9 @@ Design: `docs/superpowers/specs/2026-11-23-chessboard-hero-design.md`. Mood refe
 
 - Pieces: Cyrus = the Cyrus Cylinder, worn and broken at one end, in the centre (focus); Zagros = hex vault with five keys (three turned); OnePharma = graph lattice; Black Pearl = a dark milled block holding an open ivory shell with a black pearl; Falah = balance scale, tilted, coins on the low pan; Network Intrusion Detection = a round shield that has taken three arrows. The ivory is aged on purpose (grime, pitting, cracks). Farhad wants each piece to carry a story, not look clean.
 - The board is blocks of stone at uneven heights (`build_board` in `blender/hero/scene.py`); each piece stands on a raised platform of tiles (`PLATFORM`). The look is near-black with smoke-grey fog; Farhad found blue too strong.
-- Fog is low, patchy banks between the pieces lit by a cool backlight, not an even haze: a noise-driven volume in the posters, six drifting sprites in `hero.js`.
+- One light only, hidden right behind the Cyrus Cylinder at the barrel's height (Farhad's call, after a reference still): the cylinder stands dark with a lit outline, rays fan through the fog, the sides fall to blue-black. No spots, no fill.
+- Fog is low, patchy banks: a noise-driven volume in Blender. The live scene does not fake it: it draws the poster as its backdrop and lays `atmos*.webp` (the fog rendered alone, pieces as holdouts, `--stage atmos`) over the geometry. No bloom pass.
+- Materials differ on purpose: Cyrus is fired clay with uneven lengthwise lines of writing (a shader bump, `clay_lines`) on an alabaster mount; the ivory lets light through where thin.
 - The poster (`poster.webp`, or `poster-portrait.webp` under `(orientation: portrait)`) is the first paint and the fallback. It always fits the width, so no piece is cropped.
 - Six `a[data-piece]` links in `nav.hero-pieces` are placed over the pieces from `layout.json`. They are the keyboard and screen-reader route and the tap targets when only the poster shows. Each goes to `#proj-<id>`.
 - `hero.js` mounts over the poster only when: motion is allowed, WebGL2 exists, the device is not weak (coarse pointer under 768 px, under 4 GB or 4 cores), and the hero is within one viewport. It falls back to the poster on load failure, context loss, or if six timed frames at mount average over 20 ms (measured 3.5 ms at 2160×1215 on an M1 Pro). `localStorage.heroForce = "1"` bypasses the weak-device test on localhost only.

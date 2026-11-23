@@ -3,7 +3,8 @@
     blender --background --factory-startup --python blender/build_hero.py -- --stage <pieces|stills|export|all> [--draft]
 
 pieces  clay contact sheet of the six pieces  -> blender/out/pieces-sheet.png
-stills  posters + layout.json                 -> assets/hero/
+stills  posters + layout.json + atmos        -> assets/hero/
+atmos   the fog on its own (atmos*.webp)      -> assets/hero/
 export  baked textures, sprites, pieces.glb   -> assets/hero/
 all     stills + export
 """
@@ -28,7 +29,7 @@ TRI_MAX, H_MIN, H_MAX = 15000, 1.0, 1.3
 def parse():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", choices=["pieces", "stills", "export", "all"], default="all")
+    ap.add_argument("--stage", choices=["pieces", "stills", "atmos", "export", "all"], default="all")
     ap.add_argument("--draft", action="store_true")
     return ap.parse_args(argv)
 
@@ -139,6 +140,9 @@ def main():
             use_cycles(64 if args.draft else 256)
             output.render_posters(objs, args.draft, ASSETS)
             output.write_layout(objs, ASSETS)
+        if args.stage in ("stills", "atmos", "all"):
+            use_cycles(48 if args.draft else 128)
+            output.render_atmosphere(objs, args.draft, ASSETS)
         if args.stage in ("export", "all"):
             use_cycles(48 if args.draft else 128)
             output.bake_and_export(objs, ASSETS, OUT, args.draft)

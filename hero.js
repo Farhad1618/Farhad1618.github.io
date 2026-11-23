@@ -12,11 +12,8 @@ const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
 const HAZE = [0.016, 0.021, 0.036];      // what distance fades to: blue-black
 // The one light in blender/hero/scene.py, hidden behind the Cyrus Cylinder at the barrel's height.
-// Blender (0, 1.5, 0.34 + 0.35 + 0.80) in this scene's axes (x, z, -y). The backdrop glows around it
-// and the fog banks are lit by how close they drift to it.
+// Blender (0, 1.5, 0.34 + 0.35 + 0.80) in this scene's axes (x, z, -y). The fog layer is pinned to it.
 const LIGHT = [0, 1.49, -1.5];
-const FOG_LIT = [0.85, 0.82, 0.77];       // a bank right by the light: warm smoke
-const FOG_DARK = [0.07, 0.09, 0.15];      // a bank out at the sides: barely there, cold
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -32,8 +29,7 @@ uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform f
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 void main(){
   vec3 n = normalize(vN);
-  vec3 c = texture2D(map, vUv).rgb * 0.94 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
-  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.55);
+  vec3 c = texture2D(map, vUv).rgb * 1.08 * uLift + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
   gl_FragColor = vec4(c, 1.0);
 }`;
 const BOARD_FS = `
@@ -42,7 +38,6 @@ varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
   c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
-  c = mix(c, uHaze, smoothstep(6.5, 20.0, vDepth) * 0.55);
   // the board has no edge: its outer blocks sink into the fog
   vec2 e = abs(vWorld.xz - uCentre) / uHalf;
   c = mix(c, uHaze, smoothstep(0.72, 0.97, max(e.x, e.y)));
@@ -52,6 +47,7 @@ const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(pos
 const POST_FS = `
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uPx; uniform float uNear; uniform float uFar;
 uniform float uFocus; uniform float uAperture; uniform float uMaxR; uniform float uFade; uniform vec3 uInk;
+uniform sampler2D tAtmos; uniform float uPosterScale; uniform vec2 uShift;
 varying vec2 vUv;
 float viewZ(vec2 uv){
   float d = texture2D(tDepth, uv).x * 2.0 - 1.0;
@@ -73,14 +69,11 @@ void main(){
     }
   }
   vec3 c = acc / wsum;
-  // bloom: the bright marble bleeds softly into the fog
-  vec3 glow = vec3(0.0);
-  for (int i = 0; i < 8; i++) {
-    float fi = float(i);
-    float a = fi * 2.39996323, rr = (0.35 + 0.65 * sqrt((fi + 0.5) / 8.0)) * uMaxR * 2.6;
-    glow += max(texture2D(tColor, vUv + vec2(cos(a), sin(a)) * rr * uPx).rgb - 0.52, 0.0);
-  }
-  c += glow / 8.0 * 0.7;
+  // Blender's render with every solid thing cut out (assets/hero/atmos*.webp): over empty air it is the
+  // whole background, night and fog (alpha 1); over a piece it is just the fog in front of it.
+  vec2 puv = vec2(vUv.x, 0.5 + (vUv.y - 0.5) * uPosterScale) + uShift;
+  vec4 at = texture2D(tAtmos, clamp(puv, 0.0, 1.0));
+  c = mix(c, at.rgb, at.a);
   gl_FragColor = vec4(mix(uInk, c, uFade), 1.0);
 }`;
 
@@ -98,38 +91,41 @@ export async function mountHero(stage, layout, opts = {}) {
   const listeners = [];
   const on = (t, e, f, o) => { t.addEventListener(e, f, o); listeners.push([t, e, f, o]); };
 
-  let gltf, matcapTex, hazeTex;
+  let gltf, matcapTex, plates;
   try {
     const tl = new THREE.TextureLoader();
     const gl = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-    [gltf, matcapTex, hazeTex] = await Promise.all([
-      gl.loadAsync(BASE + "pieces.glb"), tl.loadAsync(BASE + "matcap.webp"), tl.loadAsync(BASE + "haze.webp"),
+    let at, ap;
+    [gltf, matcapTex, at, ap] = await Promise.all([
+      gl.loadAsync(BASE + "pieces.glb"), tl.loadAsync(BASE + "matcap.webp"),
+      tl.loadAsync(BASE + "atmos.webp"), tl.loadAsync(BASE + "atmos-portrait.webp"),
     ]);
+    plates = { landscape: { atmos: at }, portrait: { atmos: ap } };
   } catch (e) { renderer.dispose(); throw e; }
   let cleanup = () => { for (const d of disposables) { try { d.dispose(); } catch (_) { /* gone */ } } canvas.remove(); };
   try {
-  [matcapTex, hazeTex].forEach(raw);
-  disposables.push(matcapTex, hazeTex);
+  raw(matcapTex);
+  disposables.push(matcapTex);
+  for (const o of Object.values(plates)) for (const t of Object.values(o)) {
+    raw(t); t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; disposables.push(t);
+  }
 
   const scene = new THREE.Scene();
   const hazeU = { value: new THREE.Vector3(...HAZE) };
 
-  // backdrop: blue-black, glowing only around the hidden light, so the cylinder stands dark against it.
-  // It is drawn in the scene (not in the post pass) so the pieces and fog banks show in front of it.
+  // backdrop: Blender's render with the solid things cut out, fitted like the poster, so the air between and
+  // behind the pieces is exactly what Blender rendered: real volumetric fog, the glow behind the cylinder, the rays.
   const backGeo = new THREE.PlaneGeometry(2, 2);
+  const plateU = { uPosterScale: { value: 1 }, uShift: { value: new THREE.Vector2() } };
   const backMat = new THREE.ShaderMaterial({
     depthTest: false, depthWrite: false,
-    uniforms: { uHaze: hazeU, uInk: { value: new THREE.Vector3(...INK) },
-      uLight: { value: new THREE.Vector2(0.5, 0.55) }, uAspect: { value: 16 / 9 } },
+    uniforms: { tPoster: { value: plates.landscape.atmos }, ...plateU },
     vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }",
-    fragmentShader: `uniform vec3 uHaze; uniform vec3 uInk; uniform vec2 uLight; uniform float uAspect; varying vec2 vUv;
+    fragmentShader: `uniform sampler2D tPoster; uniform float uPosterScale; uniform vec2 uShift; varying vec2 vUv;
 void main(){
-  vec3 c = mix(uHaze, uInk * 0.85, smoothstep(0.3, 0.95, vUv.y));
-  vec2 d = (vUv - uLight) * vec2(uAspect, 1.0);
-  float r2 = dot(d, d);
-  c += vec3(1.0, 0.93, 0.82) * 0.55 * exp(-r2 / 0.02);       // the light itself, behind the cylinder
-  c += vec3(0.62, 0.66, 0.74) * 0.16 * exp(-r2 / 0.12);      // its halo in the air
-  gl_FragColor = vec4(c, 1.0);
+  vec2 puv = vec2(vUv.x, 0.5 + (vUv.y - 0.5) * uPosterScale) + uShift;
+  gl_FragColor = vec4(texture2D(tPoster, clamp(puv, 0.0, 1.0)).rgb, 1.0);
 }`,
   });
   const back = new THREE.Mesh(backGeo, backMat);
@@ -181,25 +177,10 @@ void main(){
     };
   }
 
-  // haze: three slow sprites between the pieces and the dark
-  const hazeGeo = new THREE.PlaneGeometry(1, 1);
-  // banks of low fog lying between the rows of pieces, each drifting at its own pace
-  const hazes = [[-1.5, 1.0, 1.0, 11, 3.2, 47], [2.5, 0.9, -0.6, 10, 2.8, 61], [-3.0, 1.2, -1.6, 12, 3.6, 53],
-    [1.0, 1.1, -3.0, 14, 4.0, 71], [0, 1.7, -6.5, 26, 6.5, 83], [-4.0, 0.8, 3.2, 9, 2.4, 43]].map(([x, y, z, w, h, period], i) => {
-    const m = new THREE.MeshBasicMaterial({ map: hazeTex, transparent: true, depthWrite: false, opacity: 0.55 });
-    m.color.setRGB(...FOG_DARK);
-    const s = new THREE.Mesh(hazeGeo, m);
-    s.position.set(x, y, z); s.scale.set(w, h, 1); s.renderOrder = 10;
-    s.userData = { x, period, phase: i * 2.1 };
-    scene.add(s); disposables.push(m);
-    return s;
-  });
-  disposables.push(hazeGeo);
-
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 60);
   const camBase = new THREE.Vector3(), camTarget = new THREE.Vector3();
-  const lightP = new THREE.Vector3();
+  const lightP = new THREE.Vector3(), lightBase = new THREE.Vector3();
   let focusBase = 10;
 
   // post: depth of field
@@ -213,6 +194,7 @@ void main(){
       uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: 10 }, uAperture: { value: 25 },
       uMaxR: { value: 14 }, uFade: { value: 1 },
       uInk: { value: new THREE.Vector3(...INK) },
+      tAtmos: { value: plates.landscape.atmos }, uPosterScale: plateU.uPosterScale, uShift: plateU.uShift,
     },
   });
   const postGeo = new THREE.PlaneGeometry(2, 2);
@@ -231,6 +213,11 @@ void main(){
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
     focusBase = camBase.distanceTo(state[layout.focusId].centre);
+    backMat.uniforms.tPoster.value = plates[o].atmos;
+    postMat.uniforms.tAtmos.value = plates[o].atmos;
+    plateU.uPosterScale.value = v.aspect / aspect;          // poster height / screen height, both width-fitted
+    camera.position.copy(camBase); camera.lookAt(camTarget); camera.updateMatrixWorld();
+    lightBase.set(...LIGHT).project(camera);
   }
   function resize() {
     W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
@@ -348,18 +335,9 @@ void main(){
     const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
     focusNow = ease(focusNow, focusTo, 5, dt);
     postMat.uniforms.uFocus.value = focusNow;
-    for (const h of hazes) {
-      h.position.x = h.userData.x + Math.sin((t / h.userData.period) * Math.PI * 2 + h.userData.phase) * 2.6;
-      h.quaternion.copy(camera.quaternion);
-      // lit by the one light: bright as it drifts past it, dark and cold out at the sides
-      const dx = h.position.x - LIGHT[0], dz = h.position.z - LIGHT[2];
-      const k = Math.exp(-(dx * dx + dz * dz) / 9);
-      h.material.color.setRGB(FOG_DARK[0] + (FOG_LIT[0] - FOG_DARK[0]) * k,
-        FOG_DARK[1] + (FOG_LIT[1] - FOG_DARK[1]) * k, FOG_DARK[2] + (FOG_LIT[2] - FOG_DARK[2]) * k);
-    }
+    // keep the poster and fog layer pinned to the scene as the camera drifts
     lightP.set(...LIGHT).project(camera);
-    backMat.uniforms.uLight.value.set(lightP.x * 0.5 + 0.5, lightP.y * 0.5 + 0.5);
-    backMat.uniforms.uAspect.value = camera.aspect;
+    plateU.uShift.value.set((lightBase.x - lightP.x) * 0.5, (lightBase.y - lightP.y) * 0.5 * plateU.uPosterScale.value);
   }
   function render() {
     renderer.setRenderTarget(rt);

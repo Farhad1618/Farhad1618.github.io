@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const dir = path.join(root, "assets", "hero");
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
-const FILES = ["poster.webp", "poster-portrait.webp", "pieces.glb", "matcap.webp", "haze.webp", "layout.json"];
+const FILES = ["poster.webp", "poster-portrait.webp", "atmos.webp", "atmos-portrait.webp", "pieces.glb", "matcap.webp", "layout.json"];
 const BUDGET = 2621440, POSTER_MAX = 153600, TRI_MAX = 15000;
 
 const checks = [];
