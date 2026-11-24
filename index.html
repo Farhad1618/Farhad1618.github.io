@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Farhad — AI &amp; Agentic Systems Engineer in Dubai. Ontologies, knowledge graphs, agentic AI and governance layers for regulated systems. CTO at OnePharma.">
 <meta name="author" content="Farhad">
-<meta name="theme-color" content="#0C0C0E">
+<meta name="theme-color" content="#0A0F1C">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta property="og:description" content="Most systems remember. I build systems that understand.">
@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta name="twitter:description" content="Most systems remember. I build systems that understand.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230C0C0E'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230A0F1C'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
 <style>
   html{ color-scheme: dark; }
   body{ margin:0; }
@@ -37,7 +37,7 @@
   window.heroWhy = function(t){
     if (!/[?&]why\b/.test(location.search)) return;
     var put = function(){ var d = document.getElementById("hero-why");
-      if (!d) { d = document.createElement("div"); d.id = "hero-why"; d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99;font:11px/1.4 monospace;color:#ECE7DC;background:rgba(12,12,14,.85);padding:6px 8px;white-space:pre-wrap;pointer-events:none"; document.body.appendChild(d); }
+      if (!d) { d = document.createElement("div"); d.id = "hero-why"; d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99;font:11px/1.4 monospace;color:#ECE7DC;background:rgba(10,15,28,.85);padding:6px 8px;white-space:pre-wrap;pointer-events:none"; document.body.appendChild(d); }
       d.textContent += t + "\n"; };
     document.body ? put() : addEventListener("DOMContentLoaded", put);
   };
@@ -47,28 +47,45 @@
     try { forced = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){}
     window.heroWhy("mem " + n.deviceMemory + " · cores " + n.hardwareConcurrency + " · dpr " + devicePixelRatio + " · " + innerWidth + "x" + innerHeight
       + (m("(prefers-reduced-motion: reduce)") ? " · REDUCED MOTION" : "") + (window.WebGL2RenderingContext ? "" : " · NO WEBGL2"));
-    if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) { window.heroWhy("poster from the start" + (weak ? " (weak device)" : "")); return posterFirst(); }
+    if (m("(prefers-reduced-motion: reduce)") || !window.WebGL2RenderingContext || !window.fetch) { window.heroWhy("poster from the start"); return posterFirst(); }
     var html = document.documentElement;
+    /* the loader (html.hero-load; the hero's own name, a bar, "Loading"): every visit that tries the scene,
+       unless it starts at a #link down the page. It replaces the give-up timers below; the hero block in the
+       main script drives it. Weak devices are asked first (html.hero-ask): nothing loads until they choose. */
+    var loader = !location.hash;
+    window.heroReady = new Promise(function(r){ window.heroReadyGo = r; });
     /* the poster is not pinned (see html.hero-pinned in the styles), unless they have already scrolled into the
        pinned stretch: taking the extra height away then would jump the page */
     window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait");
+      if (window.heroUnload) window.heroUnload();
       if (html.classList.contains("hero-pinned") && (window.scrollY || 0) < innerHeight * 0.5) {
         html.classList.remove("hero-pinned");
         if (window.heroPosterPush) window.heroPosterPush();
         if (window.ScrollTrigger) window.ScrollTrigger.refresh();
       } };
+    /* hero.js, three.js and pieces.glb, asked for ahead of everything else */
+    window.heroPreload = function(){
+      var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
+      [["modulepreload", "hero.js"], ["modulepreload", "hero-core.js"], ["modulepreload", "hero-shaders.js"],
+       ["modulepreload", j + "build/three.module.js"],
+       ["modulepreload", j + "examples/jsm/loaders/GLTFLoader.js"], ["modulepreload", j + "examples/jsm/libs/meshopt_decoder.module.js"],
+       ["preload", "assets/hero/pieces.glb"]].forEach(function(r){
+        var l = document.createElement("link"); l.rel = r[0]; l.href = r[1];
+        if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
+        head.appendChild(l);
+      });
+    };
+    if (weak && !forced) {
+      if (!loader) { window.heroWhy("poster from the start (weak device)"); window.heroReadyGo(); return posterFirst(); }
+      window.heroWhy("weak device: asking");
+      html.classList.add("hero-load", "hero-loading", "hero-ask", "hero-wait"); window.heroTry = "ask";
+      return;
+    }
     html.classList.add("hero-wait", "hero-pinned"); window.heroTry = true;
-    window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000);
-    var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
-    [["modulepreload", "hero.js"], ["modulepreload", "hero-core.js"], ["modulepreload", "hero-shaders.js"],
-     ["modulepreload", j + "build/three.module.js"],
-     ["modulepreload", j + "examples/jsm/loaders/GLTFLoader.js"], ["modulepreload", j + "examples/jsm/libs/meshopt_decoder.module.js"],
-     ["preload", "assets/hero/pieces.glb"]].forEach(function(r){
-      var l = document.createElement("link"); l.rel = r[0]; l.href = r[1];
-      if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
-      head.appendChild(l);
-    });
-  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pinned"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
+    if (loader) html.classList.add("hero-load", "hero-loading");
+    else { window.heroReadyGo(); window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000); }
+    window.heroPreload();
+  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pinned", "hero-load", "hero-loading", "hero-ask"); window.heroReadyGo && window.heroReadyGo(); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
   /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
      on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
   function posterFirst(){
@@ -91,7 +108,7 @@
    Content is visible without JS; hide-before-reveal only under html.motion.
    ============================================================ */
 :root{
-  --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
+  --ink:#0A0F1C; --ink-2:#12192B; --rule:#1E2539; --rule-soft:#151C2D;
   --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --sig:#E9A03B; --trace:#5FA8B8;
   --disp:'Bodoni Moda',serif; --who:'Fraunces',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
   --g:clamp(16px,4vw,56px);
@@ -177,6 +194,32 @@ html.hero-wait .hero-poster{opacity:0}
 .line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
+/* The loader (see the script before <main>): the hero itself, with only the name in its own place, sliding up as
+   the title always does, a hairline bar and "Loading" where the subtitle sits. html.hero-loading while it waits
+   (scroll locked), html.hero-unloading for the fade out, html.hero-ask shows the choice instead of the bar.
+   html.hero-load stays for the visit: the name and subtitle reveal in CSS here, not in GSAP. */
+@keyframes heroName{from{transform:translateY(105%)}to{transform:none}}
+html.hero-load .hero-title .line>span{animation:heroName 1.6s cubic-bezier(.16,1,.3,1) .1s both}
+html.hero-load .hero .sub.line>span{animation:heroName 1.4s cubic-bezier(.16,1,.3,1) .05s both}
+html.hero-loading .hero .sub,html.hero-unloading .hero .sub{display:none}
+html.hero-loading .hero .cue,html.hero-loading .hero-pieces{visibility:hidden}
+html.hero-loading .hero.live .hero-stage,html.hero-unloading .hero.live .hero-stage{opacity:0}
+.hero-loader{display:none}
+html.hero-loading .hero-loader,html.hero-unloading .hero-loader{display:flex;flex-direction:column;align-items:center;gap:14px;margin-top:clamp(14px,2.4vh,26px);transition:opacity .45s ease}
+html.hero-unloading .hero-loader{opacity:0}
+.hero-loader .bar{display:block;width:clamp(120px,13vw,190px);height:1px;background:var(--rule);overflow:hidden;opacity:0;animation:heroFade .7s ease .5s forwards}
+.hero-loader .bar i{display:block;height:100%;background:var(--bone);transform-origin:0 50%;transform:scaleX(0)}
+.hero-loader .txt{font-size:10px;letter-spacing:.42em;padding-left:.42em;opacity:0;animation:heroFade .7s ease .65s forwards}
+@keyframes heroFade{to{opacity:1}}
+.hero-loader .choice{display:none;flex-direction:column;align-items:center;gap:16px;pointer-events:auto;opacity:0;animation:heroFade .6s ease .2s forwards}
+html.hero-ask .hero-loader .choice{display:flex}
+html.hero-ask .hero-loader .bar,html.hero-ask .hero-loader .txt{display:none}
+.hero-loader .note{font-size:10px;letter-spacing:.24em;color:var(--dim)}
+.hero-loader .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;padding:0 16px}
+.hero-loader button{font-size:10.5px;letter-spacing:.22em;color:var(--bone);background:transparent;border:1px solid var(--rule);border-radius:999px;padding:12px 18px;cursor:pointer;transition:border-color .3s,color .3s}
+.hero-loader button:hover,.hero-loader button:focus-visible{border-color:var(--sig);outline:none}
+.hero-loader button[data-load="full"]{border-color:var(--muted)}
+@media (orientation:portrait) and (max-width:600px){html.hero-loading .hero-loader,html.hero-unloading .hero-loader{margin-top:12px}}
 
 /* 02 who: an editorial staircase set in Fraunces (variable: soft roman, wonky italic), used only here.
    A small name line, then the statement: line two flush left, line three flush right.
@@ -193,7 +236,7 @@ html.motion .line>span{transform:translateY(105%)}
 .who-head .ch{display:inline-block}
 .pill{--pw:1.72em;--ph:.78em;display:inline-block;position:relative;width:var(--pw);height:var(--ph);margin:0 .22em;vertical-align:-.02em;
   border-radius:999px;overflow:hidden;background:var(--ink-2);
-  box-shadow:0 0 0 .05em #060607,0 0 0 calc(.05em + 1px) #2c2b2e,0 .2em .5em rgba(0,0,0,.55)}
+  box-shadow:0 0 0 .05em #05070E,0 0 0 calc(.05em + 1px) #262E42,0 .2em .5em rgba(0,0,0,.55)}
 .pill-in,.pill .dot{position:absolute;left:50%;top:50%;width:var(--pw);height:var(--ph);transform:translate(-50%,-50%);border-radius:999px}
 .pill-in{transition:transform .8s cubic-bezier(.16,1,.3,1)}
 .pill:hover .pill-in{transform:translate(-50%,-50%) scale(1.1)}
@@ -297,6 +340,11 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     <div class="hero-head">
       <div class="hero-mark" aria-hidden="true"></div>
       <h1 class="hero-title" aria-label="Farhad"><span class="line" aria-hidden="true"><span>Farhad</span></span></h1>
+      <div class="hero-loader" role="status" aria-live="polite">
+        <span class="bar" aria-hidden="true"><i></i></span><span class="mono txt">Loading</span>
+        <span class="choice"><span class="mono note">This device may struggle with the 3D scene</span>
+          <span class="btns"><button type="button" class="mono" data-load="full">Load full experience</button><button type="button" class="mono" data-load="lite">Optimised for this device</button></span></span>
+      </div>
       <p class="mono sub line"><span>Software Developer</span></p>
     </div>
     <nav class="hero-pieces" aria-label="Projects"><a data-piece="cyrus" href="#proj-cyrus">Cyrus</a><a data-piece="zagros" href="#proj-zagros">Zagros</a><a data-piece="onepharma" href="#proj-onepharma">OnePharma</a><a data-piece="pearl" href="#proj-pearl">Black Pearl</a><a data-piece="falah" href="#proj-falah">Falah</a><a data-piece="nids" href="#proj-nids">Network Intrusion Detection</a></nav>
@@ -437,7 +485,7 @@ var TAU = Math.PI * 2;
 /* ============================================================
    PALETTE
    ============================================================ */
-var C = { ink:"#0C0C0E", ink2:"#18181C", bone:"#ECE7DC", dim:"#A8A49C",
+var C = { ink:"#0A0F1C", ink2:"#12192B", bone:"#ECE7DC", dim:"#A8A49C",
           muted:"#716E68", sig:"#E9A03B", trace:"#5FA8B8" };
 function rgba(hex,a){
   var h=hex.replace("#",""); var n=parseInt(h,16);
@@ -551,14 +599,98 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
   }
   addEventListener("scroll", feedScroll, { passive:true });
   addEventListener("resize", feedScroll);
+  /* The loader (html.hero-loading, set before first paint): the bar follows what has really arrived (resource
+     timing for the modules and three.js, bytes for pieces.glb), then the mount. It eases toward that and is
+     shown for at least LOAD_MIN so it never flashes. ask() swaps the bar for the two buttons. */
+  var loadEl = sec.querySelector(".hero-loader"), barEl = loadEl.querySelector(".bar i"), de = document.documentElement;
+  var LOAD_MIN = 1800, LOAD_STALL = 12000;
+  var load = { on: de.classList.contains("hero-loading"), t0: performance.now(), shown: 0, target: 0, moved: performance.now(), ready: false, asked: false,
+    parts: { mods:[0.07, 0], three:[0.28, 0], loaders:[0.05, 0], glb:[0.42, 0], mount:[0.18, 0] } };
+  function loadSet(k, f){
+    if (!load.on) return;
+    var q = load.parts[k]; f = Math.min(1, f);
+    if (f > q[1]) { q[1] = f; load.moved = performance.now(); }
+    var t = 0; for (var n in load.parts) t += load.parts[n][0] * load.parts[n][1];
+    load.target = t;
+  }
+  function loadTick(now){
+    if (!load.on) return;
+    requestAnimationFrame(loadTick);
+    /* eases toward what has arrived, and creeps a little past it so a big file never looks frozen */
+    var goal = Math.min(load.target + 0.05, 0.99); if (load.ready) goal = 1;
+    load.shown += load.shown < load.target ? (load.target - load.shown) * 0.09 : Math.max(0, (goal - load.shown) * 0.004);
+    if (load.ready) load.shown += (1 - load.shown) * 0.12;
+    barEl.style.transform = "scaleX(" + Math.min(1, load.shown).toFixed(4) + ")";
+    if (load.ready && load.shown > 0.995 && now - load.t0 > LOAD_MIN) loadReveal(true);
+    else if (!load.ready && !load.asked && now - load.moved > LOAD_STALL && heroState === "mounting")
+      loadAsk("stalled", function(){ load.moved = performance.now(); }, function(){ heroFail("chose optimised after a stall"); });
+  }
+  /* the two buttons: full keeps going (onFull), optimised goes to the poster (onLite) */
+  function loadAsk(why, onFull, onLite){
+    load.asked = true; de.classList.add("hero-ask"); window.heroWhy("asking: " + why);
+    var bs = loadEl.querySelectorAll("button");
+    function pick(e){
+      var full = e.currentTarget.getAttribute("data-load") === "full";
+      bs.forEach(function(b){ b.removeEventListener("click", pick); });
+      load.asked = false; de.classList.remove("hero-ask"); load.moved = performance.now();
+      window.heroWhy("chose " + (full ? "full" : "optimised"));
+      (full ? onFull : onLite)();
+    }
+    bs.forEach(function(b){ b.addEventListener("click", pick); });
+    setTimeout(function(){ if (load.asked && bs[0]) bs[0].focus({ preventScroll:true }); }, 650);
+  }
+  /* the name stays; the bar fades, the subtitle slides in, the mark grows and the scene fades in with its entrance */
+  function loadReveal(live){
+    if (!load.on) return; load.on = false;
+    de.classList.remove("hero-loading", "hero-ask"); de.classList.add("hero-unloading");
+    setTimeout(function(){
+      de.classList.remove("hero-unloading");
+      if (live && window.heroLive) window.heroLive.ignite();
+      if (window.heroReadyGo) window.heroReadyGo();
+      if (window.ScrollTrigger) window.ScrollTrigger.refresh();
+    }, 450);
+  }
+  window.heroUnload = function(){ loadReveal(false); };
+  /* no scrolling while it loads. Not overflow:hidden on <html>: that empties the IntersectionObservers' root
+     and nothing down the page would ever start. Wheel, touch and scroll keys are held instead. */
+  function loadHold(e){
+    if (!load.on) return;
+    if (e.type === "keydown" && !/^(ArrowDown|ArrowUp|PageDown|PageUp|Home|End| |Spacebar)$/.test(e.key)) return;
+    if (e.type === "keydown" && e.target && e.target.tagName === "BUTTON" && e.key === " ") return;
+    e.preventDefault();
+  }
+  if (load.on) {
+    ["wheel", "touchmove", "keydown"].forEach(function(t){ addEventListener(t, loadHold, { passive:false }); });
+    requestAnimationFrame(loadTick);
+    var seen = {};
+    var onEntry = function(e){
+      var u = e.name, k = /\/hero(-core|-shaders)?\.js$/.test(u) ? "mods" : /three\.module\.js$/.test(u) ? "three"
+        : /GLTFLoader\.js$|meshopt_decoder/.test(u) ? "loaders" : /pieces\.glb$/.test(u) ? "glb" : null;
+      if (!k || seen[u]) return; seen[u] = 1;
+      var c = 0; for (var x in seen) if ((k === "mods" && /\/hero(-core|-shaders)?\.js$/.test(x)) || (k === "loaders" && /GLTFLoader\.js$|meshopt_decoder/.test(x)) || (k !== "mods" && k !== "loaders" && x === u)) c++;
+      loadSet(k, k === "mods" ? c / 3 : k === "loaders" ? c / 2 : 1);
+    };
+    try { new PerformanceObserver(function(l){ l.getEntries().forEach(onEntry); }).observe({ type:"resource", buffered:true }); }
+    catch(e){ /* no resource timing: the bar moves on the bytes of pieces.glb and the mount alone */ }
+  }
+
   function posterBack(why){ if (window.heroPosterBack) window.heroPosterBack(why); }
   if (!window.fetch) return posterBack();
   fetch("assets/hero/layout.json").then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(L){ window.heroLayout = L; place(); boot(); })
     .catch(function(e){ heroSettle("down"); soloHook.down("hero layout"); posterBack("layout.json: " + e); /* links stay a hidden, focusable list */ });
 
-  /* live scene: only where the first-paint test said to try it (motion allowed, not weak, WebGL2) */
+  /* live scene: only where the first-paint test said to try it (motion allowed, WebGL2; weak devices once they
+     choose the full experience). force: mount at the lowest level with no speed limit (the visitor chose it). */
+  var force = false, heroFail = function(why){ heroSettle("down"); soloHook.down(why); posterBack(why); };
   function boot(){
+    /* a weak device: nothing has loaded yet; full fetches everything and mounts with no speed limit */
+    if (window.heroTry === "ask") {
+      return loadAsk("weak device", function(){
+        window.heroTry = true; force = true; de.classList.add("hero-pinned"); window.heroPreload(); boot();
+        if (window.ScrollTrigger) window.ScrollTrigger.refresh();
+      }, function(){ heroSettle("down"); soloHook.down("chose optimised"); posterBack("chose optimised"); });
+    }
     if (!window.heroTry) { heroSettle("down"); return posterBack("not tried"); }
     var probe = document.createElement("canvas"), gl = probe.getContext("webgl2");
     if (!gl) { heroSettle("down"); soloHook.down("webgl2 refused"); return posterBack("webgl2 context refused"); }
@@ -566,16 +698,21 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
     var started = false;
     /* any failure, now or later (context loss while the canvas is in a chapter too): the chapters go to their posters */
     function fallBack(why){ heroSettle("down"); soloHook.down("hero: " + (typeof why === "string" ? why : "mount failed")); sec.classList.remove("live"); window.heroLive = null; showLabel(null); place(); posterBack(typeof why === "string" ? why : "mount failed"); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
+    heroFail = fallBack;
     function start(){
       if (started || heroState === "down") return; started = true; heroState = "mounting";
       /* the stall timer now counts from here: a slow first visit gets 8 s for the mount itself */
-      clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(function(){ posterBack("8 s and the mount is not up"); }, 8000); window.heroWhy("mount started");
+      clearTimeout(window.heroWaitTimer); window.heroWhy("mount started" + (force ? " (forced)" : ""));
+      if (!load.on) window.heroWaitTimer = setTimeout(function(){ posterBack("8 s and the mount is not up"); }, 8000);
       /* a core the chapters made for themselves goes (or finishes and goes) before the hero makes its own */
       Promise.resolve(soloHook.release()).then(function(){ return import("./hero.js"); }).then(function(m){
-        return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack,
+        loadSet("mods", 1); loadSet("mount", 0.15);
+        return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack, force:force,
+          onProgress:function(f){ loadSet("three", 1); loadSet("loaders", 1); loadSet("glb", f); },
           onBoxes:function(){ if (window.heroLive) place(); } });
       }).then(function(h){
-        window.heroLive = h; clearTimeout(window.heroWaitTimer); sec.classList.add("live"); place();
+        if (heroState === "down") { h.dispose(); return; }   /* they chose the poster while it was still loading */
+        window.heroLive = h; loadSet("glb", 1); loadSet("mount", 1); load.ready = true; clearTimeout(window.heroWaitTimer); sec.classList.add("live"); place();
         heroSettle("up"); soloHook.heroUp(h);
         /* up after a timer had already given up on it: pin again, if they have not scrolled into the hero yet */
         var de = document.documentElement;
@@ -584,7 +721,16 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
         window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms"
           + (h.ladder ? " · " + h.ladder : "") + (h.phone ? " · phone " + h.phone : "") + (h.pr != null ? " · pr " + h.pr.toFixed(2) : "") + (h.buf ? " · " + h.buf : "")
           + (h.msaa != null ? " · msaa " + h.msaa : "") + (h.half != null ? (h.half ? " · half" : " · 8bit") : "") + (h.halfPost === false ? " · post 8bit" : ""));
-      }).catch(function(e){ fallBack("mount error: " + (e && e.message || e)); console.warn("hero: live scene unavailable, showing the poster.", e); });
+      }).catch(function(e){
+        var why = e && e.message || String(e);
+        /* too slow for the speed test: with the loader up, they choose */
+        if (load.on && why === "too slow" && !force) {
+          return loadAsk("speed test", function(){ force = true; started = false; heroState = "idle"; start(); },
+            function(){ fallBack("too slow, chose optimised"); });
+        }
+        if (heroState === "down") return;
+        fallBack("mount error: " + why); console.warn("hero: live scene unavailable, showing the poster.", e);
+      });
     }
     function near(){
       if (!("IntersectionObserver" in window)) return start();
@@ -598,7 +744,7 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
 })();
 
 /* The mark above the name: appears like ink in water (mark.js, data in mark-data.json). Decorative; fails to nothing. */
-import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(".hero-mark")); }).catch(function(e){ console.warn("mark unavailable", e); });
+Promise.resolve(window.heroReady).then(function(){ return import("./mark.js"); }).then(function(m){ return m.mountMark(document.querySelector(".hero-mark")); }).catch(function(e){ console.warn("mark unavailable", e); });
 
 /* Portrait slot: a URL in data-photo swaps the monogram in the first headline pill for a graded <img>. */
 (function(){
@@ -631,7 +777,7 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
   }
   function bg(g, w, h){
     var gr = g.createRadialGradient(w*.5, h*.45, 0, w*.5, h*.5, w*.6);
-    gr.addColorStop(0, "#1d1c20"); gr.addColorStop(1, "#0f0f12");
+    gr.addColorStop(0, "#182033"); gr.addColorStop(1, "#0C1221");
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
   }
   var COLS = 9, ROWS = 3;
@@ -862,7 +1008,9 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   gsap.registerPlugin(ScrollTrigger);
   document.documentElement.classList.add("motion");
   var EASE = "expo.out";
-  gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
+  /* under the loader (html.hero-load) the name and subtitle reveal in CSS, on the loader's clock */
+  if (!document.documentElement.classList.contains("hero-load"))
+    gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
   /* The hero. Pinned (html.hero-pinned): the title and the cue clear in the first 0.3 of the extra height, the
      scene plays its scroll move over the first 0.7 (fed from the hero block above, not from here), and the
      picture fades from 0.8 until the pin has let go and half of it has gone, so the page hands over to 01.

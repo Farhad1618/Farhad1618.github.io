@@ -412,7 +412,7 @@ export async function createCore(opts = {}) {
   // intervals are no use here: a throttled or background tab would look like a slow device.
   // Takes the first level inside its budget, starting from rung `from` (0, the sharpest, by default);
   // throws "too slow" if none is. A level forced by key (readout) is kept: only it is timed, never thrown.
-  function mountTest(w, from = 0) {
+  function mountTest(w, from = 0, force = false) {
     if (w && w !== world) throw new Error("mountTest: world not attached");
     const gl = renderer.getContext(), px = new Uint8Array(4);
     const i0 = picked ? Math.min(LADDER.length - 1, Math.max(0, from | 0)) : Math.max(0, LADDER.indexOf(level));
@@ -429,7 +429,7 @@ export async function createCore(opts = {}) {
       if (ms <= level[2]) break;
     }
     core.level = LADDER.indexOf(level); core.mountMs = ms;
-    if (picked && ms > level[2]) throw new Error("too slow");
+    if (picked && ms > level[2] && !force) throw new Error("too slow");
     return ms;
   }
   // On localhost only: a small readout in the corner (which sharpness level, the buffer size, frames a

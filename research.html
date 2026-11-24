@@ -6,7 +6,7 @@
 <title>IoT Botnet Detection</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Case study of 'Deep Learning for Preventing Botnet Attacks on IoT' (Springer LNCS, NEW2AN / ruSMART 2023), co-authored by Farhad: the study, the public notebook's NSL-KDD CNN-RNN model, retrained and running live in your browser, a re-examination on the official test set, and what it takes to ship.">
-<meta name="theme-color" content="#0C0C0E">
+<meta name="theme-color" content="#0A0F1C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Archivo:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -19,7 +19,7 @@ try{ if(!matchMedia("(prefers-reduced-motion: reduce)").matches){ document.docum
    figures break out to full column width; the demo and the layer diagram are the two loud moments. */
 :root{
   color-scheme: dark;
-  --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
+  --ink:#0A0F1C; --ink-2:#12192B; --rule:#1E2539; --rule-soft:#151C2D;
   --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --muted-txt:#8A867F;
   --sig:#E9A03B; --sig-dim:#8A6224; --trace:#5FA8B8;
 
@@ -63,7 +63,7 @@ h1,h2,h3,h4{ margin:0; font-weight:400; text-wrap:balance; }
 /* ============================================================ TOP BAR */
 .top{
   position:sticky; top:env(safe-area-inset-top,0px); z-index:40;
-  background:rgba(12,12,14,.86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  background:rgba(10,15,28,.86); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
   border-bottom:1px solid var(--rule-soft);
 }
 .top .wrap{ display:flex; align-items:center; gap:clamp(14px,2.4vw,30px); padding-block:14px; }
@@ -752,7 +752,7 @@ footer a:hover{ color:var(--sig); }
 "use strict";
 var doc=document.documentElement;
 doc.classList.add("js");
-var C={ ink:"#0C0C0E", ink2:"#18181C", rule:"#26262A", ruleSoft:"#1B1B1E", bone:"#ECE7DC", dim:"#A8A49C", muted:"#716E68", mutedTxt:"#8A867F", sig:"#E9A03B", sigDim:"#8A6224", trace:"#5FA8B8" };
+var C={ ink:"#0A0F1C", ink2:"#12192B", rule:"#1E2539", ruleSoft:"#151C2D", bone:"#ECE7DC", dim:"#A8A49C", muted:"#716E68", mutedTxt:"#8A867F", sig:"#E9A03B", sigDim:"#8A6224", trace:"#5FA8B8" };
 function rgba(hex,a){ var n=parseInt(hex.slice(1),16); return "rgba("+((n>>16)&255)+","+((n>>8)&255)+","+(n&255)+","+a+")"; }
 function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
 function $(id){ return document.getElementById(id); }

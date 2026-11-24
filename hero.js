@@ -780,7 +780,8 @@ export async function mountHero(stage, layout, opts = {}) {
   let core = null;
   const [coreR, gltfR] = await Promise.allSettled([
     createCore({ onLost: reason => { if (opts.onLost) opts.onLost(reason); } }),
-    gl.loadAsync(BASE + "pieces.glb"),
+    // the loader's bar (site.html) follows the bytes of pieces.glb
+    gl.loadAsync(BASE + "pieces.glb", opts.onProgress && (e => { if (e.total) opts.onProgress(e.loaded / e.total); })),
   ]);
   if (coreR.status === "fulfilled") core = coreR.value;
   if (gltfR.status === "rejected") { if (core) core.dispose(); throw gltfR.reason; }
@@ -808,7 +809,7 @@ export async function mountHero(stage, layout, opts = {}) {
     core.attach(stage, world);
     if (new URLSearchParams(location.search).has("compare")) core.grainCompare();
     world.update(0, core); core.render();          // first frame is on screen before the caller fades the stage in
-    core.mountTest(world);
+    core.mountTest(world, 0, opts.force);     // force: the visitor chose the full scene; the lowest level, never too slow
     core.initReadout();
     core.start();
     return handle;
