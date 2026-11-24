@@ -54,15 +54,8 @@
        main script drives it. Weak devices are asked first (html.hero-ask): nothing loads until they choose. */
     var loader = !location.hash;
     window.heroReady = new Promise(function(r){ window.heroReadyGo = r; });
-    /* the poster is not pinned (see html.hero-pinned in the styles), unless they have already scrolled into the
-       pinned stretch: taking the extra height away then would jump the page */
     window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait");
-      if (window.heroUnload) window.heroUnload();
-      if (html.classList.contains("hero-pinned") && (window.scrollY || 0) < innerHeight * 0.5) {
-        html.classList.remove("hero-pinned");
-        if (window.heroPosterPush) window.heroPosterPush();
-        if (window.ScrollTrigger) window.ScrollTrigger.refresh();
-      } };
+      if (window.heroUnload) window.heroUnload(); };
     /* hero.js, three.js and pieces.glb, asked for ahead of everything else */
     window.heroPreload = function(){
       var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
@@ -81,11 +74,11 @@
       html.classList.add("hero-load", "hero-loading", "hero-ask", "hero-wait"); window.heroTry = "ask";
       return;
     }
-    html.classList.add("hero-wait", "hero-pinned"); window.heroTry = true;
+    html.classList.add("hero-wait"); window.heroTry = true;
     if (loader) html.classList.add("hero-load", "hero-loading");
     else { window.heroReadyGo(); window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000); }
     window.heroPreload();
-  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pinned", "hero-load", "hero-loading", "hero-ask"); window.heroReadyGo && window.heroReadyGo(); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
+  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-load", "hero-loading", "hero-ask"); window.heroReadyGo && window.heroReadyGo(); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
   /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
      on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
   function posterFirst(){
@@ -134,10 +127,8 @@ section{position:relative;padding:0 var(--g)}
 
 /* 01 hero: a marble chessboard, one piece per project. Where the live scene (hero.js) will be tried, the hero
    starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback.
-   Everything sits in .hero-pin. On phones where the scene is tried (html.hero-pinned, set with hero-wait)
-   the hero is taller and .hero-pin sticks for the tour (see below). Everywhere else both are one screen, nothing
-   sticks and the page simply scrolls on while the scene plays its scroll move (hero.js SCROLL). .hero itself must not clip
-   (overflow:hidden would make it the scroll box and sticky would never stick); .hero-pin clips instead. */
+   Nothing is pinned anywhere: the hero is one screen and the page simply scrolls on while the scene plays its
+   scroll move (hero.js SCROLL). Phones once pinned it for a tour; it read as a page that would not scroll. */
 .hero{height:100svh;min-height:560px;padding:0;text-align:center;background:var(--ink)}
 .hero-pin{position:sticky;top:0;height:100svh;min-height:560px;overflow:hidden}
 .hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
@@ -148,7 +139,7 @@ section{position:relative;padding:0 var(--g)}
 html.hero-wait .hero-poster{opacity:0}
 .hero-stage{opacity:0;transition:opacity .9s ease}
 .hero.live .hero-stage{opacity:1}
-.hero-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+.hero-stage canvas{display:block;width:100%;height:100%;touch-action:manipulation}
 .hero-pin::before,.hero-pin::after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
 .hero-pin::before{top:0;height:34%;background:linear-gradient(180deg,var(--ink) 8%,transparent)}
 /* vignette: the edges fall away into the dark, the centre holds the light */
@@ -171,7 +162,7 @@ html.hero-wait .hero-poster{opacity:0}
 .hero-label{position:absolute;z-index:4;left:0;top:0;transform:translate(-50%,-100%);padding-bottom:12px;color:var(--bone);white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
 .hero-label.on{opacity:1}
 /* phones: a tighter title block (it ends at ~16% of the height, clear of the pieces, which the live scene's
-   closer phone camera puts at ~34-56%) and a wider vignette, so the outer pieces are not dimmed */
+   closer phone camera puts at ~35-52%) and a wider vignette, so the outer pieces are not dimmed */
 @media (orientation:portrait) and (max-width:600px){
   .hero-head{top:10svh}
   .hero-mark{width:44px;margin:0 0 10px -22px}
@@ -180,16 +171,6 @@ html.hero-wait .hero-poster{opacity:0}
   .hero-pin::before{height:22%}
   .hero-view::after{background:radial-gradient(ellipse 110% 70% at 50% 50%,transparent 40%,rgba(8,8,11,.78) 100%)}
 }
-/* the phone tour (hero.js TOUR): wherever the live scene frames for a phone and the row is wider than the
-   screen (portrait under aspect 0.72, hero.js PHONE_AT[1]; phones, and an iPad mini, whose 0.66 still gets part
-   of the phone framing) the pin holds for 3 screens, the first 2.3 for the seven stops (about a third of a
-   screen each), the last 0.7 for the exit. The same query is heroTourQ below. */
-@media (orientation:portrait) and (max-aspect-ratio:18/25){
-  html.hero-pinned .hero{height:400svh;min-height:2240px}
-}
-/* the presented piece's label on the tour sits under its plinth, on the dark board, with its number */
-.hero-label.under{transform:translate(-50%,0);padding:10px 0 0;font-size:10.5px;color:var(--bone);text-shadow:0 0 10px var(--ink),0 0 3px var(--ink)}
-.hero-label .n{color:var(--sig);margin-right:.7em}
 .line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
@@ -536,12 +517,6 @@ function heroCover(aspect){
   return { w:W, h:h, dx:0, dy:(H-h)/2 };
 }
 window.heroOrientation = heroOrientation; window.heroCover = heroCover;
-/* phones: the pinned stretch is longer (see the phone CSS) and its first part is the scene's tour, one stop
-   per piece (hero.js TOUR); TOUR_SHARE of the extra height is the tour, the rest the exit */
-window.heroTourQ = matchMedia("(orientation:portrait) and (max-aspect-ratio:18/25)");
-window.HERO_TOUR_SHARE = 2.3 / 3;
-/* the pinned extra height split into the tour (0 where there is none) and the exit */
-window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * window.HERO_TOUR_SHARE : 0; return { tour:t, exit:x - t }; };
 (function(){
   var sec = document.getElementById("top"), nav = sec && sec.querySelector(".hero-pieces");
   if (!nav) return;
@@ -551,43 +526,32 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
     soloHook.prefetch(id);       /* its piece loads during the scroll */
     if (t) t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block:"start" });
   }
-  /* the live scene names the piece it presents: over its top on desktop; on phones (yb: the foot of its
-     plinth) under it, with its number, kept inside the screen */
-  function showLabel(id, x, y, yb){
+  /* the live scene names the piece it presents, over its top */
+  function showLabel(id, x, y){
     if (!id) { label.classList.remove("on"); stage.style.cursor = ""; return; }
-    var a = nav.querySelector('a[data-piece="'+id+'"]'), under = yb != null && window.heroTourQ.matches;
-    var key = id + (under ? "|u" : "");
-    if (label.getAttribute("data-k") !== key) {
-      label.setAttribute("data-k", key); label.textContent = "";
-      if (under) {
-        var n = document.createElement("span"); n.className = "n";
-        n.textContent = "0" + ([].indexOf.call(links, a) + 1); label.appendChild(n);
-      }
-      label.appendChild(document.createTextNode(a ? a.textContent : ""));
-      label.classList.toggle("under", under);
-    }
-    if (under) {
-      var hw = label.offsetWidth / 2, W = stage.clientWidth;
-      x = Math.max(hw + 12, Math.min(W - hw - 12, x)); y = yb;
-    }
+    var a = nav.querySelector('a[data-piece="'+id+'"]');
+    var txt = a ? a.textContent : "";
+    if (label.textContent !== txt) label.textContent = txt;
     label.style.left = x+"px"; label.style.top = y+"px";
     label.classList.add("on"); stage.style.cursor = "pointer";
   }
   function place(){
     var L = window.heroLayout; if (!L) return;
-    /* live: the boxes come from the scene's own camera (phones frame closer and pan, see hero.js PHONE_CAM).
-       A piece turned out of view takes its link out of the tab order until it is back. */
+    /* live: the boxes come from the scene's own camera (phones frame closer, see hero.js PHONE_CAM). A piece
+       out of view takes its link out of the tab order; one the scene leaves out (phones show four of the six,
+       hero.js HIDE_ON_PHONE) has no box and its link is hidden: the project is still in the Work section. */
     var B = window.heroLive && window.heroLive.boxes ? window.heroLive.boxes() : null;
     var v = L[heroOrientation()], c = heroCover(v.aspect);
     links.forEach(function(a){
       var id = a.getAttribute("data-piece");
       if (B) {
-        var r = B[id]; if (!r) return;
+        var r = B[id];
+        a.style.display = r ? "" : "none"; if (!r) return;
         a.style.left = r.x+"px"; a.style.top = r.y+"px"; a.style.width = r.w+"px"; a.style.height = r.h+"px";
         if (r.on) a.removeAttribute("tabindex"); else a.setAttribute("tabindex", "-1");
         return;
       }
-      a.removeAttribute("tabindex");
+      a.removeAttribute("tabindex"); a.style.display = "";
       var b = v.pieces[id]; if (!b) return;
       a.style.left = (c.dx + (b.cx-b.w/2)*c.w)+"px"; a.style.top = (c.dy + (b.cy-b.h/2)*c.h)+"px";
       a.style.width = (b.w*c.w)+"px"; a.style.height = (b.h*c.h)+"px";
@@ -608,16 +572,12 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
     a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
   });
   addEventListener("resize", place);
-  /* the scene's scroll move: 0..1 over the hero's height as it scrolls away (nothing is pinned there). The raw position; hero.js eases after it. Fed at mount too, so a reload partway down
-     starts where the page is. Plain scroll events, so it works without GSAP.
-     Phones (heroSplit): the tour first, 0..1 over its share of the stretch (setScroll's second value), then
-     the exit, 0..1 over the first 0.7 of the rest. */
-  var pinEl = sec.querySelector(".hero-pin");
+  /* the scene's scroll move: 0..1 over the hero's height as it scrolls away (nothing is pinned). The raw
+     position; hero.js eases after it. Fed at mount too, so a reload partway down starts where the page is.
+     Plain scroll events, so it works without GSAP. */
   function feedScroll(){
     if (!window.heroLive) return;
-    var x = sec.offsetHeight - pinEl.offsetHeight, y = -sec.getBoundingClientRect().top, s = window.heroSplit(x);
-    if (s.tour) return window.heroLive.setScroll((y - s.tour) / (s.exit * 0.7), y / s.tour);
-    window.heroLive.setScroll(y / sec.offsetHeight);
+    window.heroLive.setScroll(-sec.getBoundingClientRect().top / sec.offsetHeight);
   }
   addEventListener("scroll", feedScroll, { passive:true });
   addEventListener("resize", feedScroll);
@@ -709,7 +669,7 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
     /* a weak device: nothing has loaded yet; full fetches everything and mounts with no speed limit */
     if (window.heroTry === "ask") {
       return loadAsk("weak device", function(){
-        window.heroTry = true; force = true; de.classList.add("hero-pinned"); window.heroPreload(); boot();
+        window.heroTry = true; force = true; window.heroPreload(); boot();
         if (window.ScrollTrigger) window.ScrollTrigger.refresh();
       }, function(){ heroSettle("down"); soloHook.down("chose optimised"); posterBack("chose optimised"); });
     }
@@ -738,7 +698,6 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
         heroSettle("up"); soloHook.heroUp(h);
         /* up after a timer had already given up on it: pin again, if they have not scrolled into the hero yet */
         var de = document.documentElement;
-        if (!de.classList.contains("hero-pinned") && (window.scrollY || 0) < innerHeight * 0.5) { de.classList.add("hero-pinned"); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
         feedScroll();
         window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms"
           + (h.ladder ? " · " + h.ladder : "") + (h.phone ? " · phone " + h.phone : "") + (h.pr != null ? " · pr " + h.pr.toFixed(2) : "") + (h.buf ? " · " + h.buf : "")
@@ -1033,18 +992,15 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   /* under the loader (html.hero-load) the name and subtitle reveal in CSS, on the loader's clock */
   if (!document.documentElement.classList.contains("hero-load"))
     gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
-  /* The hero. Not pinned (all but the phone tour): the title and the cue clear by 60% of the hero and the picture
-     keeps its full strength for the first 40%, then fades over the rest, while the scene plays its scroll move (fed from the hero block above, not from here).
-     Phones (heroSplit): the title clears over the hold on the first stop (half of the tour's first seventh, as
-     the camera starts to turn), and then the exit: the
-     picture fades from 0.8 of it until the pin has let go and half of it has gone. The poster alone pushes in. */
+  /* The hero: the title and the cue clear by 60% of it, and the picture keeps its full strength for the first
+     40%, then fades over the rest, while the scene plays its scroll move (fed from the hero block above). The
+     poster alone pushes in. */
   var heroSec = document.getElementById("top"), heroPinEl = heroSec.querySelector(".hero-pin");
-  var heroExtra = function(){ return Math.max(0, heroSec.offsetHeight - heroPinEl.offsetHeight); };
   gsap.to([".hero-head", ".hero .cue"], { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top",
-    end:function(){ var x = heroExtra(), s = window.heroSplit(x); return "+=" + Math.round(s.tour ? s.tour / 7 * 0.5 : x ? x * 0.3 : heroPinEl.offsetHeight * 0.6); }, scrub:true } });
+    end:function(){ return "+=" + Math.round(heroPinEl.offsetHeight * 0.6); }, scrub:true } });
   gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero",
-    start:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "top+=" + Math.round(s.tour + s.exit * 0.8) + " top" : "top+=" + Math.round(heroPinEl.offsetHeight * 0.4) + " top"; },
-    end:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "+=" + Math.round(s.exit * 0.2 + heroPinEl.offsetHeight * 0.5) : "bottom top"; }, scrub:true } });
+    start:function(){ return "top+=" + Math.round(heroPinEl.offsetHeight * 0.4) + " top"; },
+    end:"bottom top", scrub:true } });
   /* the poster's push-in: only where nothing is pinned; heroPosterBack() starts it when a live try falls back */
   var heroPushed = false;
   window.heroPosterPush = function(){
@@ -1052,7 +1008,7 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
     gsap.fromTo(".hero-poster img", { yPercent:-50, y:0, scale:1 }, { yPercent:-46, y:0, scale:1.06, ease:"none",
       scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true } });
   };
-  if (!document.documentElement.classList.contains("hero-pinned")) window.heroPosterPush();
+  window.heroPosterPush();
   ScrollTrigger.batch(".rv", {
     start:"top 88%", once:true,
     onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
