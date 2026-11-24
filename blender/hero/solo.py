@@ -3,7 +3,7 @@
 SOLO[pid] holds what differs per piece. Positions are in Blender world metres; the piece's base (the top of
 its plinth) is at (ox, oy, PLATFORM[pid] + PLINTH_H), where (ox, oy) keeps its hero offset inside a tile
 (centred, or astride two), so a patch of the hero's board fits round it.
-  tiles   patch size in tiles (x, y): one row in front of the piece's tile, the rest behind
+  tiles   the nominal stage in tiles (x, y), for layout.json; only the piece's own block is built (patch)
   light   the one point light, relative to the piece base: a little behind (+y), to one side, about
           0.7-0.9 of the piece's height up, so a lit edge wraps onto the front
   energy  watts: 900 * (d / 1.5)^2, d the light's distance to the piece's centre (the hero's irradiance)
@@ -59,17 +59,45 @@ def offset_in_tile(pid):
 
 
 def patch(pid):
-    """Centre and size for build_board so it makes exactly tiles[0] x tiles[1] tiles round the piece,
-    and the patch's real extent (centre, size) for layout.json."""
+    """Centre and size for build_board so it makes only the block the piece stands on (both, where it stands
+    astride a seam), and the nominal stage (centre, size) for layout.json, which the live board fade is
+    measured on: far bigger than the block, so the fade never reaches it."""
     nx, ny = SOLO[pid]["tiles"]
     ox, oy = offset_in_tile(pid)
-    ci, cj = round(ox / TILE), round(oy / TILE)
-    i0, i1 = ci - (nx - 1) // 2, ci + nx // 2
-    j0, j1 = cj - 1, cj + ny - 2                     # one row in front of the piece, the rest behind it
+    own = [[k for k in range(-2, 3) if abs(k * TILE - o) < scene.REACH] for o in (ox, oy)]
+    (i0, i1), (j0, j1) = ((c[0], c[-1]) for c in own)
+    if (i1 - i0 + 1) * (j1 - j0 + 1) > 2:
+        raise RuntimeError(f"{pid} stands on more than two tiles")
     centre = ((i0 + i1) / 2 * TILE, (j0 + j1) / 2 * TILE)
     # build_board spans floor(x0 / TILE) .. ceil((x0 + size) / TILE): tile centres on both ends
     size = ((i1 - i0) * TILE, (j1 - j0) * TILE)
-    return centre, size, (nx * TILE, ny * TILE)
+    ci, cj = round(ox / TILE), round(oy / TILE)
+    a0, a1 = ci - (nx - 1) // 2, ci + nx // 2
+    b0, b1 = cj - 1, cj + ny - 2
+    stage = ((a0 + a1) / 2 * TILE, (b0 + b1) / 2 * TILE)
+    return centre, size, stage, (nx * TILE, ny * TILE)
+
+
+def _sink(mat, top):
+    """The block has no floor to stand on: its sides (stone and sheen) sink to black below the top."""
+    nt = mat.node_tree
+    N, Lk, b = nt.nodes, nt.links, nt.nodes["Principled BSDF"]
+    geo, sep, k = N.new("ShaderNodeNewGeometry"), N.new("ShaderNodeSeparateXYZ"), N.new("ShaderNodeMapRange")
+    Lk.new(geo.outputs["Position"], sep.inputs[0])
+    k.interpolation_type = "SMOOTHSTEP"
+    k.inputs["From Min"].default_value, k.inputs["From Max"].default_value = top - 0.5, top
+    Lk.new(sep.outputs["Z"], k.inputs["Value"])
+    mul = N.new("ShaderNodeMixRGB")
+    mul.blend_type = "MULTIPLY"
+    mul.inputs["Fac"].default_value = 1.0
+    Lk.new(b.inputs["Base Color"].links[0].from_socket, mul.inputs["Color1"])
+    Lk.new(k.outputs["Result"], mul.inputs["Color2"])
+    Lk.new(mul.outputs[0], b.inputs["Base Color"])
+    sp = N.new("ShaderNodeMath")
+    sp.operation = "MULTIPLY"
+    sp.inputs[1].default_value = 0.15
+    Lk.new(k.outputs["Result"], sp.inputs[0])
+    Lk.new(sp.outputs[0], b.inputs["Specular IOR Level"])
 
 
 def seed_for(pid):
@@ -95,7 +123,14 @@ def _clear_round(haze, at, radii):
     Lk.new(dist.outputs["Value"], k.inputs["Value"])
     mul = N.new("ShaderNodeMath"); mul.operation = "MULTIPLY"
     Lk.new(src, mul.inputs[0]); Lk.new(k.outputs["Result"], mul.inputs[1])
-    Lk.new(mul.outputs[0], vol.inputs["Density"])
+    sep = N.new("ShaderNodeSeparateXYZ")
+    Lk.new(geo.outputs["Position"], sep.inputs[0])
+    fl = N.new("ShaderNodeMapRange"); fl.interpolation_type = "SMOOTHSTEP"
+    fl.inputs["From Min"].default_value, fl.inputs["From Max"].default_value = -0.5, 1.0
+    Lk.new(sep.outputs["Z"], fl.inputs["Value"])
+    m2 = N.new("ShaderNodeMath"); m2.operation = "MULTIPLY"
+    Lk.new(mul.outputs[0], m2.inputs[0]); Lk.new(fl.outputs["Result"], m2.inputs[1])
+    Lk.new(m2.outputs[0], vol.inputs["Density"])
 
 
 def build_solo(pid, draft=False):
@@ -116,20 +151,26 @@ def build_solo(pid, draft=False):
         ob.data.materials.append(m)
     pl.data.materials.append(plinth_mat)
 
-    centre, size, extent = patch(pid)
-    board = scene.build_board(center=centre, size=size, placement={pid: (ox, oy, yaw)}, platform={pid: platform},
-                              seed=seed_for(pid), back=True)
+    own, size, centre, extent = patch(pid)
+    board = scene.build_board(center=own, size=size, placement={pid: (ox, oy, yaw)}, platform={pid: platform},
+                              seed=seed_for(pid), back=True, lo=-2.0)
+    if len(board.data.polygons) not in (5, 10):
+        raise RuntimeError(f"board has {len(board.data.polygons)} faces, expected one or two blocks of 5")
     # the inlay's own glow is for the far hero board; at a few metres it reads too hot
-    for n in M["board"].node_tree.nodes:
-        if n.bl_idname == "ShaderNodeMath" and n.operation == "MULTIPLY" and abs(n.inputs[1].default_value - 0.04) < 1e-6:
-            n.inputs[1].default_value = 0.012
+    bn = M["board"].node_tree.nodes
+    glow = [n for n in bn if n.bl_idname == "ShaderNodeMath" and n.operation == "MULTIPLY"
+            and abs(n.inputs[1].default_value - 0.04) < 1e-6]
     # the warm tiles: the hero sees them from 10 m at a slant; here they fill the foreground and outshone the piece
-    for n in M["board"].node_tree.nodes:
-        if n.bl_idname == "ShaderNodeMixRGB" and tuple(round(c, 3) for c in n.inputs["Color2"].default_value[:3]) == (0.1, 0.058, 0.028):
-            n.inputs["Color2"].default_value = (0.055, 0.032, 0.016, 1)
+    warm = [n for n in bn if n.bl_idname == "ShaderNodeMixRGB"
+            and tuple(round(c, 3) for c in n.inputs["Color2"].default_value[:3]) == (0.1, 0.058, 0.028)]
+    if len(glow) != 1 or len(warm) != 1:
+        raise RuntimeError(f"board material changed: {len(glow)} glow and {len(warm)} warm-stone nodes, expected 1 each")
+    glow[0].inputs[1].default_value = 0.012
+    warm[0].inputs["Color2"].default_value = (0.055, 0.032, 0.016, 1)
     # honed stone seen close and low: less sheen, or the tops mirror the lit fog to white
     scene._set(M["board"].node_tree.nodes["Principled BSDF"], **{"Specular IOR Level": 0.15})
     board.data.materials.append(M["board"])
+    _sink(M["tile-side"], platform)
     board.data.materials.append(M["tile-side"])
 
     sc = bpy.context.scene
@@ -145,10 +186,11 @@ def build_solo(pid, draft=False):
     # the fog: a smaller box round the patch, with the hero's banks metre for metre. A little thinner than the
     # hero's: the camera is close to the light, and 1.6x (then 1.15x) washed the frame out round it
     hz = S["haze"]
-    hloc = (centre[0], oy + hz["front"] + hz["depth"] / 2, 2.5)
-    hscale = (hz["width"], hz["depth"], 5.0)
+    # z -2 .. 5, thinned out below the block's top (_clear_round): with no floor, a box ending at z 0 showed its edge
+    hloc = (centre[0], oy + hz["front"] + hz["depth"] / 2, 1.5)
+    hscale = (hz["width"], hz["depth"], 7.0)
     ns, lo = scene.haze_mapping(hloc, hscale, hz["top"])
-    haze = scene.build_haze(loc=hloc, scale=hscale, noise_loc=(3.1, 0.7, 0.0), dens=(0.0035 * hz["dens"], 0.15 * hz["dens"]),
+    haze = scene.build_haze(loc=hloc, scale=hscale, noise_loc=(3.1, 0.7, -0.75), dens=(0.0035 * hz["dens"], 0.15 * hz["dens"]),
                             noise_scale=ns, low_z=lo)
     _clear_round(haze, light.location, S.get("clear", (0.25, 1.0)))
 
@@ -166,6 +208,60 @@ def build_solo(pid, draft=False):
     bpy.context.view_layer.update()
     return {"id": pid, "pieces": {pid: ob}, "plinths": {pid: pl}, "board": board, "lights": [light], "haze": haze,
             "cam_solo": cam, "patch": (centre, extent), "base": base}
+
+
+def poster_look(board, sheen=0.12, albedo=0.5, glow=0.15):
+    """For the still only (the bakes have no gloss and keep the real board): as the camera sees them, the tiles
+    have little sheen, darker stone and a fainter inlay, so none outshines the piece's lit edge. Every other ray
+    meets the real board: its bounce is the only fill on the front of the piece, and without it the writing
+    goes black. Returns a function that undoes it."""
+    undo = []
+    for mat in board.data.materials:
+        nt = mat.node_tree
+        b, out = nt.nodes["Principled BSDF"], nt.nodes["Material Output"]
+        made = []
+
+        def new(kind):
+            made.append(nt.nodes.new(kind))
+            return made[-1]
+        d = new("ShaderNodeBsdfPrincipled")
+        for a, c in zip(b.inputs, d.inputs):
+            if a.is_linked:
+                nt.links.new(a.links[0].from_socket, c)
+            elif hasattr(a, "default_value"):
+                c.default_value = a.default_value
+        for name, k in (("Specular IOR Level", sheen), ("Metallic", 0.0), ("Emission Strength", glow)):
+            sock = d.inputs[name]
+            if sock.is_linked:
+                n = new("ShaderNodeMath")
+                n.operation = "MULTIPLY"
+                n.inputs[1].default_value = k
+                nt.links.new(sock.links[0].from_socket, n.inputs[0])
+                nt.links.new(n.outputs[0], sock)
+            else:
+                sock.default_value *= k
+        col = new("ShaderNodeMixRGB")
+        col.blend_type = "MULTIPLY"
+        col.inputs["Fac"].default_value = 1.0
+        col.inputs["Color2"].default_value = (albedo, albedo, albedo, 1)
+        nt.links.new(d.inputs["Base Color"].links[0].from_socket, col.inputs["Color1"])
+        nt.links.new(col.outputs[0], d.inputs["Base Color"])
+        lp, mix = new("ShaderNodeLightPath"), new("ShaderNodeMixShader")
+        nt.links.new(lp.outputs["Is Camera Ray"], mix.inputs[0])
+        nt.links.new(b.outputs[0], mix.inputs[1])
+        nt.links.new(d.outputs[0], mix.inputs[2])
+        nt.links.new(mix.outputs[0], out.inputs["Surface"])
+
+        def back(nt=nt, made=made, b=b, out=out):
+            for n in made:
+                nt.nodes.remove(n)
+            nt.links.new(b.outputs[0], out.inputs["Surface"])
+        undo.append(back)
+
+    def restore():
+        for u in undo:
+            u()
+    return restore
 
 
 # ---------------------------------------------------------------- the clay sheet

@@ -258,11 +258,11 @@ def board_material():
 
 
 def build_board(center=BOARD_CENTER, size=BOARD_SIZE, placement=PLACEMENT, platform=PLATFORM, seed=11,
-                back=False, name="board"):
+                back=False, name="board", lo=-0.6):
     """Blocks of stone at uneven heights. Tops carry the inlay; sides are plain dark stone.
     UVs: tops are a straight top-down projection in the upper 80% of the map, the visible
     sides (front, left, right) are packed into a strip along the bottom. back=True also builds the back face
-    (the hero never does; a close, tilted solo view can see it). The rng call order is the hero's."""
+    (the hero never does; a close, tilted solo view can see it). The rng call order is the hero's. lo: how far down the sides go."""
     rng = random.Random(seed)
     x0, y0 = center[0] - size[0] / 2, center[1] - size[1] / 2
     kx = range(int(math.floor(x0 / TILE)), int(math.ceil((x0 + size[0]) / TILE)) + 1)
@@ -281,7 +281,6 @@ def build_board(center=BOARD_CENTER, size=BOARD_SIZE, placement=PLACEMENT, platf
                 if abs(cx - px) < reach and abs(cy - py) < reach:
                     h = platform[pid]
             a = TILE / 2 - TILE_GAP / 2
-            lo = -0.6
             c = [(cx - a, cy - a), (cx + a, cy - a), (cx + a, cy + a), (cx - a, cy + a)]
             top = bm.faces.new([bm.verts.new((x, y, h)) for x, y in c])
             for loop in top.loops:

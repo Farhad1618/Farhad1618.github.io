@@ -523,9 +523,10 @@ def build_cyrus():
         pb.from_mesh(me)
         n0 = len(pb.faces)
         gone = [f for f in pb.faces if any(r(f) for r in rules)]
+        n_gone = len(gone)
         bmesh.ops.delete(pb, geom=gone, context="FACES")
-        if not pb.faces:
-            raise RuntimeError(f"mount part {me.name}: nothing left after dropping hidden faces")
+        if n_gone != len(rules) or not pb.faces:      # one flat face per covered plane, and nothing else
+            raise RuntimeError(f"mount part {me.name}: dropped {n_gone} hidden faces, expected {len(rules)}")
         print(f"  {me.name}: {n0} faces, {len(gone)} hidden dropped")
         pb.to_mesh(me)
         pb.free()

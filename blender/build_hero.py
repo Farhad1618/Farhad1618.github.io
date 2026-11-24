@@ -38,7 +38,7 @@ def parse():
                     default="all")
     ap.add_argument("--draft", action="store_true")
     ap.add_argument("--piece", action="append", help="solo stages: a piece id (repeatable)")
-    ap.add_argument("--poster-only", action="store_true", help="solo: poster and layout, no bakes (for tuning)")
+    ap.add_argument("--poster-only", action="store_true", help="solo: the poster only; solo.glb and layout.json stay as they are")
     return ap.parse_args(argv)
 
 
@@ -151,10 +151,12 @@ def stage_solo(ids, draft, clay_only, poster_only=False):
         ok &= report(objs["pieces"], SOLO_TRI_MAX)
         os.makedirs(assets_dir, exist_ok=True)
         use_cycles(64 if draft else S["samples"])
+        restore = solo.poster_look(objs["board"])
         output.render_poster(objs, objs["cam_solo"], "poster", assets_dir, out_dir, draft)
-        output.write_solo_layout(objs, assets_dir)
-        if poster_only:
+        restore()                                # the bakes see the real board
+        if poster_only:                          # layout.json goes with the glb: leave both alone
             continue
+        output.write_solo_layout(objs, assets_dir)
         sizes = {k: (v // 2 if draft else v) for k, v in S["tex"].items()}
         use_cycles(48 if draft else S["samples"])
         output.bake_and_export(objs, assets_dir, out_dir, draft, ids=[pid], cam=objs["cam_solo"], sizes=sizes,
