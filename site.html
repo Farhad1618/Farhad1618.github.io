@@ -8,7 +8,7 @@
    on any failure, and if the scene still is not up 6 s after first paint (before the mount starts) or 8 s
    after the mount starts. Everyone else sees the poster from first paint.
    This runs first in the page, before the font stylesheet can block it, and after the import map: where the
-   scene will be tried it asks for hero.js, three.js and pieces.glb straight away, ahead of the poster. */
+   scene will be tried it asks for hero.js (with hero-core.js and hero-shaders.js), three.js and pieces.glb straight away, ahead of the poster. */
 (function(){
   window.heroTry = false;
   /* ?why on the URL prints why the hero chose the poster or the live scene, for checking on a phone */
@@ -38,7 +38,8 @@
     html.classList.add("hero-wait", "hero-pin"); window.heroTry = true;
     window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000);
     var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
-    [["modulepreload", "hero.js"], ["modulepreload", j + "build/three.module.js"],
+    [["modulepreload", "hero.js"], ["modulepreload", "hero-core.js"], ["modulepreload", "hero-shaders.js"],
+     ["modulepreload", j + "build/three.module.js"],
      ["modulepreload", j + "examples/jsm/loaders/GLTFLoader.js"], ["modulepreload", j + "examples/jsm/libs/meshopt_decoder.module.js"],
      ["preload", "assets/hero/pieces.glb"]].forEach(function(r){
       var l = document.createElement("link"); l.rel = r[0]; l.href = r[1];

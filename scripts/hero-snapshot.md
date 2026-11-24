@@ -11,5 +11,12 @@ Run:
 2. In the page:
    `for (const i of [0,1,2]) { heroLive.setLevel(i); heroLive.freeze(5); out[i] = {hash: heroLive.hash(), sig: heroLive.sig()}; }`
 3. Compare with `blender/out/hero-baseline.json` (git-ignored, machine-specific:
-   `{"0":{"hash","sig"},"1":...,"2":...,"viewport":[w,h]}`). Pass on an exact hash, or a max absolute
+   `{"0":{"hash","sig"},"1":...,"2":...,"viewport":[w,h],"dpr":2}`; `dpr` is the `devicePixelRatio` the
+   baseline was taken at, and a baseline only compares against a run at the same viewport and dpr). Pass on an exact hash, or a max absolute
    `sig` difference of 1.0 or less.
+
+Caveat (found in Task 2): a level change redraws the grain tile at the new pixel ratio, and that image loads
+asynchronously. Run step 2 with no awaits and each level is hashed with the grain tile of the level before it,
+which is how the baseline was taken: run the loop twice in one page and compare the second pass (it starts
+from level 2's tile, as the baseline did). A first pass straight after load, or a wait after `setLevel`, gives
+different but equally valid hashes. `?grain=off` removes the dependency for a new baseline.
