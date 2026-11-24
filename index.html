@@ -35,7 +35,7 @@
   window.heroTry = false;
   try {
     var m = function(q){ return matchMedia(q).matches; }, n = navigator, forced = false;
-    var weak = (m("(pointer:coarse)") && Math.min(screen.width, screen.height) < 768) || n.deviceMemory < 4 || n.hardwareConcurrency < 4;
+    var weak = n.deviceMemory < 4 || n.hardwareConcurrency < 4;   // phones are tried too: the mount speed test sends a slow one to the poster
     try { forced = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){}
     if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) return posterFirst();
     var html = document.documentElement;
@@ -427,7 +427,7 @@ function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>
 /* ============================================================
    HERO: the chessboard. Where the device can take it, hero.js mounts the live scene and fades it in over a
    dark hero (the poster is hidden from first paint, see the script before <header>). The poster is the
-   fallback: weak devices, phones, reduced motion, no WebGL2, load failure, context loss, or a slow start.
+   fallback: weak devices, slow phones, reduced motion, no WebGL2, load failure, context loss, or a slow start.
    Six project links sit over the pieces (positions from assets/hero/layout.json).
    ============================================================ */
 window.heroLayout = null; window.heroLive = null;
