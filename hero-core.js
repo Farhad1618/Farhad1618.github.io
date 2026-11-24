@@ -9,10 +9,12 @@
 //   world = { scene, camera, zs /* = camera.far */, fogMat, moteMat, moteScene,
 //             update(dt, core), postUniforms() /* { uNear, uFar, uFocus, uAperture, uMaxR } uniform objects */,
 //             ignite(s), resize(bw, bh, pr), dispose(),
+//             attached?() /* called after every attach (the solo worlds replay their ignite; the hero does not) */,
 //             stale?() /* true: resize the world even if the buffer did not change */,
 //             hold?() /* re-apply a freeze after update */ }
 // postUniforms() objects are shared by reference into the post pass while the world is attached, so the
-// world's dust and the depth of field read the same focus.
+// world's dust and the depth of field read the same focus. The world owns the light coming up: its update()
+// sets core.fxaa.uIgnite every frame, so a world the canvas returns to carries on where it was.
 import * as THREE from "three";
 import { POST_VS, POST_FS, DOWN_FS, BLUR_FS, FXAA_FS, glslFloat } from "./hero-shaders.js";
 
@@ -70,6 +72,13 @@ function noiseVolume(size = 64) {
   tex.wrapS = tex.wrapT = tex.wrapR = THREE.RepeatWrapping;
   tex.unpackAlignment = 1; tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true;
   return tex;
+}
+
+// The light coming up, s seconds after a world starts: once, smoothly, in about 1.4 s (no flicker: Farhad did
+// not like the light trying to catch). Shared by every world.
+export function igniteAt(s) {
+  const x = Math.min(1, Math.max(0, (s - 0.15) / 1.3));
+  return x * x * (3 - 2 * x);
 }
 
 export function raw(tex) { tex.colorSpace = THREE.NoColorSpace; tex.needsUpdate = true; return tex; }
@@ -271,6 +280,7 @@ export async function createCore(opts = {}) {
   // aperture, blur radius) are shared into the post pass by reference while it is attached.
   function attach(st, w) {
     if (disposed) return;
+    if (world !== w) lastW = lastH = 0;   // another world on the same stage: frame it again
     world = w;
     fogQuad.material = w.fogMat;
     Object.assign(postMat.uniforms, w.postUniforms());
@@ -283,6 +293,7 @@ export async function createCore(opts = {}) {
     stage.appendChild(canvas);
     if (readout) stage.appendChild(readout);
     resize();
+    if (w.attached) w.attached(core);
   }
   function detach() {
     stop();
@@ -399,13 +410,17 @@ export async function createCore(opts = {}) {
 
   // Does this GPU keep up? Time real frames, forced to finish by a 1-pixel readback. Frame
   // intervals are no use here: a throttled or background tab would look like a slow device.
-  // Takes the first level inside its budget; throws "too slow" if none is.
-  function mountTest(w) {
+  // Takes the first level inside its budget, starting from rung `from` (0, the sharpest, by default);
+  // throws "too slow" if none is. A level forced by key (readout) is kept: only it is timed, never thrown.
+  function mountTest(w, from = 0) {
     if (w && w !== world) throw new Error("mountTest: world not attached");
     const gl = renderer.getContext(), px = new Uint8Array(4);
+    const i0 = picked ? Math.min(LADDER.length - 1, Math.max(0, from | 0)) : Math.max(0, LADDER.indexOf(level));
+    const i1 = picked ? LADDER.length : i0 + 1;
+    if (level !== LADDER[i0]) { level = LADDER[i0]; resize(); }
     let ms = 0;
-    for (let i = 0; i < LADDER.length; i++) {
-      if (i) { level = LADDER[i]; resize(); }
+    for (let i = i0; i < i1; i++) {
+      if (i > i0) { level = LADDER[i]; resize(); }
       // two warm-ups (shader compile, uploads, new buffers after a level change), then the median of seven
       // frames: one late frame (another tab, a compile finishing) must not send a good GPU to the poster
       const one = () => { const t0 = performance.now(); render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return performance.now() - t0; };
@@ -414,7 +429,7 @@ export async function createCore(opts = {}) {
       if (ms <= level[2]) break;
     }
     core.level = LADDER.indexOf(level); core.mountMs = ms;
-    if (ms > level[2]) throw new Error("too slow");
+    if (picked && ms > level[2]) throw new Error("too slow");
     return ms;
   }
   // On localhost only: a small readout in the corner (which sharpness level, the buffer size, frames a

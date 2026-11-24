@@ -13,7 +13,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { WAKE_N, pieceShaders, boardShaders, fogShader, moteShader } from "./hero-shaders.js";
-import { createCore, raw } from "./hero-core.js";
+import { createCore, raw, igniteAt } from "./hero-core.js";
 
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
@@ -78,14 +78,10 @@ const WAKE_LIFE = 1.4;                       // seconds for the cursor's wake in
 const WAKE_STEP = 0.08;                      // spacing of the wake along the cursor's path, in canvas halves
 const MOTES = 420;                           // dust in the air round the light
 
-// The entrance, s seconds after the scene starts. The light comes up once, smoothly (no flicker: Farhad
-// did not like the light trying to catch). Five pieces rise into place from a little below, each with its own
+// The entrance, s seconds after the scene starts. The light comes up once, smoothly (igniteAt, hero-core.js).
+// Five pieces rise into place from a little below, each with its own
 // delay, distance and time: two pairs start almost together, the shield lands last. Cyrus stands still.
 // Some board blocks start a little high or low and settle once (see "aIn" below). The light is mostly up before anything moves, so the motion is seen. All done by about 3.6 s.
-function igniteAt(s) {
-  const x = Math.min(1, Math.max(0, (s - 0.15) / 1.3));
-  return x * x * (3 - 2 * x);
-}
 const ENTER = {                                // [delay s, distance below rest, seconds to rise]
   pearl: [0.6, 0.30, 1.6], onepharma: [0.7, 0.36, 1.7], zagros: [1.0, 0.42, 1.9],
   falah: [1.45, 0.26, 1.5], nids: [1.55, 0.45, 2.0],
@@ -93,6 +89,21 @@ const ENTER = {                                // [delay s, distance below rest,
 const TILE_IN = { share: 0.36, min: 0.05, max: 0.2, delay: [0.5, 1.9], dur: [1.2, 1.9] };
 const outCubic = x => { x = Math.min(1, Math.max(0, x)); return 1 - (1 - x) * (1 - x) * (1 - x); };
 const smooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
+
+// What a world build that failed part way had taken: its own materials and every geometry, material and
+// texture still in the loaded glb.
+function freeGltf(gltf, disposables) {
+  for (const d of disposables) { try { d.dispose(); } catch (_) { /* already gone */ } }
+  gltf.scene.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.dispose();
+    for (const m of [].concat(o.material)) {
+      for (const k of ["map", "emissiveMap"]) if (m[k] && m[k].dispose) m[k].dispose();
+      if (m.uniforms) for (const u of Object.values(m.uniforms)) if (u && u.value && u.value.isTexture && u.value !== m.uniforms.matcap?.value) u.value.dispose();
+      m.dispose();
+    }
+  });
+}
 
 // The hero world: the chessboard with its six pieces, rendered by the core (hero-core.js). Owns the scene,
 // the camera and its framing, the fog and dust materials (the core's fog pass and dust pass draw them), the
@@ -124,8 +135,10 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   disposables.push(backGeo, backMat);
 
   // pieces and plinths: swap the exported materials for the unlit baked shader
-  const pieces = {}, state = {}, liftAmt = new Float32Array(IDS.length);
+  const pieces = {}, state = {}, liftAmt = new Float32Array(IDS.length), rigs = {};
   let boardMesh = null;
+  // a build that fails part way (a piece missing from the glb) gives back what it allocated
+  try {
   scene.add(gltf.scene);
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse(o => {
@@ -176,7 +189,6 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   }
 
   // moving parts: each piece's rig comes from the node extras (pieces.py _rig); its parts are marked in COLOR_0
-  const rigs = {};
   for (const id of IDS) {
     let parts = [];
     try { parts = JSON.parse(pieces[id].userData.rig || "[]"); } catch (_) { parts = []; }
@@ -238,6 +250,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     // the pieces rise as the ripple reaches their platforms
     for (const id of IDS) state[id].riseAt = Math.min(1, Math.hypot(state[id].at.x - c0.x, state[id].at.z - c0.z) / S.reach) * 0.5 + 0.05;
   }
+  } catch (e) { freeGltf(gltf, disposables); throw e; }
 
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, ZS);
@@ -500,8 +513,8 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     if (id) touchTimer = setTimeout(clearTouch, 4000);
   });
   on(canvas, "pointercancel", () => { if (drag) offAt = tourP + scrollP; down = null; drag = null; });
-  on(window, "blur", () => { pointer.set(0, 0); pointerIn = false; clearTouch(); });
-  on(window, "scroll", () => { if (touchHover) clearTouch(); }, { passive: true });
+  on(window, "blur", () => { if (mine()) { pointer.set(0, 0); pointerIn = false; clearTouch(); } });
+  on(window, "scroll", () => { if (mine() && touchHover) clearTouch(); }, { passive: true });
 
   function update(dt) {
     t += dt;
@@ -800,4 +813,104 @@ export async function mountHero(stage, layout, opts = {}) {
     core.start();
     return handle;
   } catch (e) { if (world && core.world !== world) world.dispose(); core.dispose(); throw e; }
+}
+
+// The solo pieces: one live close-up per project chapter, on the hero's core and canvas (one WebGL context for
+// the page). opts: { core (the hero's, heroLive.core; created here if missing, with its own mount test on the
+// first piece), base (the assets/solo/ folder), onLost(reason), pointerTarget }.
+// setPiece(id, plate) loads that piece (cached), moves the canvas into the plate's .plate-stage (or the plate
+// itself), replays the light coming up and runs; it resolves false when a newer setPiece or returnTo came first.
+// returnTo(stage, world) gives the canvas back (the hero resumes quietly, no replayed entrance).
+export async function mountSolo(opts = {}) {
+  const { createSoloWorld, SOLO_DEFAULTS } = await import("./hero-solo.js");
+  const base = new URL(opts.base || "./assets/solo/", opts.base ? location.href : import.meta.url).href;
+  const own = !opts.core;
+  const core = opts.core || await createCore({ onLost: reason => { if (opts.onLost) opts.onLost(reason); } });
+  const loads = new Map(), worlds = new Map();
+  let seq = 0, current = null, tested = !own, pointerTarget = opts.pointerTarget || null, disposed = false;
+  const gl = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+
+  function load(id) {
+    if (!loads.has(id)) {
+      const dir = base + id + "/";
+      const p = Promise.all([
+        gl.loadAsync(dir + "solo.glb"),
+        fetch(dir + "layout.json").then(r => { if (!r.ok) throw new Error("layout.json " + r.status); return r.json(); }),
+      ]);
+      p.catch(() => loads.delete(id));         // a failed load may be tried again
+      loads.set(id, p);
+    }
+    return loads.get(id);
+  }
+  function worldFor(id, gltf, layout) {
+    if (!worlds.has(id)) worlds.set(id, createSoloWorld(core, gltf, layout, { pointerTarget }));
+    return worlds.get(id);
+  }
+  function lost(reason) {
+    if (opts.onLost) opts.onLost(reason);
+  }
+
+  async function setPiece(id, plate) {
+    if (disposed || core.disposed) return false;
+    const my = ++seq;
+    const [gltf, layout] = await load(id);
+    if (my !== seq || disposed || core.disposed) return false;
+    const w = worldFor(id, gltf, layout);
+    const stage = (plate && plate.querySelector && plate.querySelector(".plate-stage")) || plate;
+    current = w;
+    core.attach(stage, w);                     // attached(): the light comes up again
+    w.update(0, core); core.render();          // the first frame is in before the caller fades the plate in
+    if (!tested) {
+      tested = true;
+      try { core.mountTest(w); }
+      catch (e) { core.dispose(); lost(e.message || "too slow"); throw e; }
+      core.initReadout();
+    }
+    core.start();
+    return true;
+  }
+  function prefetch(id) { load(id).catch(() => { /* setPiece reports it */ }); }
+  function stop() { if (current && core.world === current) core.stop(); }
+  function returnTo(stage, world) {
+    seq++;                                     // a load still on its way must not take the canvas back
+    current = null;
+    if (core.disposed) return;
+    core.attach(stage, world);
+    core.start();
+  }
+  function setPointerTarget(el) {
+    pointerTarget = el || null;
+    for (const w of worlds.values()) w.setPointerTarget(pointerTarget);
+  }
+  function box() {
+    return current ? current.box() : { x: 0, y: 0, w: 0, h: 0 };
+  }
+  function dispose() {
+    if (disposed) return;
+    disposed = true; seq++;
+    if (own) core.dispose();                   // disposes the attached world too
+    else if (current && core.world === current) core.detach();
+    for (const w of worlds.values()) w.dispose();
+    worlds.clear(); current = null;
+    if (window.soloLive === solo) delete window.soloLive;
+  }
+
+  // live tuning from the console (soloLive.live.*): the attached piece's uniforms
+  const live = {
+    get fog() { return current && current.fogMat.uniforms; },
+    get motes() { return current && current.moteMat.uniforms; },
+    get post() { return core.post; },
+    get fxaa() { return core.fxaa; },
+    get bright() { return core.bright; },
+    get spec() { return current && current.spec; },       // uSpecK, uLightCol (energy-scaled), uLight
+    get sheen() { return current && current.sheen; },     // piece, plinth
+    get tilt() { return current && current.tilt; },       // yaw, pitch degrees
+    get board() { return current && current.board; },
+    defaults: SOLO_DEFAULTS,                              // fit, ease, touch, tapHold: read every frame / resize
+    ignite: s => current && current.ignite(s),
+  };
+  const solo = { core, setPiece, prefetch, stop, returnTo, setPointerTarget, box, dispose, live,
+    get world() { return current; } };
+  window.soloLive = solo;
+  return solo;
 }

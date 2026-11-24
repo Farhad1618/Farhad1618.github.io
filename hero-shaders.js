@@ -1,5 +1,5 @@
-// Every GLSL string of the live scene (hero.js, hero-core.js). Shared by every world: the chessboard hero
-// and, later, the solo pieces. What differs per world is passed in, never baked in:
+// Every GLSL string of the live scene (hero.js, hero-core.js, hero-solo.js). Shared by every world: the
+// chessboard hero and the solo pieces. What differs per world is passed in, never baked in:
 //   ZS   the camera's far plane (#define): scene alpha = view depth / ZS, read back by POST_FS
 //   NOCC how many pieces shadow the fog and lift tiles (#define): the arrays uOcc, uOccY, uP, uLiftAmt.
 //        Never pad those arrays with zero-size occluders (uOcc.zw divides): size NOCC to the world.
@@ -15,6 +15,9 @@ export const glslFloat = v => (Number.isInteger(v) ? v.toFixed(1) : String(v));
 // it hangs from. A turning part rotates about its pivot; a hanging part follows its anchor without tilting.
 const PIECE_VS_SRC = `
 varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
+#ifdef SOLO
+varying vec3 vWN;
+#endif
 #ifdef RIG
 uniform vec4 uRigP[3]; uniform vec4 uRigA[3]; uniform vec4 uRigH[3];
 vec3 rotA(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
@@ -34,6 +37,9 @@ void main(){
 #endif
   vUv = uv; vN = normalize(normalMatrix * nrm);
   vWorld = (modelMatrix * vec4(pos, 1.0)).xyz;
+#ifdef SOLO
+  vWN = mat3(modelMatrix) * nrm;
+#endif
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   vDepth = -mv.z; gl_Position = projectionMatrix * mv;
 }`;
@@ -42,6 +48,13 @@ uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform v
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
 #ifdef GAIN
 uniform float uGain;
+#endif
+#ifdef SOLO
+// solo pieces: the bake holds only what does not depend on the view, so the highlight is drawn here, from the
+// one light. emissiveMap is the baked mask: r gloss, g how much of the light reaches the surface (no glint
+// inside a baked shadow), b how strong the surface's highlight is.
+uniform sampler2D emissiveMap; uniform vec3 uLight; uniform vec3 uLightCol; uniform float uSpecK;
+varying vec3 vWN; varying vec3 vWorld;
 #endif
 void main(){
   vec3 n = normalize(vN);
@@ -53,6 +66,12 @@ void main(){
 #endif
   // the bake already holds the view's sheen and translucency: the matcap only adds a faint live glint
   vec3 c = b + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
+#ifdef SOLO
+  vec3 m = texture2D(emissiveMap, vUv).rgb;
+  vec3 q = uLight - vWorld; float d2 = dot(q, q);
+  vec3 N = normalize(vWN), h = normalize(q * inversesqrt(d2) + normalize(cameraPosition - vWorld));
+  c += m.b * m.g * pow(max(dot(N, h), 0.0), mix(8.0, 400.0, m.r * m.r)) * (m.r * 0.9 + 0.1) * uLightCol * uSpecK / max(d2, 0.5);
+#endif
   gl_FragColor = vec4(c, vDepth / ZS);     // alpha: view depth, averaged by the MSAA resolve (see POST_FS)
 }`;
 // The board. The tiles under a piece rise with it on hover: only their top corners move (aLift = the piece's
@@ -505,10 +524,11 @@ void main(){
 }`;
 
 // Builders. zs is the world camera's far plane; nocc its number of shadowing pieces.
+// solo: the live highlight (uniforms emissiveMap, uLight, uLightCol, uSpecK); only for a mesh with a baked mask
 export function pieceShaders({ rig = false, solo = false, zs = 60 } = {}) {
-  void solo;            // reserved for the solo worlds (one detailed piece); today it changes nothing
   const defines = { ZS: glslFloat(zs) };
   if (rig) defines.RIG = 1;
+  if (solo) defines.SOLO = 1;
   return { vertexShader: PIECE_VS_SRC, fragmentShader: PIECE_FS_SRC, defines };
 }
 export function boardShaders({ nocc = 6, zs = 60 } = {}) {
