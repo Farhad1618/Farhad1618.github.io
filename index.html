@@ -164,6 +164,16 @@ html.hero-wait .hero-poster{opacity:0}
   .hero-pin::before{height:22%}
   .hero-view::after{background:radial-gradient(ellipse 110% 70% at 50% 50%,transparent 40%,rgba(8,8,11,.78) 100%)}
 }
+/* the phone tour (hero.js TOUR): wherever the live scene frames for a phone and the row is wider than the
+   screen (portrait under aspect 0.72, hero.js PHONE_AT[1]; phones, and an iPad mini, whose 0.66 still gets part
+   of the phone framing) the pin holds for 3 screens, the first 2.3 for the seven stops (about a third of a
+   screen each), the last 0.7 for the exit as on desktop. The same query is heroTourQ below. */
+@media (orientation:portrait) and (max-aspect-ratio:18/25){
+  html.hero-pin .hero{height:400svh;min-height:2240px}
+}
+/* the presented piece's label on the tour sits under its plinth, on the dark board, with its number */
+.hero-label.under{transform:translate(-50%,0);padding:10px 0 0;font-size:10.5px;color:var(--bone);text-shadow:0 0 10px var(--ink),0 0 3px var(--ink)}
+.hero-label .n{color:var(--sig);margin-right:.7em}
 .line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
@@ -437,6 +447,12 @@ function heroCover(aspect){
   return { w:W, h:h, dx:0, dy:(H-h)/2 };
 }
 window.heroOrientation = heroOrientation; window.heroCover = heroCover;
+/* phones: the pinned stretch is longer (see the phone CSS) and its first part is the scene's tour, one stop
+   per piece (hero.js TOUR); TOUR_SHARE of the extra height is the tour, the rest the exit, as on desktop */
+window.heroTourQ = matchMedia("(orientation:portrait) and (max-aspect-ratio:18/25)");
+window.HERO_TOUR_SHARE = 2.3 / 3;
+/* the pinned extra height split into the tour (0 where there is none) and the exit */
+window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * window.HERO_TOUR_SHARE : 0; return { tour:t, exit:x - t }; };
 (function(){
   var sec = document.getElementById("top"), nav = sec && sec.querySelector(".hero-pieces");
   if (!nav) return;
@@ -445,10 +461,25 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     var t = document.getElementById("proj-"+id);
     if (t) t.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block:"start" });
   }
-  function showLabel(id, x, y){
+  /* the live scene names the piece it presents: over its top on desktop; on phones (yb: the foot of its
+     plinth) under it, with its number, kept inside the screen */
+  function showLabel(id, x, y, yb){
     if (!id) { label.classList.remove("on"); stage.style.cursor = ""; return; }
-    var a = nav.querySelector('a[data-piece="'+id+'"]');
-    label.textContent = a ? a.textContent : "";
+    var a = nav.querySelector('a[data-piece="'+id+'"]'), under = yb != null && window.heroTourQ.matches;
+    var key = id + (under ? "|u" : "");
+    if (label.getAttribute("data-k") !== key) {
+      label.setAttribute("data-k", key); label.textContent = "";
+      if (under) {
+        var n = document.createElement("span"); n.className = "n";
+        n.textContent = "0" + ([].indexOf.call(links, a) + 1); label.appendChild(n);
+      }
+      label.appendChild(document.createTextNode(a ? a.textContent : ""));
+      label.classList.toggle("under", under);
+    }
+    if (under) {
+      var hw = label.offsetWidth / 2, W = stage.clientWidth;
+      x = Math.max(hw + 12, Math.min(W - hw - 12, x)); y = yb;
+    }
     label.style.left = x+"px"; label.style.top = y+"px";
     label.classList.add("on"); stage.style.cursor = "pointer";
   }
@@ -489,11 +520,14 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
   addEventListener("resize", place);
   /* the scene's scroll move: 0..1 over the first 0.7 of the pinned stretch, or over the whole hero where
      nothing is pinned. The raw position; hero.js eases after it. Fed at mount too, so a reload partway down
-     starts where the page is. Plain scroll events, so it works without GSAP. */
+     starts where the page is. Plain scroll events, so it works without GSAP.
+     Phones (heroSplit): the tour first, 0..1 over its share of the stretch (setScroll's second value), then
+     the exit, 0..1 over the first 0.7 of the rest, as on desktop. */
   var pinEl = sec.querySelector(".hero-pin");
   function feedScroll(){
     if (!window.heroLive) return;
-    var x = sec.offsetHeight - pinEl.offsetHeight, y = -sec.getBoundingClientRect().top;
+    var x = sec.offsetHeight - pinEl.offsetHeight, y = -sec.getBoundingClientRect().top, s = window.heroSplit(x);
+    if (s.tour) return window.heroLive.setScroll((y - s.tour) / (s.exit * 0.7), y / s.tour);
     window.heroLive.setScroll(y / (x > 0 ? x * 0.7 : sec.offsetHeight));
   }
   addEventListener("scroll", feedScroll, { passive:true });
@@ -1137,14 +1171,16 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   /* The hero. Pinned (html.hero-pin): the title and the cue clear in the first 0.3 of the extra height, the
      scene plays its scroll move over the first 0.7 (fed from the hero block above, not from here), and the
      picture fades from 0.8 until the pin has let go and half of it has gone, so the page hands over to 01.
-     Not pinned: as before (title by 60% of the hero, the picture over all of it), and the poster pushes in. */
+     Not pinned: as before (title by 60% of the hero, the picture over all of it), and the poster pushes in.
+     Phones (heroSplit): the title clears over the hold on the first stop (half of the tour's first seventh, as
+     the camera starts to turn), and the exit's share of the stretch plays as above after the tour. */
   var heroSec = document.getElementById("top"), heroPinEl = heroSec.querySelector(".hero-pin");
   var heroExtra = function(){ return Math.max(0, heroSec.offsetHeight - heroPinEl.offsetHeight); };
   gsap.to([".hero-head", ".hero .cue"], { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top",
-    end:function(){ var x = heroExtra(); return "+=" + Math.round(x ? x * 0.3 : heroPinEl.offsetHeight * 0.6); }, scrub:true } });
+    end:function(){ var x = heroExtra(), s = window.heroSplit(x); return "+=" + Math.round(s.tour ? s.tour / 7 * 0.5 : x ? x * 0.3 : heroPinEl.offsetHeight * 0.6); }, scrub:true } });
   gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero",
-    start:function(){ var x = heroExtra(); return x ? "top+=" + Math.round(x * 0.8) + " top" : "top top"; },
-    end:function(){ var x = heroExtra(); return x ? "+=" + Math.round(x * 0.2 + heroPinEl.offsetHeight * 0.5) : "bottom top"; }, scrub:true } });
+    start:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "top+=" + Math.round(s.tour + s.exit * 0.8) + " top" : "top top"; },
+    end:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "+=" + Math.round(s.exit * 0.2 + heroPinEl.offsetHeight * 0.5) : "bottom top"; }, scrub:true } });
   /* the poster's push-in: only where nothing is pinned; heroPosterBack() starts it when a live try falls back */
   var heroPushed = false;
   window.heroPosterPush = function(){

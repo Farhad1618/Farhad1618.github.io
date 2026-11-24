@@ -40,10 +40,19 @@ void main(){
 const PIECE_FS_SRC = `
 uniform sampler2D map; uniform sampler2D matcap; uniform float uSheen; uniform vec3 uHaze;
 varying vec2 vUv; varying vec3 vN; varying float vDepth;
+#ifdef GAIN
+uniform float uGain;
+#endif
 void main(){
   vec3 n = normalize(vN);
+  vec3 b = texture2D(map, vUv).rgb;
+#ifdef GAIN
+  // presented on the phone tour (hero.js TOUR.gain): the dim side of the bake comes up, the bright faces stay
+  // where they are, so nothing clips. No light is added. uGain 1 multiplies by exactly 1.
+  b *= 1.0 + (uGain - 1.0) * (1.0 - smoothstep(0.35, 0.9, max(b.r, max(b.g, b.b))));
+#endif
   // the bake already holds the view's sheen and translucency: the matcap only adds a faint live glint
-  vec3 c = texture2D(map, vUv).rgb + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
+  vec3 c = b + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
   gl_FragColor = vec4(c, vDepth / ZS);     // alpha: view depth, averaged by the MSAA resolve (see POST_FS)
 }`;
 // The board. The tiles under a piece rise with it on hover: only their top corners move (aLift = the piece's
