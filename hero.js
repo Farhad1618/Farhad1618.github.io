@@ -31,36 +31,21 @@ const DEG = Math.PI / 180;
 const ZS = 60;                              // the camera's far plane: scene alpha = view depth / ZS
 const DRIFT_YAW = 2.5, DRIFT_PITCH = 1.0;    // camera arc with the mouse, degrees at the canvas edge
 // Phones: the poster's portrait camera fits all six across the width, so on a phone each piece was about 46 px
-// wide and far off (Farhad, Nov 24). Narrow portrait gets a closer, lower camera instead (pieces ~1.8x, the
-// band at ~34-56% of the height, the board filling the lower half), and the row, now wider than the screen, is
-// toured by scrolling (TOUR) and a sideways drag, both turning the view in place. Turning in place keeps every piece at the angle it
-// was baked from; orbiting would swing the camera ~2 m off the bake view. Fully on at aspect PHONE_AT[0] and
-// below, back to the poster's camera by PHONE_AT[1], so portrait tablets (0.7 and up) still see all six.
-// Phones in Safari are 0.55-0.6 (svh, toolbars shown); an iPhone SE at the 560 px min-height is ~0.67.
-const PHONE_CAM = { position: [0, 1.45, 8.6], target: [0, 0.35, -1.0], hfov: 32 };
+// wide and far off (Farhad, Nov 24). Narrow portrait gets a closer, lower camera instead, and shows four pieces:
+// Zagros and the shield (HIDE_ON_PHONE) are left out, with their plinths, and their raised tiles sink flush
+// with the board (their projects stay in the Work section). PHONE_CAM frames the four: Cyrus at ~44% of the
+// width, Black Pearl and Falah fully in with ~8-9% to spare, the band at ~35-52% of the height, clear of the
+// title, the board filling the lower half. The look is aimed a little right of the cylinder (target x 0.35) so
+// the group, which reaches farther right (Falah) than left (Pearl), sits balanced. Nothing pans: Farhad found
+// the sideways drag and the scroll tour blocked the page on his iPhone (Nov 24). Fully on at aspect
+// PHONE_AT[0] and below, back to the poster's camera by PHONE_AT[1], so portrait tablets (0.72 and up) still
+// see all six. Phones in Safari are 0.55-0.6 (svh, toolbars shown); an iPhone SE at the 560 px min-height is ~0.67.
+const PHONE_CAM = { position: [0, 1.45, 8.6], target: [0.35, 0.35, -1.0], hfov: 34 };
 const PHONE_AT = [0.6, 0.72];
-const PAN_MARGIN = 8;                        // degrees a drag or the tour can turn past the outer pieces' edges (5 until the tour: 8 keeps Zagros and the shield clear of the vignette at their stops)
-// The phone tour (Nov 24, Farhad: two pieces were reachable only by a sideways swipe nobody would find). Where
-// site.html feeds a tour progress (setScroll's second value: phones, whose hero is pinned longer), scrolling
-// turns the look in place across the row, one stop per entry of `stops`: a hold for the first `hold` of its
-// stretch, then an eased turn to the next. A stop's angle is its piece's own direction from the live camera,
-// clamped to panLo/panHi. The stop's piece is presented as if hovered (rises, focus, label, moving parts) and
-// its bake lifted a little (`gain`; no light is added, see PIECE_FS). A swipe adds an offset on top; once the
-// page has scrolled back[0] of either progress since the swipe ended, the offset goes home over back[1] s.
-// After the last stop the exit progress turns the look back to the centre over `home`.
-const TOUR = {
-  stops: ["cyrus", "zagros", "pearl", "cyrus", "onepharma", "falah", "nids"],
-  hold: 0.45,           // share of each stop's stretch spent still on it; the rest is the turn to the next
-  show: 0.15,           // a stop's piece is presented until this far into the turn, the next one from 1 - show
-  gain: { cyrus: 1, pearl: 1.2, falah: 1.2, onepharma: 1.25, zagros: 1.3, nids: 1.3 },
-  back: [0.01, 0.6],    // the swipe offset: [progress moved after the swipe before it goes home, seconds home]
-  home: [0, 0.6],       // exit progress over which the look turns back to the centre
-  drop: 0.3,            // exit progress after which nothing is presented any more (the fog takes over)
-  lean: 0.5,            // share of the camera's lean-in (SCROLL.dolly, .dip) spread over the tour; the rest in the exit
-  swiped: 1.5,          // degrees off the tour path that count as swiped: then the piece nearest the centre is presented
-};
-// Scroll. Where the live scene runs the hero is pinned for 0.7 of a screen, and site.html feeds 0..1 over the
-// first 0.7 of that stretch (setScroll). All in the scene's own language, nothing flashy: the camera leans in,
+const HIDE_ON_PHONE = ["zagros", "nids"];
+// Scroll. Where the live scene runs on a desktop the hero is pinned for 0.7 of a screen, and site.html feeds
+// 0..1 over the first 0.7 of that stretch (setScroll); on touch screens nothing is pinned and the same 0..1
+// comes over the first 0.65 of the hero as it scrolls away. All in the scene's own language, nothing flashy: the camera leans in,
 // the stone blocks answer in a ripple out from the Cyrus Cylinder while the pieces rise a little on their
 // platforms, then the fog banks thicken and rise and the one light goes down. update() reads it through
 // scrollNow, which eases after the page, so a flick of the finger still moves the scene smoothly.
@@ -96,7 +81,7 @@ const smooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); r
 
 // The hero world: the chessboard with its six pieces, rendered by the core (hero-core.js). Owns the scene,
 // the camera and its framing, the fog and dust materials (the core's fog pass and dust pass draw them), the
-// pieces' state and rigs, the board's attributes, the hover / tap / pan input on the canvas, the scroll
+// pieces' state and rigs, the board's attributes, the hover / tap input on the canvas, the scroll
 // choreography and the entrance. gltf is the loaded pieces.glb.
 function createHeroWorld(core, gltf, layout, opts = {}) {
   const orientation = opts.orientation || (() => "landscape");
@@ -165,14 +150,8 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
       at: new THREE.Box3().setFromObject(pl).getCenter(new THREE.Vector3()),
       period: 11 + (IDS.indexOf(id) * 8) / 5, phase: IDS.indexOf(id) * 1.7,
       top: new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2),
-      centre: box.getCenter(new THREE.Vector3()), gain: { value: 1 },
+      centre: box.getCenter(new THREE.Vector3()), sink: 0,
     };
-    // the tour's brightness lift (TOUR.gain): the piece only, not its plinth
-    p.traverse(o => {
-      if (!o.isMesh) return;
-      o.material.uniforms.uGain = state[id].gain;
-      o.material.defines = { ...o.material.defines, GAIN: 1 }; o.material.needsUpdate = true;
-    });
   }
 
   // moving parts: each piece's rig comes from the node extras (pieces.py _rig); its parts are marked in COLOR_0
@@ -212,6 +191,29 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
       IDS.forEach((id, k) => { const c = state[id].at; if (Math.abs(cx - c.x) < REACH && Math.abs(cz - c.z) < REACH) a[i] = k; });
     }
     boardMesh.geometry.setAttribute("aLift", new THREE.BufferAttribute(a, 1));
+    // a piece left out on phones (HIDE_ON_PHONE): how far its platform's tops sink to sit flush with the board
+    // round it, the median top of the free tiles next to its platform (negative: down)
+    const tops = new Map(), key = (ix, iz) => ix + "," + iz;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(boardMesh.matrixWorld);
+      if (v.y < -0.3) continue;
+      const kk = key(Math.round(v.x / TILE), Math.round(v.z / TILE)), was = tops.get(kk);
+      tops.set(kk, { y: Math.max(was ? was.y : -Infinity, v.y), lift: Math.max(was ? was.lift : -1, a[i]) });
+    }
+    for (const id of HIDE_ON_PHONE) {
+      const k = IDS.indexOf(id), mine = [], round = [];
+      for (const [kk, tp] of tops) if (tp.lift === k) mine.push(kk.split(",").map(Number).concat(tp.y));
+      if (!mine.length) continue;
+      for (const [kk, tp] of tops) {
+        if (tp.lift >= 0) continue;
+        const [ix, iz] = kk.split(",").map(Number);
+        if (mine.some(m => Math.abs(m[0] - ix) <= 1 && Math.abs(m[1] - iz) <= 1)) round.push(tp.y);
+      }
+      if (!round.length) continue;
+      round.sort((x, y) => x - y);
+      const flush = round[Math.floor(round.length / 2)], top = mine.reduce((m, q) => m + q[2], 0) / mine.length;
+      state[id].sink = Math.min(0, flush - top);
+    }
     // the entrance: about a third of the free blocks start a little high or low and settle once. Picked by a
     // fixed hash of the tile, so it is the same composition every visit. Platforms (Cyrus's too) stay out.
     const ain = new Float32Array(pos.count * 3), T = TILE_IN;
@@ -254,6 +256,8 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   const occ = IDS.map(id => { const b = state[id].box;
     return new THREE.Vector4((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, (b.max.x - b.min.x) * 0.375, (b.max.z - b.min.z) * 0.375); });
   const occY = IDS.map(id => new THREE.Vector2(state[id].box.min.y, state[id].box.max.y));
+  // where the fog thins round each piece; a piece left out on phones is moved far off (see setOrientation)
+  const occP = IDS.map(id => state[id].centre.clone());
   // the cursor's wake (see WAKE_GLSL): shared by the fog and the dust
   const wakeD = Array.from({ length: WAKE_N }, () => new THREE.Vector4(0, 0, -1, 0));
   const wakeV = Array.from({ length: WAKE_N }, () => new THREE.Vector4(0, 0, 0, 1));
@@ -270,7 +274,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
       uShadowFloor: { value: 0.02 },   // what a piece's shadow lets through: near black, as in Blender
       uInvProj: { value: camera.projectionMatrixInverse }, uCamWorld: { value: camera.matrixWorld },
       uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 },
-      uP: { value: IDS.map(id => state[id].centre) },
+      uP: { value: occP },
       uLight: { value: new THREE.Vector3(...LIGHT) },
       uLightCol: { value: new THREE.Vector3(...LIGHT_COL) }, uLightK: lightK,
       uDense: { value: 1 }, uRise: { value: 0 },
@@ -316,7 +320,9 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   moteScene.add(motes);
   disposables.push(moteGeo, moteMat);
 
-  let current = null, phone = 0, panLo = 0, panHi = 0, boxesDirty = true;
+  let current = null, phone = 0, boxesDirty = true;
+  const hidden = new Set();                  // pieces left out: HIDE_ON_PHONE wherever the phone framing is on
+  const shown = id => !hidden.has(id);
   const camV = new THREE.Vector3();
   function setOrientation(o) {
     current = o;
@@ -332,20 +338,16 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     camera.fov = (2 * Math.atan(Math.tan(hfov / 2) / aspect)) / DEG;
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
-    // how far a drag may turn each way: until the outermost piece's edge is PAN_MARGIN inside the frame
-    panLo = panHi = 0;
-    if (phone > 0) {
-      const look = Math.atan2(camTarget.x - camBase.x, camBase.z - camTarget.z);
-      for (const id of IDS) {
-        const b = state[id].box;
-        for (const bx of [b.min.x, b.max.x]) for (const bz of [b.min.z, b.max.z]) {
-          const a = Math.atan2(bx - camBase.x, camBase.z - bz) - look;
-          panHi = Math.max(panHi, a + PAN_MARGIN * DEG - hfov / 2);
-          panLo = Math.max(panLo, -a + PAN_MARGIN * DEG - hfov / 2);
-        }
-      }
-    }
-    panGoal = Math.min(panHi, Math.max(-panLo, panGoal));
+    // four pieces on phones: the two left out are not drawn, picked, named or boxed, cast no shadow into the
+    // fog and do not thin it, and their platforms sink flush (update())
+    hidden.clear();
+    if (phone > 0) for (const id of HIDE_ON_PHONE) hidden.add(id);
+    IDS.forEach((id, k) => {
+      const off = hidden.has(id);
+      pieces[id].visible = state[id].plinth.visible = !off;
+      occP[k].copy(state[id].centre); if (off) occP[k].set(1e4, 0, 1e4);
+    });
+    if (hoverId && hidden.has(hoverId)) hoverId = null;
     boxesDirty = true;
     if (shownId) shownId = undefined;      // the label is placed again on the next frame
     // depth of field and the wide glow are sized by the focal length in backing pixels, not the buffer
@@ -374,41 +376,18 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   let pointerIn = false, wakeSpeed = 0, igT = 0, igHold = -1, t = 0, disposed = false;
   const wakeAge = new Float32Array(WAKE_N).fill(99), wakePeak = new Float32Array(WAKE_N);
   const wakeAt = new THREE.Vector2(), wakePrev = new THREE.Vector3(), wakeTmp = new THREE.Vector3();
-  // the phone pan (see PHONE_CAM): the look turns about the camera's own position. panBase is where the tour
-  // puts it (0 without a tour), panGoal the finger's offset on top (or the glide after it, or a focused link's),
-  // panNow eases after base + offset, clamped to panLo/panHi; radians, positive looks right.
-  let panGoal = 0, panNow = 0, panVel = 0, panBase = 0, drag = null, boxKey = NaN, boxAt = 0;
-  // the tour (TOUR): tourP raw from the page, tourNow eased after it; tourOn while the page feeds one.
-  // offAt: the progress when the swipe ended (null: none held); home: [offset at the start, seconds] going home.
-  let tourOn = false, tourP = 0, tourNow = 0, offAt = null, home = null, aim = null;
-  let autoId = null, shownId = null;              // presented by the tour or the swipe; what the label shows
-  const ang = {};                                 // each piece's direction from the live camera, radians off the look
-  const UP = new THREE.Vector3(0, 1, 0);
-  const clampPan = a => Math.min(panHi, Math.max(-panLo, a));
-
-  // a keyboard focus on a link (site.html) presents its piece; on the tour it also turns the look to it, as a
-  // swipe would, until the page scrolls on
-  function setHover(id) {
-    hoverId = id && state[id] ? id : null;
-    if (tourOn && hoverId && panLo + panHi > 0) { aim = hoverId; offAt = tourP + scrollP; home = null; panVel = 0; }
-    else if (!hoverId) aim = null;
-    // on the tour the label is set again from the scene (under the plinth) on the next frame: the link's own
-    // placement (site.html) is the desktop one, and on leaving, the tour's piece must be named again
-    if (tourOn) shownId = undefined;
-  }
-  // the raw scroll position (0..1 of the pinned stretch); the first one is taken as is, so a reload partway down
-  // starts where the page is. tour: the phone tour's progress (0..1), or undefined where there is no tour; then
-  // p is the exit (fog, light) that follows the tour.
-  function setScroll(p, tour) {
+  let boxKey = NaN, boxAt = 0, shownId = null;     // shownId: the piece the label names
+  // a link's focus or pointer (site.html) presents its piece
+  function setHover(id) { hoverId = id && state[id] && shown(id) ? id : null; }
+  // the raw scroll position (0..1 of the scroll move); the first one is taken as is, so a reload partway down
+  // starts where the page is
+  function setScroll(p) {
     scrollP = Math.min(1, Math.max(0, p || 0));
-    tourOn = typeof tour === "number" && isFinite(tour);
-    tourP = tourOn ? Math.min(1, Math.max(0, tour)) : 0;
-    if (!scrollFed) { scrollFed = true; scrollNow = scrollP; tourNow = tourP; }
+    if (!scrollFed) { scrollFed = true; scrollNow = scrollP; }
   }
-  // the label follows what is presented: the pointer's or a link's piece first, else the tour's
+  // the label follows what is presented: the pointer's or a link's piece
   function present() {
-    const id = hoverId || autoId;
-    if (id !== shownId) { shownId = id; labelAt(id); }
+    if (hoverId !== shownId) { shownId = hoverId; labelAt(hoverId); }
   }
   function pick(e) {
     const r = canvas.getBoundingClientRect();
@@ -416,7 +395,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     ray.setFromCamera(ndc, camera);
     let best = null, bestD = Infinity;
     for (const id of IDS) {
-      if (ray.ray.intersectBox(state[id].box, hit)) {
+      if (shown(id) && ray.ray.intersectBox(state[id].box, hit)) {
         const d = hit.distanceTo(camera.position);
         if (d < bestD) { bestD = d; best = id; }
       }
@@ -426,45 +405,23 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   function labelAt(id) {
     if (!opts.onHover) return;
     if (!id) return opts.onHover(null, 0, 0);
-    const s = state[id], up = s.up || 0;
-    tmp.copy(s.top); tmp.y += up; tmp.project(camera);
-    const x = (tmp.x * 0.5 + 0.5) * core.W, y = (-tmp.y * 0.5 + 0.5) * core.H - 6;
-    // and the foot of its plinth at the front, for a label set under the piece (phones, site.html)
-    tmp.set(s.centre.x, s.box.min.y + up, s.box.max.z).project(camera);
-    opts.onHover(id, x, y, (-tmp.y * 0.5 + 0.5) * core.H);
+    const s = state[id];
+    tmp.copy(s.top); tmp.y += s.up || 0; tmp.project(camera);
+    opts.onHover(id, (tmp.x * 0.5 + 0.5) * core.W, (-tmp.y * 0.5 + 0.5) * core.H - 6);
   }
   function hoverFromPointer(id) {
     if (id === hoverId) return;
-    hoverId = id && state[id] ? id : null; present();
+    hoverId = id && state[id] && shown(id) ? id : null; present();
   }
   function clearTouch() { clearTimeout(touchTimer); touchHover = null; hoverFromPointer(null); }
 
   // input on the shared canvas: only while this world is the one attached
   const mine = () => core.world === world;
   let down = null;
-  // A sideways drag turns the view where the phone framing leaves pieces outside the frame (panLo/panHi).
-  // The canvas keeps touch-action:pan-y, so an upright drag still scrolls the page: the browser takes it and
-  // sends pointercancel. Past 8 px, mostly sideways, it is a drag and no longer a tap.
+  // Taps and the mouse only: nothing here calls preventDefault or captures a pointer, so a swipe on the
+  // canvas always scrolls the page (the browser takes it and sends pointercancel).
   on(canvas, "pointermove", e => {
-    if (!mine() || !down || down.id !== e.pointerId || panLo + panHi <= 0) return;
-    if (e.pointerType === "mouse" && !(e.buttons & 1)) return;
-    const now = performance.now();
-    if (!drag) {
-      const dx = e.clientX - down.x, dy = e.clientY - down.y;
-      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
-      // the offset, from where the view is now (on the tour, relative to the tour's angle)
-      drag = { x: e.clientX, from: clampPan(panNow) - panBase, px: e.clientX, pt: now };
-      panVel = 0; aim = null; home = null; offAt = null;
-      if (e.pointerType === "mouse") { try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* gone */ } }
-    }
-    // the board stays under the finger: the canvas width is the horizontal view
-    const per = (2 * Math.atan(Math.tan((camera.fov * DEG) / 2) * camera.aspect)) / core.W;
-    panGoal = clampPan(panBase + drag.from - (e.clientX - drag.x) * per) - panBase;
-    panVel += ((-(e.clientX - drag.px) * per * 1000) / Math.max(1, now - drag.pt) - panVel) * 0.5;
-    drag.px = e.clientX; drag.pt = now;
-  });
-  on(canvas, "pointermove", e => {
-    if (!mine() || e.pointerType !== "mouse" || drag) return;
+    if (!mine() || e.pointerType !== "mouse") return;
     const r = canvas.getBoundingClientRect();
     pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
     lastMouse.clientX = e.clientX; lastMouse.clientY = e.clientY; pickS = scrollNow;
@@ -475,18 +432,10 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   on(canvas, "pointerdown", e => {
     if (!mine()) return;
     if (e.button !== 0 || e.isPrimary === false) { down = null; return; }
-    down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType, id: e.pointerId };
-    if (!drag) panVel = 0;                           // a touch catches the glide
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType };
   });
   on(canvas, "pointerup", e => {
     if (!mine() || !down) return;
-    if (drag) {
-      // let go: it glides on (update()) unless the finger had stopped
-      if (performance.now() - drag.pt > 80) panVel = 0;
-      drag = null; down = null;
-      offAt = tourP + scrollP;                       // on the tour, it goes home once the page scrolls on
-      return;
-    }
     const quick = down.type === "mouse" || performance.now() - down.t < 300;
     const tap = quick && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10;
     const type = down.type; down = null;
@@ -499,7 +448,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     touchHover = id; hoverFromPointer(id);
     if (id) touchTimer = setTimeout(clearTouch, 4000);
   });
-  on(canvas, "pointercancel", () => { if (drag) offAt = tourP + scrollP; down = null; drag = null; });
+  on(canvas, "pointercancel", () => { down = null; });
   on(window, "blur", () => { pointer.set(0, 0); pointerIn = false; clearTouch(); });
   on(window, "scroll", () => { if (touchHover) clearTouch(); }, { passive: true });
 
@@ -510,16 +459,10 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     // (phone framing included; camBase itself never moves). The arc is a few degrees about the target, small
     // enough that the view-dependent bakes still hold; the light stays put in the world, so the halo moves as
     // parallax would.
-    const sWas = scrollNow, tWas = tourNow, follow = 1 - Math.exp(-dt * SCROLL.ease);
-    scrollNow += (scrollP - scrollNow) * follow;
+    const sWas = scrollNow;
+    scrollNow += (scrollP - scrollNow) * (1 - Math.exp(-dt * SCROLL.ease));
     if (Math.abs(scrollP - scrollNow) < 1e-4) scrollNow = scrollP;
-    tourNow += (tourP - tourNow) * follow;
-    if (Math.abs(tourP - tourNow) < 1e-4) tourNow = tourP;
-    const sp = scrollNow, inOut = x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(2 - 2 * x, 3) / 2);
-    // the lean-in: on the tour a share of it is spread over the stops (mild), the rest comes with the exit
-    const se = tourOn ? TOUR.lean * smooth(0, 1, tourNow) + (1 - TOUR.lean) * inOut(sp) : inOut(sp);
-    // the ripple and the pieces' rise: on the tour they play in the first stop, before the camera turns
-    const rp = tourOn ? Math.min(1, tourNow * TOUR.stops.length) : sp;
+    const sp = scrollNow, rp = sp, se = sp < 0.5 ? 4 * sp * sp * sp : 1 - Math.pow(2 - 2 * sp, 3) / 2;
     const de = 1 - Math.exp(-dt * 3.5), canDrift = fine.matches;
     drift.x += ((canDrift ? pointer.x : 0) - drift.x) * de;
     drift.y += ((canDrift ? pointer.y : 0) - drift.y) * de;
@@ -533,52 +476,11 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
       camTarget.z + radius * Math.cos(pitch) * Math.cos(yaw));
     tmp.copy(camTarget); tmp.y -= SCROLL.dip * se;
     camera.lookAt(tmp);
-    // the tour (TOUR): where the look turns to for this much scroll, and which piece it presents. Each stop's
-    // angle is its piece's direction from the camera as it stands now (lean-in included), within the pan limits.
-    let tourId = null;
-    panBase = 0;
-    if (tourOn) {
-      const cp = camera.position, look = Math.atan2(tmp.x - cp.x, cp.z - tmp.z);
-      for (const id of IDS) { const c = state[id].centre; ang[id] = Math.atan2(c.x - cp.x, cp.z - c.z) - look; }
-      const S = TOUR.stops, N = S.length, i = Math.min(N - 1, Math.floor(tourNow * N));
-      const w = i >= N - 1 ? 0 : smooth(TOUR.hold, 1, tourNow * N - i);
-      const a0 = clampPan(ang[S[i]]), a1 = i >= N - 1 ? a0 : clampPan(ang[S[i + 1]]);
-      panBase = (a0 + (a1 - a0) * w) * (1 - smooth(TOUR.home[0], TOUR.home[1], sp));
-      if (sp < TOUR.drop) tourId = w < TOUR.show ? S[i] : w > 1 - TOUR.show ? S[i + 1] : null;
-      // the swipe's offset on top: a focused link holds it on its piece; once the page scrolls on, it goes home
-      if (aim) panGoal = clampPan(ang[aim]) - panBase;
-      if (!drag && offAt !== null && Math.abs(tourP + scrollP - offAt) > TOUR.back[0]) { home = [panGoal, 0]; offAt = null; panVel = 0; aim = null; }
-      if (home) {
-        home[1] += dt;
-        const x = Math.min(1, home[1] / TOUR.back[1]);
-        panGoal = home[0] * (1 - x * x * (3 - 2 * x));
-        if (x >= 1) { home = null; panGoal = 0; }
-      }
-    } else { home = null; offAt = null; aim = null; }
-    // the phone pan: a glide after the finger lets go, then the look turns about the camera's own position
-    if (!drag && panVel) {
-      const g = panGoal + panVel * dt, c = clampPan(panBase + g);
-      panGoal = c - panBase;
-      panVel = c !== panBase + g || Math.abs(panVel) < 1e-3 ? 0 : panVel * Math.exp(-dt * 5);
-    }
-    const panWas = panNow, panTo = clampPan(panBase + panGoal);
-    panNow += (panTo - panNow) * (drag ? 1 : 1 - Math.exp(-dt * 12));
-    if (Math.abs(panNow) < 1e-6) panNow = 0;
-    if (panNow) camera.rotateOnWorldAxis(UP, -panNow);
     camera.updateMatrixWorld();
-    // presented: on the tour, the stop's piece; swiped off the path, the piece nearest the middle of the view
-    autoId = null;
-    if (tourOn && sp < TOUR.drop) {
-      if (drag || Math.abs(panTo - panBase) > TOUR.swiped * DEG) {
-        let best = Infinity;
-        for (const id of IDS) { const d = Math.abs(ang[id] - panNow); if (d < best) { best = d; autoId = id; } }
-      } else autoId = tourId;
-    }
     present();
-    if (shownId && (Math.abs(drift.x - pointer.x) + Math.abs(drift.y - pointer.y) > 1e-3 || Math.abs(panNow - panWas) > 1e-5
-      || Math.abs(scrollNow - sWas) > 1e-4 || Math.abs(tourNow - tWas) > 1e-4)) labelAt(shownId);
+    if (shownId && (Math.abs(drift.x - pointer.x) + Math.abs(drift.y - pointer.y) > 1e-3 || Math.abs(scrollNow - sWas) > 1e-4)) labelAt(shownId);
     // the wheel moves the scene under a still mouse: look again at what is under it
-    if (pointerIn && canDrift && !drag && Math.abs(scrollNow - pickS) > 2e-3) { pickS = scrollNow; hoverFromPointer(pick(lastMouse)); }
+    if (pointerIn && canDrift && Math.abs(scrollNow - pickS) > 2e-3) { pickS = scrollNow; hoverFromPointer(pick(lastMouse)); }
     // the scroll's board and air: the ripple (none right in front of the lens), the banks thicken and rise
     // from SCROLL.fog[0], the light goes down from SCROLL.dim[0]
     const bu = boardMesh.material.uniforms, fc = smooth(SCROLL.fog[0], 1, sp);
@@ -636,6 +538,9 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     // to move the baked light visibly.
     const ease = 1 - Math.exp(-dt * 6);
     IDS.forEach((id, k) => {
+      // left out on phones: its platform sits flush with the board, and it shadows no fog (its footprint
+      // reaches no height the fog is at)
+      if (hidden.has(id)) { state[id].lift = state[id].up = 0; liftAmt[k] = state[id].sink; occY[k].set(-100, -100); return; }
       // entrance: the piece starts below its place and rises once; hover waits until it has landed
       const en = ENTER[id], landed = !en || igT >= en[0] + en[2];
       const sunk = en && !landed ? -en[1] * (1 - outCubic((igT - en[0]) / en[2])) : 0;
@@ -644,16 +549,13 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
         s.lift += (to - s.lift) * ease;
         if (id === shownId) labelAt(id);
       } else s.lift = to;
-      // the tour's presented piece: its bake lifted a little (TOUR.gain), never on desktop (exactly 1 there)
-      const gTo = tourOn && id === shownId ? (TOUR.gain[id] ?? 1) : 1, g = s.gain;
-      g.value = Math.abs(gTo - g.value) > 1e-3 ? g.value + (gTo - g.value) * (1 - Math.exp(-dt * 3)) : gTo;
       // the scroll: the piece rises with its platform as the ripple reaches it. Cyrus only as high as its hover,
       // and the two do not add: the light is hidden right behind the cylinder and must stay hidden.
       const capped = id in LIFT_BY, rise = (capped ? Math.min(SCROLL.rise, LIFT_BY[id]) : SCROLL.rise) * smooth(s.riseAt, s.riseAt + 0.35, rp);
       const up = (capped ? Math.max(s.lift, rise) : s.lift + rise) + sunk;
       s.up = up; liftAmt[k] = up;
       pieces[id].position.y = s.pieceY + up; s.plinth.position.y = s.plinthY + up;
-      occY[k].y = s.box.max.y + up;
+      occY[k].set(s.box.min.y, s.box.max.y + up);
       pieces[id].rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 1 * DEG;
       // its moving parts: a turn springs to its angle while hovered and back after; a quiver shakes once
       const rg = rigs[id];
@@ -679,9 +581,9 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     postU.uFocus.value = focusNow;
     fogMat.uniforms.uTime.value = t;
     // the page's link boxes follow the live view: at once after a resize, then at most every 0.12 s while the
-    // pan, the scroll or a piece's rise moves them (the last move always lands: the key still differs)
+    // scroll or a piece's rise moves them (the last move always lands: the key still differs)
     if (opts.onBoxes) {
-      let key = panNow + scrollNow * 10 + tourNow * 10;
+      let key = scrollNow * 10;
       for (const id of IDS) key += (state[id].up || 0) * 3;
       if (boxesDirty || (Math.abs(key - boxKey) > 1e-4 && t - boxAt > 0.12)) {
         boxesDirty = false; boxKey = key; boxAt = t;
@@ -690,10 +592,11 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     }
   }
   // each piece's box (piece and plinth, risen by its lift) through the live camera, in CSS px of the stage.
-  // on: its centre is inside the stage
+  // on: its centre is inside the stage. A piece left out on phones has no box.
   function boxes() {
     const out = {}, W = core.W, H = core.H;
     for (const id of IDS) {
+      if (hidden.has(id)) continue;
       const b = state[id].box, up = state[id].up || 0;
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       for (let i = 0; i < 8; i++) {
@@ -708,7 +611,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   }
 
   // freeze(t): every time-dependent input held still for pixel-exact refactor checks (scripts/hero-snapshot.md).
-  // Scene time t, ignite (fully lit, entrance done), wake, drift, hover, scroll, phone pan and rig springs are
+  // Scene time t, ignite (fully lit, entrance done), wake, drift, hover, scroll and rig springs are
   // set to rest, and the core steps with dt 0, so every frame is identical. freeze(null) lets time run again
   // and gives back the ignite hold from before the freeze.
   let frozenT = null, igHoldWas = -1;
@@ -716,7 +619,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     if (frozenT === null) return;
     t = frozenT; igHold = frozenT;
     pointer.set(0, 0); drift.set(0, 0); pointerIn = false; hoverId = null; touchHover = null;
-    scrollP = scrollNow = 0; tourOn = false; tourP = tourNow = 0; autoId = null;
+    scrollP = scrollNow = 0;
   }
   function freeze(tv) {
     if (typeof tv !== "number") {
@@ -727,9 +630,9 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     frozenT = tv; hold(); core.setFrozen(true);
     wakeAge.fill(99); wakePeak.fill(0); wakeSpeed = 0;
     for (let i = 0; i < WAKE_N; i++) { wakeD[i].set(0, 0, -1, 0); wakeV[i].set(0, 0, 0, 1); }
-    panGoal = panNow = panVel = panBase = 0; drag = null; home = offAt = aim = null; focusNow = 0;
+    focusNow = 0;
     for (const id of IDS) {
-      state[id].lift = 0; state[id].gain.value = 1;
+      state[id].lift = 0;
       const rg = rigs[id];
       if (rg) { rg.t = 99; rg.was = false; for (const L of rg.parts) { L.x = 0; L.v = 0; rg.A[L.r.part - 1].w = 0; } }
     }
@@ -752,9 +655,6 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     stale: () => current !== orientation(),
     // the hero's own surface (heroLive)
     pieces, setOrientation, setHover, setScroll, boxes, freeze,
-    // the phone tour as it stands, angles in degrees (positive looks right), for checking from the console
-    tour: () => ({ on: tourOn, p: tourNow, exit: scrollNow, base: panBase / DEG, offset: panGoal / DEG, lo: -panLo / DEG, hi: panHi / DEG,
-      stops: TOUR.stops.map(id => [id, ang[id] == null ? null : Math.round((clampPan(ang[id]) / DEG) * 10) / 10]), shown: shownId }),
     board: boardMesh.material.uniforms,
     get phone() { return phone; },
   };
@@ -784,7 +684,7 @@ export async function mountHero(stage, layout, opts = {}) {
       // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
       // weights uTightK, uWideK, and uIgnite), .bright (bloom threshold uThresh), .motes (uGain, uCol); .ignite() replays the light
       ignite: world.ignite, grain: core.grain, motes: world.moteMat.uniforms, freeze: world.freeze, hash: core.hash, sig: core.sig,
-      setLevel: core.setLevel, tour: world.tour,
+      setLevel: core.setLevel,
       board: world.board, fog: world.fogMat.uniforms, post: core.post, fxaa: core.fxaa, bright: core.bright,
     };
     // live values from the core and the world
