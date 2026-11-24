@@ -31,16 +31,17 @@ const DEG = Math.PI / 180;
 const ZS = 60;                              // the camera's far plane: scene alpha = view depth / ZS
 const DRIFT_YAW = 2.5, DRIFT_PITCH = 1.0;    // camera arc with the mouse, degrees at the canvas edge
 // Phones: the poster's portrait camera fits all six across the width, so on a phone each piece was about 46 px
-// wide and far off (Farhad, Nov 24). Narrow portrait gets a closer, lower camera instead, and shows four pieces:
+// wide and far off (Farhad, Nov 24). Narrow portrait gets a high camera far back on a long lens (a low, close
+// one made the front tiles huge: Farhad picked this from four angles, with the lighting kept), and four pieces:
 // Zagros and the shield (HIDE_ON_PHONE) are left out, with their plinths, and their raised tiles sink flush
-// with the board (their projects stay in the Work section). PHONE_CAM frames the four: Cyrus at ~44% of the
-// width, Black Pearl and Falah fully in with ~8-9% to spare, the band at ~35-52% of the height, clear of the
+// with the board (their projects stay in the Work section). PHONE_CAM frames the four: Cyrus at ~43% of the
+// width, Black Pearl and Falah fully in with ~5-7% to spare, the band at ~30-55% of the height, clear of the
 // title, the board filling the lower half. The look is aimed a little right of the cylinder (target x 0.35) so
 // the group, which reaches farther right (Falah) than left (Pearl), sits balanced. Nothing pans: Farhad found
 // the sideways drag and the scroll tour blocked the page on his iPhone (Nov 24). Fully on at aspect
 // PHONE_AT[0] and below, back to the poster's camera by PHONE_AT[1], so portrait tablets (0.72 and up) still
 // see all six. Phones in Safari are 0.55-0.6 (svh, toolbars shown); an iPhone SE at the 560 px min-height is ~0.67.
-const PHONE_CAM = { position: [0, 1.45, 8.6], target: [0.35, 0.35, -1.0], hfov: 34 };
+const PHONE_CAM = { position: [0.35, 4.6, 20], target: [0.35, 0.5, -1.2], hfov: 15 };
 const PHONE_AT = [0.6, 0.72];
 const HIDE_ON_PHONE = ["zagros", "nids"];
 // Scroll. Where the live scene runs on a desktop the hero is pinned for 0.7 of a screen, and site.html feeds
