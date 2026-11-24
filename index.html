@@ -455,7 +455,7 @@ function rgba(hex,a){
    competes with the hero's first paint; soloHook is filled in by the plates block below. */
 var heroState = "idle", heroSettled = [];
 function heroSettle(s){ heroState = s; var q = heroSettled; heroSettled = []; q.forEach(function(f){ f(s); }); }
-var soloHook = { down:function(){}, heroUp:function(){}, prefetch:function(){} };
+var soloHook = { down:function(){}, heroUp:function(){}, release:function(){ return Promise.resolve(); }, prefetch:function(){} };
 
 window.heroLayout = null; window.heroLive = null;
 function heroOrientation(){ return matchMedia("(orientation: portrait)").matches ? "portrait" : "landscape"; }
@@ -570,7 +570,8 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
       if (started || heroState === "down") return; started = true; heroState = "mounting";
       /* the stall timer now counts from here: a slow first visit gets 8 s for the mount itself */
       clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(function(){ posterBack("8 s and the mount is not up"); }, 8000); window.heroWhy("mount started");
-      import("./hero.js").then(function(m){
+      /* a core the chapters made for themselves goes (or finishes and goes) before the hero makes its own */
+      Promise.resolve(soloHook.release()).then(function(){ return import("./hero.js"); }).then(function(m){
         return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack,
           onBoxes:function(){ if (window.heroLive) place(); } });
       }).then(function(h){
@@ -745,9 +746,31 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
     if (window.heroPosterBack) window.heroPosterBack("chapters: " + why);
     console.warn("plates: live view stopped (" + why + "), showing the posters.");
   }
-  /* the hero is up on its own core: chapters that had to make their own give it up and use the hero's */
-  function heroUp(h){
-    if (solo && solo.core !== h.core) { solo.dispose(); solo = null; active = null; clearLive(null); update(); }
+  /* One WebGL context for the page. A core the chapters made themselves (the hero had not started) is given up
+     before the hero mounts (release, called from the hero's start()), so the hero's mount never runs beside a
+     second context. gen counts releases: an own mount still on its way when one happens throws itself away. */
+  var gen = 0;
+  function drop(s){
+    var c = s.core;
+    try { s.dispose(); } catch(e){}
+    /* renderer.dispose() leaves the context to the garbage collector: let it go now (its listeners are gone,
+       so this is no loss to report) */
+    try { if (c && c.renderer) c.renderer.forceContextLoss(); } catch(e){}
+  }
+  function own(s){ var hl = window.heroLive; return !(hl && hl.core && s.core === hl.core); }
+  /* resolves once no core of the chapters' own is left: an own mount still on its way is waited for (it then
+     throws itself away), so the hero's core is never made while another context exists */
+  function release(){
+    gen++;
+    if (solo && own(solo)) { drop(solo); solo = null; window.heroWhy("chapters: gave their core up for the hero"); }
+    var pending = mounting;
+    mounting = null; active = null; clearLive(null);
+    return pending ? pending.then(function(){}, function(){}) : Promise.resolve();
+  }
+  /* the hero is up: anything still on a core of the chapters' own goes (normally release() already did it) */
+  function heroUp(){
+    if (solo && own(solo)) { gen++; drop(solo); solo = null; mounting = null; active = null; clearLive(null); }
+    active = null; update();
   }
   function whenHero(){
     return heroState === "mounting" ? new Promise(function(r){ heroSettled.push(r); }) : Promise.resolve(heroState);
@@ -755,18 +778,28 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
   function get(){
     if (dead) return Promise.reject(new Error("down"));
     if (solo) return Promise.resolve(solo);
-    if (!mounting) mounting = whenHero().then(function(st){
+    if (mounting) return mounting;
+    var my = gen, m = mounting = whenHero().then(function(st){
       if (st === "down" || dead) throw new Error("down");
-      return import("./hero.js").then(function(m){
+      return import("./hero.js").then(function(mod){
         var hl = window.heroLive;
-        return m.mountSolo({ core: hl && hl.core || undefined, base:"./assets/solo/", onLost:ownLost });
+        /* the hero's core when it is up; otherwise (the hero has not started) one of their own */
+        return mod.mountSolo({ core: hl && hl.core || undefined, base:"./assets/solo/",
+          onLost: function(why){ if (my === gen) ownLost(why); } });
       });
     }).then(function(s){
-      mounting = null;
-      if (dead) { s.dispose(); throw new Error("down"); }
+      if (mounting === m) mounting = null;
+      if (dead) { drop(s); throw new Error("down"); }
+      /* released while it was on its way, or the hero came up meanwhile: an own core must not stay beside the
+         hero's. Throw it away; with the hero up, mount again on its core. */
+      if (my !== gen || (heroState !== "idle" && own(s))) {
+        drop(s);
+        if (heroState === "up" && !dead) return get();
+        throw new Error("down");
+      }
       solo = s; return s;
-    }, function(e){ mounting = null; throw e; });
-    return mounting;
+    }, function(e){ if (mounting === m) mounting = null; throw e; });
+    return m;
   }
   function pick(){
     var best = null, br = 0;
@@ -804,6 +837,7 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
 
   soloHook.down = down;
   soloHook.heroUp = heroUp;
+  soloHook.release = release;
   soloHook.prefetch = function(id){
     if (dead || heroState !== "up" || !document.querySelector('.plate[data-solo="' + id + '"]')) return;
     get().then(function(s){ s.prefetch(id); }).catch(function(){});
