@@ -73,15 +73,19 @@ check("work chapters: names in h3, problem/built/matters rows", () => {
   const parts = src.split(/<section class="proj"/).slice(1).map((p) => p.split("</section>")[0]);
   parts.forEach((p, i) => {
     for (const row of ["The problem", "What I built", "Why it matters"]) if (!p.includes(row)) errs.push(`proj ${i + 1} lacks "${row}"`);
-    if (!/<canvas/.test(p)) errs.push(`proj ${i + 1} lacks canvas`);
+    const id = (p.match(/data-id="([^"]+)"/) || [])[1];
+    if (!/<div class="plate"[\s>]/.test(p)) errs.push(`proj ${i + 1} lacks class="plate"`);
+    const solo = (p.match(/<div class="plate"[^>]*\sdata-solo="([^"]*)"/) || [])[1];
+    if (solo !== undefined && solo !== id) errs.push(`proj ${i + 1}: data-solo="${solo}" but data-id="${id}"`);
+    if (solo !== undefined && !p.includes(`src="assets/solo/${id}/poster.webp"`)) errs.push(`proj ${i + 1}: poster for ${id} missing`);
   });
   const zag = parts[1] || "";
   if (/<a\s/.test(zag)) errs.push("Zagros must have no link");
   const nids = parts[5] || "";
   if (!nids.includes('href="research.html"') || !nids.includes("10.1007/978-3-031-60994-7_4")) errs.push("nids links missing");
-  if (!/SCENES\s*=\s*\[sceneCyrus,\s*sceneZagros,\s*sceneGraph,\s*scenePearl,\s*sceneFalah,\s*sceneNids\]/.test(src)) errs.push("SCENES array missing");
-  if (!/function fitPlate\(/.test(src)) errs.push("fitPlate missing");
-  if (!/rootMargin\s*:\s*"100px"/.test(src)) errs.push("IntersectionObserver rootMargin 100px missing");
+  for (const gone of ["SCENES", "sceneCyrus", "fitPlate", "docsCache", "drawPlate"]) if (src.includes(gone)) errs.push(`old canvas plate remnant "${gone}"`);
+  const css = src.replace(/\/\*[\s\S]*?\*\//g, "");
+  if (!/\.proj \.num\{[^}]*z-index\s*:/.test(css)) errs.push(".proj .num needs a z-index (the live canvas sits in the plate)");
   return errs;
 });
 
@@ -135,18 +139,19 @@ check("hero: chessboard poster, title and six project links", () => {
   }
   if (!src.includes('src="assets/hero/poster.webp"')) errs.push("poster.webp not referenced");
   if (!/<source media="\(orientation: portrait\)" srcset="assets\/hero\/poster-portrait\.webp">/.test(src)) errs.push("portrait poster source missing");
-  const head = src.slice(0, src.indexOf("<header"));
+  const head = src.slice(0, src.indexOf("<main"));
   if (/<script[^>]+src="[^"]*three/.test(head)) errs.push("three.js must not load from a script tag in the head");
   return errs;
 });
 
 check("hero: live scene is lazy and pinned", () => {
-  const errs = [], head = src.slice(0, src.indexOf("<header"));
-  if (!/<script type="importmap">[^<]*"three":\s*"https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//.test(head)) errs.push("importmap pinning three on jsdelivr missing before <header");
+  const errs = [], head = src.slice(0, src.indexOf("<main"));
+  if (!/<script type="importmap">[^<]*"three":\s*"https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//.test(head)) errs.push("importmap pinning three on jsdelivr missing before <main");
   if (!src.includes('import("./hero.js")')) errs.push('import("./hero.js") missing');
   if (/<script type="module" src/.test(src)) errs.push("no static module scripts");
   const hp = join(root, "hero.js");
   if (!existsSync(hp) || !readFileSync(hp, "utf8").includes("export async function mountHero")) errs.push("hero.js with mountHero missing");
+  if (!existsSync(hp) || !readFileSync(hp, "utf8").includes("export async function mountSolo")) errs.push("hero.js with mountSolo missing");
   return errs;
 });
 

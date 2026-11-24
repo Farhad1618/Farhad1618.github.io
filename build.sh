@@ -27,8 +27,8 @@ cat <<'HEAD'
   [hidden]{ display:none !important; }
 </style>
 HEAD
-# everything from site.html up to (not incl.) the first <header> goes in head; rest in body
-awk 'BEGIN{inhead=1} /^<div class="progress" id="progress">/{ if(inhead){ print "</head>\n<body>"; inhead=0 } } { print }' site.html
+# everything from site.html up to (not incl.) the first <main> goes in head; rest in body
+awk 'BEGIN{inhead=1} /^<main>/{ if(inhead){ print "</head>\n<body>"; inhead=0 } } { print }' site.html
 cat <<'FOOT'
 </body>
 </html>
