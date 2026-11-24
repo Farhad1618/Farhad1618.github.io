@@ -34,6 +34,25 @@ export const SOLO_DEFAULTS = {
   tapHold: 2.2,          // a tap plays the moving part for this long, then it goes back
 };
 
+const TILE = 1.5;                             // as hero.js and blender/hero/scene.py
+// Keeps the board triangles of the tiles under the plinth's centre (a plinth astride a seam keeps both).
+function ownBlock(board, plinth) {
+  if (!plinth) return;
+  const g = board.geometry, pos = g.attributes.position, src = g.index;
+  const c = new THREE.Box3().setFromObject(plinth).getCenter(new THREE.Vector3());
+  const near = (v, at) => {                   // how far the tile holding v is from the plinth's centre, in tiles
+    return Math.abs(Math.round(v / TILE) * TILE - at) < TILE / 2 + 0.05;
+  };
+  const v = new THREE.Vector3(), m = new THREE.Vector3(), keep = [];
+  for (let i = 0; i < src.count; i += 3) {
+    m.set(0, 0, 0);
+    for (let j = 0; j < 3; j++) m.add(v.fromBufferAttribute(pos, src.getX(i + j)).applyMatrix4(board.matrixWorld));
+    m.divideScalar(3);
+    if (near(m.x, c.x) && near(m.z, c.z)) keep.push(src.getX(i), src.getX(i + 1), src.getX(i + 2));
+  }
+  if (keep.length) g.setIndex(keep);
+}
+
 // gltf: the loaded solo.glb; layout: its layout.json. opts: { pointerTarget }.
 export function createSoloWorld(core, gltf, layout, opts = {}) {
   const { canvas, renderer } = core;
@@ -89,6 +108,9 @@ export function createSoloWorld(core, gltf, layout, opts = {}) {
         });
         // The board shader reads three attributes the solo glb does not carry. A missing attribute reads 0, and
         // aLift 0 would lift every tile with piece 0: no tile lifts (-1), no entrance (aIn 0), no ripple (aScr 0).
+        // Farhad: only the piece and the block it stands on. Every triangle whose tile is not under the plinth goes
+        // (a tile is TILE wide, centred on a multiple of TILE in the board's own patch, with a gap between blocks).
+        ownBlock(o, gltf.scene.getObjectByName("plinth-" + id));
         const n = o.geometry.attributes.position.count;
         o.geometry.setAttribute("aLift", new THREE.BufferAttribute(new Float32Array(n).fill(-1), 1));
         o.geometry.setAttribute("aIn", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
