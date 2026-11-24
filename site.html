@@ -11,15 +11,25 @@
    scene will be tried it asks for hero.js, three.js and pieces.glb straight away, ahead of the poster. */
 (function(){
   window.heroTry = false;
+  /* ?why on the URL prints why the hero chose the poster or the live scene, for checking on a phone */
+  window.heroWhy = function(t){
+    if (!/[?&]why\b/.test(location.search)) return;
+    var put = function(){ var d = document.getElementById("hero-why");
+      if (!d) { d = document.createElement("div"); d.id = "hero-why"; d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99;font:11px/1.4 monospace;color:#ECE7DC;background:rgba(12,12,14,.85);padding:6px 8px;white-space:pre-wrap;pointer-events:none"; document.body.appendChild(d); }
+      d.textContent += t + "\n"; };
+    document.body ? put() : addEventListener("DOMContentLoaded", put);
+  };
   try {
     var m = function(q){ return matchMedia(q).matches; }, n = navigator, forced = false;
     var weak = n.deviceMemory < 4 || n.hardwareConcurrency < 4;   // phones are tried too: the mount speed test sends a slow one to the poster
     try { forced = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && localStorage.heroForce === "1"; } catch(e){}
-    if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) return posterFirst();
+    window.heroWhy("mem " + n.deviceMemory + " · cores " + n.hardwareConcurrency + " · dpr " + devicePixelRatio + " · " + innerWidth + "x" + innerHeight
+      + (m("(prefers-reduced-motion: reduce)") ? " · REDUCED MOTION" : "") + (window.WebGL2RenderingContext ? "" : " · NO WEBGL2"));
+    if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) { window.heroWhy("poster from the start" + (weak ? " (weak device)" : "")); return posterFirst(); }
     var html = document.documentElement;
-    window.heroPosterBack = function(){ clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait"); };
+    window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait"); };
     html.classList.add("hero-wait"); window.heroTry = true;
-    window.heroWaitTimer = setTimeout(window.heroPosterBack, 6000);
+    window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000);
     var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
     [["modulepreload", "hero.js"], ["modulepreload", j + "build/three.module.js"],
      ["modulepreload", j + "examples/jsm/loaders/GLTFLoader.js"], ["modulepreload", j + "examples/jsm/libs/meshopt_decoder.module.js"],
@@ -28,7 +38,7 @@
       if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
       head.appendChild(l);
     });
-  } catch(e){ document.documentElement.classList.remove("hero-wait"); window.heroTry = false; posterFirst(); }
+  } catch(e){ document.documentElement.classList.remove("hero-wait"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
   /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
      on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
   function posterFirst(){
@@ -453,29 +463,30 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
   });
   addEventListener("resize", place);
-  function posterBack(){ if (window.heroPosterBack) window.heroPosterBack(); }
+  function posterBack(why){ if (window.heroPosterBack) window.heroPosterBack(why); }
   if (!window.fetch) return posterBack();
   fetch("assets/hero/layout.json").then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(function(L){ window.heroLayout = L; place(); boot(); })
-    .catch(function(){ posterBack(); /* links stay a hidden, focusable list */ });
+    .catch(function(e){ posterBack("layout.json: " + e); /* links stay a hidden, focusable list */ });
 
   /* live scene: only where the first-paint test said to try it (motion allowed, not weak, WebGL2) */
   function boot(){
-    if (!window.heroTry) return posterBack();
+    if (!window.heroTry) return posterBack("not tried");
     var probe = document.createElement("canvas"), gl = probe.getContext("webgl2");
-    if (!gl) return posterBack();
+    if (!gl) return posterBack("webgl2 context refused");
     var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     var started = false;
-    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); posterBack(); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
+    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); posterBack(typeof why === "string" ? why : "mount failed"); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
     function start(){
       if (started) return; started = true;
       /* the stall timer now counts from here: a slow first visit gets 8 s for the mount itself */
-      clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(posterBack, 8000);
+      clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(function(){ posterBack("8 s and the mount is not up"); }, 8000); window.heroWhy("mount started");
       import("./hero.js").then(function(m){
         return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack });
       }).then(function(h){
         window.heroLive = h; clearTimeout(window.heroWaitTimer); sec.classList.add("live");
-      }).catch(function(e){ fallBack(); console.warn("hero: live scene unavailable, showing the poster.", e); });
+        window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms");
+      }).catch(function(e){ fallBack("mount error: " + (e && e.message || e)); console.warn("hero: live scene unavailable, showing the poster.", e); });
     }
     function near(){
       if (!("IntersectionObserver" in window)) return start();
