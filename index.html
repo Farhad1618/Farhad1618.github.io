@@ -117,6 +117,9 @@ html.hero-wait .hero-poster{opacity:0}
 .hero-view::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 58%,transparent 40%,rgba(8,8,11,.78) 100%)}
 .hero::after{bottom:0;height:18%;background:linear-gradient(0deg,var(--ink),transparent)}
 .hero-head{position:absolute;z-index:3;left:0;right:0;top:19%;pointer-events:none}
+.hero-mark{position:absolute;left:50%;bottom:100%;width:clamp(64px,7.5vw,104px);aspect-ratio:1;margin:0 0 clamp(14px,2.4vh,26px) calc(clamp(64px,7.5vw,104px) / -2);opacity:0;transition:opacity .4s}
+.hero-mark.on{opacity:1}
+.hero-mark svg{display:block;width:100%;height:100%;overflow:visible}
 .hero-title{font-family:var(--disp);font-weight:400;font-size:clamp(20px,2.6vw,40px);line-height:1.2;letter-spacing:.42em;text-transform:uppercase;color:var(--bone)}
 .hero-title .line,.hero .sub.line{padding:0 0 .08em .42em;margin:0}
 .hero .sub{margin-top:clamp(10px,1.6vh,18px);font-size:clamp(10px,.9vw,12px);letter-spacing:.42em;color:var(--dim)}
@@ -133,22 +136,35 @@ html.hero-wait .hero-poster{opacity:0}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
 
-/* 02 who */
-.who{padding-top:22vh;padding-bottom:18vh;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:clamp(28px,6vw,96px);align-items:center}
-.photo{position:relative;aspect-ratio:4/5;background:var(--ink-2);overflow:hidden;border:1px solid var(--rule-soft)}
-.photo .ph{position:absolute;inset:0;display:grid;place-items:center;
-  background:radial-gradient(ellipse at 50% 38%,#2a2218 0%,#141210 55%,var(--ink) 100%)}
-.photo .ph span{font-family:var(--disp);font-style:italic;font-size:clamp(90px,14vw,200px);color:#3a2d1c;letter-spacing:-.04em}
-.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1) sepia(.35) contrast(1.05)}
-.photo .tag{z-index:1;position:absolute;left:14px;bottom:12px}
-.photo .cap{z-index:1;position:absolute;right:14px;top:12px}
-.photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(233,160,59,.08));mix-blend-mode:screen}
-.photo.has-img::after{background:rgba(233,160,59,.14)}
-.who h2{font-family:var(--disp);font-weight:400;font-size:clamp(34px,4.6vw,72px);line-height:1.02;letter-spacing:-.015em;margin-bottom:28px}
-.who p{color:var(--dim);max-width:46ch;margin-bottom:18px}
+/* 02 who: a centred headline with live "windows" set into the sentence. Each pill unfolds from an amber dot
+   on the baseline; the words around it part to make room. Pill contents are sized to the open pill and centred,
+   so the opening reads as an aperture, not a squash. */
+.who{padding-top:22vh;padding-bottom:20vh;text-align:center}
+.who .chap{justify-content:center;flex-wrap:wrap}
+.who-head{font-family:var(--disp);font-weight:400;font-size:clamp(32px,10vw,116px);line-height:1.08;letter-spacing:-.02em;margin:0 auto 5vh}
+.who-head .ln{display:block;white-space:nowrap}
+.who-head .w{display:inline-block}
+.who-head em{font-style:italic;color:var(--dim)}
+.who-head em.sig{color:var(--sig)}
+.pill{--pw:1.72em;--ph:.8em;display:inline-block;position:relative;width:var(--pw);height:var(--ph);margin:0 .2em;vertical-align:-.03em;
+  border-radius:999px;overflow:hidden;background:var(--ink-2);
+  box-shadow:0 0 0 .05em #060607,0 0 0 calc(.05em + 1px) #2c2b2e,0 .2em .5em rgba(0,0,0,.55)}
+.pill-in,.pill .dot{position:absolute;left:50%;top:50%;width:var(--pw);height:var(--ph);transform:translate(-50%,-50%);border-radius:999px}
+.pill-in{transition:transform .8s cubic-bezier(.16,1,.3,1)}
+.pill:hover .pill-in{transform:translate(-50%,-50%) scale(1.1)}
+.pill .dot{width:100%;height:100%;background:var(--sig);opacity:0}
+.pill canvas,.pill img,.pill .ph{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pill img{object-fit:cover;filter:grayscale(1) sepia(.35) contrast(1.05)}
+.pill .ph{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#3a2c1b 0%,#1a1612 60%,#100f0e 100%)}
+.pill .ph span{font-style:italic;font-size:.62em;line-height:1;color:#8a6a40;letter-spacing:-.04em}
+.pill::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 .12em rgba(0,0,0,.8),inset 0 1px 0 rgba(236,231,220,.08)}
+.who-body{max-width:56ch;margin:0 auto}
+.who p{color:var(--dim);margin-bottom:18px}
 .who p em{color:var(--bone)}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);margin-top:36px;border-top:1px solid var(--rule)}
-.facts div{padding:16px 16px 0 0}
+.who .btn{margin-top:18px}
+.who .btn span{font-family:var(--body);font-size:14px;letter-spacing:0}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);max-width:760px;margin:8vh auto 0;border-top:1px solid var(--rule)}
+.facts div{padding:18px 8px 0}
 .facts b{display:block;font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);color:var(--bone)}
 
 footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:22px var(--g) 80px;border-top:1px solid var(--rule)}
@@ -224,11 +240,9 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 }
 @media (max-width:1023px){.moments{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.moments{grid-template-columns:1fr}}
-@media (max-width:860px){
-  .who{grid-template-columns:1fr}
-}
 @media (prefers-reduced-motion:reduce){
   html.motion .rv,html.motion .line>span{opacity:1;transform:none}
+  .pill-in{transition:none}
   html.motion .chroma{--sw:114%}
   html.motion .chroma::after{transform:none}
 }
@@ -246,6 +260,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
       <div class="hero-stage"></div>
     </div>
     <div class="hero-head">
+      <div class="hero-mark" aria-hidden="true"></div>
       <h1 class="hero-title" aria-label="Farhad"><span class="line" aria-hidden="true"><span>Farhad</span></span></h1>
       <p class="mono sub line"><span>Software Developer</span></p>
     </div>
@@ -255,21 +270,21 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
   </section>
 
   <section class="who" id="who">
-    <figure class="photo rv" data-photo="">
-      <div class="ph"><span>F</span></div>
-      <figcaption class="mono tag">Farhad · Dubai</figcaption>
-      <span class="mono cap sig">● Dubai, GST</span>
-    </figure>
-    <div class="rv">
-      <div class="chap"><span class="mono sig">01</span><i></i><span class="mono">Who</span></div>
-      <h2>I'm Farhad. I turn chaos into systems that think.</h2>
-      <p>CTO at OnePharma in Dubai. I design the layer most companies skip: ontologies, knowledge graphs and governance layers that let AI <em>understand</em> a business, not just store it.</p>
-      <p>I build ontology platforms, constitutional governance and detection models, and I took one of them all the way to a Springer paper.</p>
-      <div class="facts">
-        <div><b>6</b><span class="mono">Featured systems</span></div>
-        <div><b>1</b><span class="mono">Springer paper</span></div>
-        <div><b>AR/EN</b><span class="mono">Bilingual systems</span></div>
-      </div>
+    <div class="chap rv"><span class="mono sig">01</span><i></i><span class="mono">Who</span><i></i><span class="mono"><span class="sig">&#9679;</span> Dubai <span data-clock>GST</span></span></div>
+    <h2 class="who-head" aria-label="I'm Farhad. I turn chaos into systems that think.">
+      <span class="ln" aria-hidden="true"><span class="w">I'm</span> <span class="w">Farhad</span><span class="pill" data-photo=""><span class="dot"></span><span class="pill-in"><span class="ph"><span>F</span></span></span></span><span class="w">.</span></span>
+      <span class="ln" aria-hidden="true"><span class="w">I</span> <span class="w">turn</span> <span class="w"><em>chaos</em></span><span class="pill" data-pill="chaos"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">into</span></span>
+      <span class="ln" aria-hidden="true"><span class="w">systems</span><span class="pill" data-pill="graph"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">that</span> <span class="w"><em class="sig">think.</em></span></span>
+    </h2>
+    <div class="who-body">
+      <p class="rv">CTO at OnePharma in Dubai. I design the layer most companies skip: ontologies, knowledge graphs and governance layers that let AI <em>understand</em> a business, not just store it.</p>
+      <p class="rv">I build ontology platforms, constitutional governance and detection models, and I took one of them all the way to a Springer paper.</p>
+      <a class="btn rv" href="#contact">Get in touch <span>&#8599;</span></a>
+    </div>
+    <div class="facts rv">
+      <div><b>6</b><span class="mono">Featured systems</span></div>
+      <div><b>1</b><span class="mono">Springer paper</span></div>
+      <div><b>AR/EN</b><span class="mono">Bilingual systems</span></div>
     </div>
   </section>
   <section class="drive" id="drive">
@@ -497,16 +512,132 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
   }
 })();
 
-/* Portrait slot: a URL in data-photo swaps the monogram for a graded <img>. */
+/* The mark above the name: appears like ink in water (mark.js, data in mark-data.json). Decorative; fails to nothing. */
+import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(".hero-mark")); }).catch(function(e){ console.warn("mark unavailable", e); });
+
+/* Portrait slot: a URL in data-photo swaps the monogram in the first headline pill for a graded <img>. */
 (function(){
-  var fig = document.querySelector("figure.photo[data-photo]");
+  var fig = document.querySelector(".pill[data-photo]");
   var url = fig && fig.getAttribute("data-photo");
   if (!url) return;
-  var img = new Image(); img.alt = "Farhad"; img.src = url;
+  var img = new Image(); img.alt = ""; img.src = url;
   img.onload = function(){
-    var ph = fig.querySelector(".ph"); if (ph) ph.remove();
-    fig.insertBefore(img, fig.firstChild); fig.classList.add("has-img");
+    var ph = fig.querySelector(".ph"); if (!ph) return;
+    ph.parentNode.insertBefore(img, ph); ph.remove(); fig.classList.add("has-img");
   };
+})();
+
+/* Dubai clock beside the Who chapter mark */
+(function(){
+  var el = document.querySelector("[data-clock]"); if (!el) return;
+  function tick(){
+    try { el.textContent = new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Dubai", hour:"2-digit", minute:"2-digit" }).format(new Date()) + " GST"; } catch (e) {}
+  }
+  tick(); setInterval(tick, 20000);
+})();
+
+/* WHO PILLS: two tiny live scenes set into the headline.
+   chaos: loose data points wander, then lock into a lattice, hold, and let go.
+   graph: a small knowledge graph with query pulses running its edges. */
+(function(){
+  var pills = [].slice.call(document.querySelectorAll(".pill[data-pill]"));
+  if (!pills.length) return;
+  var rnd = mulberry(7), scenes = [];
+  function mulberry(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function ease(x){ return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2; }
+  function fit(sc){
+    var c = sc.cv, r = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+    var w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    sc.w = r.width; sc.h = r.height; sc.d = d;
+  }
+  function bg(g, w, h){
+    var gr = g.createRadialGradient(w*.5, h*.45, 0, w*.5, h*.5, w*.6);
+    gr.addColorStop(0, "#1d1c20"); gr.addColorStop(1, "#0f0f12");
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  }
+  var COLS = 9, ROWS = 3;
+  function chaos(cv){
+    var pts = [];
+    for (var j = 0; j < ROWS; j++) for (var i = 0; i < COLS; i++)
+      pts.push({ x:rnd(), y:rnd(), vx:(rnd()-.5)*.002, vy:(rnd()-.5)*.002, gx:(i+.5)/COLS, gy:(j+.5)/ROWS, i:i, j:j });
+    return { cv:cv, draw:function(g, w, h, t){
+      bg(g, w, h);
+      var ph = (t / 7000) % 1, k;
+      if (ph < .38) k = 0; else if (ph < .55) k = ease((ph-.38)/.17); else if (ph < .84) k = 1; else k = 1 - ease((ph-.84)/.16);
+      var P = pts.map(function(p){
+        if (!reduced) {
+          p.vx += (rnd()-.5)*.0006; p.vy += (rnd()-.5)*.0006; p.vx *= .97; p.vy *= .97;
+          p.x += p.vx; p.y += p.vy;
+          if (p.x < .04 || p.x > .96) p.vx *= -1; if (p.y < .08 || p.y > .92) p.vy *= -1;
+          p.x = Math.min(.96, Math.max(.04, p.x)); p.y = Math.min(.92, Math.max(.08, p.y));
+        }
+        var gx = .1*w + p.gx*.8*w, gy = .18*h + p.gy*.64*h;
+        return { x:p.x*w + (gx - p.x*w)*k, y:p.y*h + (gy - p.y*h)*k, i:p.i, j:p.j };
+      });
+      if (k > .02) {
+        g.strokeStyle = rgba(C.sig, .45*k); g.lineWidth = Math.max(.6, w/180);
+        g.beginPath();
+        P.forEach(function(p, n){
+          if (p.i < COLS-1) { g.moveTo(p.x, p.y); g.lineTo(P[n+1].x, P[n+1].y); }
+          if (p.j < ROWS-1) { g.moveTo(p.x, p.y); g.lineTo(P[n+COLS].x, P[n+COLS].y); }
+        });
+        g.stroke();
+      }
+      var r = Math.max(1, h/26);
+      P.forEach(function(p){
+        g.fillStyle = k > .5 ? rgba(C.bone, .6 + .4*k) : rgba(C.trace, .9 - .3*k);
+        g.beginPath(); g.arc(p.x, p.y, r, 0, TAU); g.fill();
+      });
+    }};
+  }
+  function graph(cv){
+    var N = [[.12,.55],[.26,.25],[.3,.74],[.45,.48],[.58,.2],[.62,.78],[.74,.45],[.88,.28],[.9,.7]];
+    var E = [[0,1],[0,2],[1,3],[2,3],[3,4],[3,5],[4,6],[5,6],[6,7],[6,8],[1,4],[2,5],[7,8]];
+    var pulses = [], next = 0;
+    return { cv:cv, draw:function(g, w, h, t){
+      bg(g, w, h);
+      var P = N.map(function(n, i){ return [ (.06 + n[0]*.88)*w + Math.sin(t/1700 + i*1.7)*w*.012,
+        (.12 + n[1]*.76)*h + Math.cos(t/1900 + i*2.3)*h*.03 ]; });
+      g.strokeStyle = rgba(C.trace, .38); g.lineWidth = Math.max(.6, w/200);
+      g.beginPath(); E.forEach(function(e){ g.moveTo(P[e[0]][0], P[e[0]][1]); g.lineTo(P[e[1]][0], P[e[1]][1]); }); g.stroke();
+      if (!reduced && t > next) { pulses.push({ e:E[(rnd()*E.length)|0], t0:t, back:rnd() < .5 }); next = t + 260 + rnd()*380; }
+      pulses = pulses.filter(function(p){ return t - p.t0 < 900; });
+      pulses.forEach(function(p){
+        var u = (t - p.t0) / 900, a = P[p.back ? p.e[1] : p.e[0]], b = P[p.back ? p.e[0] : p.e[1]];
+        var x = a[0] + (b[0]-a[0])*u, y = a[1] + (b[1]-a[1])*u;
+        var gl = g.createRadialGradient(x, y, 0, x, y, h*.22);
+        gl.addColorStop(0, rgba(C.sig, .55*(1-u*.6))); gl.addColorStop(1, rgba(C.sig, 0));
+        g.fillStyle = gl; g.beginPath(); g.arc(x, y, h*.22, 0, TAU); g.fill();
+        g.fillStyle = C.sig; g.beginPath(); g.arc(x, y, Math.max(1, h/30), 0, TAU); g.fill();
+      });
+      P.forEach(function(p, i){
+        g.fillStyle = i === 3 ? C.sig : rgba(C.bone, .85);
+        g.beginPath(); g.arc(p[0], p[1], Math.max(1.2, h/(i === 3 ? 13 : 22)), 0, TAU); g.fill();
+      });
+    }};
+  }
+  pills.forEach(function(p){
+    var cv = p.querySelector("canvas"); if (!cv) return;
+    scenes.push(p.getAttribute("data-pill") === "chaos" ? chaos(cv) : graph(cv));
+  });
+  var raf = 0, on = false;
+  function frame(t){
+    raf = 0;
+    scenes.forEach(function(sc){
+      fit(sc); var g = sc.cv.getContext("2d");
+      g.setTransform(sc.d, 0, 0, sc.d, 0, 0); sc.draw(g, sc.w, sc.h, reduced ? 4800 : t);
+    });
+    if (on && !reduced && !document.hidden) raf = requestAnimationFrame(frame);
+  }
+  function run(){ if (!raf) raf = requestAnimationFrame(frame); }
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(function(es){ on = es[0].isIntersecting; if (on) run(); }, { rootMargin:"80px" })
+      .observe(document.querySelector(".who-head"));
+  } else { on = true; run(); }
+  document.addEventListener("visibilitychange", run);
+  addEventListener("resize", run);
 })();
 
 /* ============================================================
@@ -989,6 +1120,34 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
     start:"top 88%", once:true,
     onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
   });
+  /* who headline: words rise out of a blur; each pill starts as an amber dot on the baseline, then unfolds
+     into its window and the words beside it part to make room */
+  (function(){
+    var head = document.querySelector(".who-head"); if (!head) return;
+    var parts = [].slice.call(head.querySelectorAll(".w,.pill"));
+    var words = parts.filter(function(el){ return el.classList.contains("w"); });
+    var pills = parts.filter(function(el){ return el.classList.contains("pill"); });
+    gsap.set(words, { opacity:0, y:"0.42em", filter:"blur(10px)" });
+    gsap.set(pills, { width:0, height:0, marginLeft:".1em", marginRight:".1em" });
+    gsap.set(head.querySelectorAll(".pill .dot"), { opacity:1 });
+    gsap.set(head.querySelectorAll(".pill-in"), { opacity:0, scale:1.5 });
+    var tl = gsap.timeline({ paused:true }), wi = 0;
+    parts.forEach(function(el){
+      if (el.classList.contains("w")) {
+        tl.to(el, { opacity:1, y:0, filter:"blur(0px)", duration:1.25, ease:EASE }, wi * .07); wi++;
+        return;
+      }
+      var at = wi * .07 + .25, dot = el.querySelector(".dot"), inn = el.querySelector(".pill-in");
+      var fs = parseFloat(getComputedStyle(head).fontSize), d = fs * .16;
+      tl.to(el, { width:d, height:d, duration:.45, ease:"back.out(3)" }, at)
+        .to(el, { width:"1.72em", marginLeft:".2em", marginRight:".2em", duration:1.1, ease:"expo.inOut" }, at + .4)
+        .to(el, { height:".8em", duration:.9, ease:"expo.inOut" }, at + .62)
+        .to(dot, { opacity:0, duration:.6, ease:"power2.out" }, at + .85)
+        .to(inn, { opacity:1, scale:1, duration:1.4, ease:EASE }, at + .8);
+    });
+    tl.eventCallback("onComplete", function(){ gsap.set(pills.concat(words), { clearProps:"width,height,marginLeft,marginRight,filter,transform,opacity" }); });
+    ScrollTrigger.create({ trigger:head, start:"top 80%", once:true, onEnter:function(){ tl.play(); } });
+  })();
   /* plate parallax: the big outline numeral drifts against the scene (moving the canvas itself would expose its edges) */
   gsap.utils.toArray(".proj .plate .num").forEach(function(n){
     gsap.fromTo(n, { yPercent:-12 }, { yPercent:24, ease:"none",

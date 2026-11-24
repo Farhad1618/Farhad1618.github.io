@@ -19,18 +19,65 @@ const HAZE = [0.011, 0.019, 0.044];      // what distance fades to: deep blue-bl
 const LIGHT = [0, 1.51, -1.5];
 const LIGHT_COL = [6.6, 7.1, 8.3];        // cold moonlight: the smoke round the light is blue-grey, never pure white
 const FOG_AMB = [0.022, 0.036, 0.070];    // what the fog shows away from the light: a faint deep blue
-const FOG_DIV = 3;                         // fog is marched at 1/FOG_DIV of the size
-const MAX_PIXELS = 3.0e6;                  // backing buffer cap: every pass but the scene scales with pixels
+const FOG_DIV = 3;                         // fog is marched at 1/fogDiv of the size: this at least, more on big buffers
+const FOG_MAX = 0.34e6;                    // and never on more fog texels than this (the march is the dearest pass)
+// Sharpness levels, best first: [pixel ratio cap, backing buffer cap, frame budget in ms at mount]. The first
+// one this GPU renders inside its budget is used. A Retina screen needs its real pixels: at the old single
+// 1.5x / 3.0 MP cap a large window was drawn below 1x and stretched, and every outline against the glow
+// showed as stair steps (Farhad, Nov 24). The fog stays at FOG_MAX texels, so the top level costs the scene
+// and the per-pixel post passes only. Every level keeps 4x MSAA: with 2x on the sharp levels Farhad found the
+// old low level looked best, because 2x gives an outline only one in-between tone.
+const LEVELS = [[2, 7.5e6, 11.5], [2, 5.0e6, 11.5], [1.5, 3.0e6, 20]];
 const TILE = 1.5, REACH = 0.8;            // blender/hero/scene.py TILE and REACH: a piece's platform is the one tile under it, or the two it stands astride
 const LIFT = 0.16;                         // how far a hovered piece rises, with its plinth and the tiles under it
+const LIFT_BY = { cyrus: 0.06 };             // Cyrus, the centre piece, barely rises (Farhad: not as high as the rest)
 const DEG = Math.PI / 180;
+const ZS = "60.0";                          // the camera's far plane: scene alpha = view depth / ZS
+const DRIFT_YAW = 2.5, DRIFT_PITCH = 1.0;    // camera arc with the mouse, degrees at the canvas edge
+const WAKE_LIFE = 1.4;                       // seconds for the cursor's wake in the fog to close to a third
+const WAKE_STEP = 0.08;                      // spacing of the wake along the cursor's path, in canvas halves
+const MOTES = 420;                           // dust in the air round the light
 
+// The entrance, s seconds after the scene starts. The light comes up once, smoothly (no flicker: Farhad
+// did not like the light trying to catch). Five pieces rise into place from a little below, each with its own
+// delay, distance and time: two pairs start almost together, the shield lands last. Cyrus stands still.
+// Some board blocks start a little high or low and settle once (see "aIn" below). The light is mostly up before anything moves, so the motion is seen. All done by about 3.6 s.
+function igniteAt(s) {
+  const x = Math.min(1, Math.max(0, (s - 0.15) / 1.3));
+  return x * x * (3 - 2 * x);
+}
+const ENTER = {                                // [delay s, distance below rest, seconds to rise]
+  pearl: [0.6, 0.30, 1.6], onepharma: [0.7, 0.36, 1.7], zagros: [1.0, 0.42, 1.9],
+  falah: [1.45, 0.26, 1.5], nids: [1.55, 0.45, 2.0],
+};
+const TILE_IN = { share: 0.36, min: 0.05, max: 0.2, delay: [0.5, 1.9], dur: [1.2, 1.9] };
+const outCubic = x => { x = Math.min(1, Math.max(0, x)); return 1 - (1 - x) * (1 - x) * (1 - x); };
+
+// RIG: a piece with moving parts (see blender/hero/pieces.py, "moving parts"). COLOR_0 red = part / 8; per part
+// uRigP = pivot and mode (w 0 turns, 1 hangs), uRigA = axis and angle (radians), uRigH = anchor and the part
+// it hangs from. A turning part rotates about its pivot; a hanging part follows its anchor without tilting.
 const PIECE_VS = `
 varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
+#ifdef RIG
+uniform vec4 uRigP[3]; uniform vec4 uRigA[3]; uniform vec4 uRigH[3];
+vec3 rotA(vec3 v, vec3 k, float a){ float c = cos(a), s = sin(a); return v * c + cross(k, v) * s + k * dot(k, v) * (1.0 - c); }
+#endif
 void main(){
-  vUv = uv; vN = normalize(normalMatrix * normal);
-  vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  vec3 pos = position, nrm = normal;
+#ifdef RIG
+  int k = int(color.r * 8.0 + 0.5) - 1;
+  if (k >= 0 && k < 3) {
+    vec4 P = uRigP[k], A = uRigA[k];
+    if (P.w < 0.5) { pos = P.xyz + rotA(pos - P.xyz, A.xyz, A.w); nrm = rotA(nrm, A.xyz, A.w); }
+    else {
+      vec4 H = uRigH[k], Pj = uRigP[int(H.w + 0.5)], Aj = uRigA[int(H.w + 0.5)];
+      pos += Pj.xyz + rotA(H.xyz - Pj.xyz, Aj.xyz, Aj.w) - H.xyz;
+    }
+  }
+#endif
+  vUv = uv; vN = normalize(normalMatrix * nrm);
+  vWorld = (modelMatrix * vec4(pos, 1.0)).xyz;
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   vDepth = -mv.z; gl_Position = projectionMatrix * mv;
 }`;
 const PIECE_FS = `
@@ -40,24 +87,28 @@ void main(){
   vec3 n = normalize(vN);
   // the bake already holds the view's sheen and translucency: the matcap only adds a faint live glint
   vec3 c = texture2D(map, vUv).rgb + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(c, vDepth / ${ZS});     // alpha: view depth, averaged by the MSAA resolve (see POST_FS)
 }`;
 // The board. The tiles under a piece rise with it on hover: only their top corners move (aLift = the piece's
 // index, -1 elsewhere), so the block's sides stretch down to where they always ended and nothing opens beneath.
 const BOARD_VS = `
 attribute float aLift; uniform float uLiftAmt[6];
-varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY;
+attribute vec3 aIn; uniform float uInT;      // entrance: a block's top starts aIn.x off its height, settles after aIn.y s over aIn.z s
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
 void main(){
   vUv = uv; vWN = normalize(mat3(modelMatrix) * normal);
   vec4 w = modelMatrix * vec4(position, 1.0);
   vBaseY = w.y;
   if (aLift > -0.5) w.y += uLiftAmt[int(aLift + 0.5)];
+  if (aIn.z > 0.0) { float x = 1.0 - clamp((uInT - aIn.y) / aIn.z, 0.0, 1.0); w.y += aIn.x * x * x * x; }
   vWorld = w.xyz;
-  gl_Position = projectionMatrix * viewMatrix * w;
+  vec4 mv = viewMatrix * w;
+  vDepth = -mv.z;
+  gl_Position = projectionMatrix * mv;
 }`;
 const BOARD_FS = `
 uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte;
-varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY;
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
   c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
@@ -76,7 +127,7 @@ void main(){
   // the board has no edge: its outer blocks sink into the fog
   vec2 e = abs(vWorld.xz - uCentre) / uHalf;
   c = mix(c, uHaze, smoothstep(0.72, 0.97, max(e.x, e.y)));
-  gl_FragColor = vec4(c, 1.0);
+  gl_FragColor = vec4(c, vDepth / ${ZS});
 }`;
 // Fog: a short march from the eye to whatever the pixel shows, through a field of drifting noise.
 // Density pools low and in banks; the one light behind the Cyrus Cylinder lights them, strongly when you
@@ -89,15 +140,7 @@ void main(){
 // the composite can tell, for every full-size pixel, which fog texels saw the same surface.
 // The banks drift like smoke in still air: the broad shapes one way, the fine detail another, and the fine
 // detail is pushed around by the broad shapes, so the fog churns slowly instead of sliding as one sheet.
-const FOG_FS = `
-precision highp sampler3D;
-uniform sampler2D tDepth; uniform sampler3D tNoise;
-uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uFull;
-uniform float uNear; uniform float uFar; uniform float uTime; uniform float uDrift;
-uniform vec3 uP[6]; uniform vec3 uLight; uniform vec3 uLightCol; uniform vec3 uAmb;
-uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor; uniform float uKnee; uniform float uJitT;
-varying vec2 vUv;
-const int STEPS = 16;
+const LIGHT_VIS = `
 // how much of the light reaches p past the pieces. uOcc = footprint centre (x, z) and half size; uOccY = bottom
 // and top. Where the segment p -> light passes closest to a footprint, is it inside it, and below the top?
 float lightVis(vec3 p){
@@ -112,7 +155,37 @@ float lightVis(vec3 p){
     v *= 1.0 - occ;
   }
   return v;
-}
+}`;
+// The cursor's wake in the fog. Each recent cursor position is a line of sight from the eye (uWakeD: direction,
+// strength) with a push (uWakeV: how far it moved the fog, and the radius of the cut, which widens as it fades).
+// Returns how much fog it cuts at p, and the push there. The fog pass and the dust both use it.
+const WAKE_N = 16;
+const WAKE_GLSL = `
+uniform vec4 uWakeD[${WAKE_N}]; uniform vec4 uWakeV[${WAKE_N}]; uniform float uWakeOn;
+float wake(vec3 p, vec3 ro, out vec3 drag){
+  drag = vec3(0.0);
+  float s = 0.0;
+  if (uWakeOn <= 0.0) return 0.0;
+  for (int i = 0; i < ${WAKE_N}; i++) {
+    vec4 d = uWakeD[i], v = uWakeV[i];
+    vec3 q = p - ro, r = q - d.xyz * dot(q, d.xyz);
+    float w = d.w * exp(-dot(r, r) / (v.w * v.w));
+    s += w; drag += v.xyz * w;
+  }
+  drag /= max(s, 1.0);           // overlapping lines share one push, they do not stack
+  return s;
+}`;
+const FOG_FS = `
+precision highp sampler3D;
+uniform sampler2D tDepth; uniform sampler3D tNoise;
+uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uFull;
+uniform float uNear; uniform float uFar; uniform float uTime; uniform float uDrift;
+uniform vec3 uP[6]; uniform vec3 uLight; uniform vec3 uLightCol; uniform vec3 uAmb;
+uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor; uniform float uKnee; uniform float uJitT;
+varying vec2 vUv;
+const int STEPS = 16;
+${LIGHT_VIS}
+${WAKE_GLSL}
 const float TOP = 3.2;          // no fog above this height
 // broad banks: about 0.17 units a second along x, a little toward the eye, a slow rise and fall
 float low(vec3 p){
@@ -160,18 +233,24 @@ void main(){
       ta = tb;
       float part = 0.0;
       for (int k = 0; k < 6; k++) { vec3 q = p - uP[k]; float w = 1.0 / (1.0 + dot(q.xz, q.xz) * 1.6); part += w * w; }
+      // the cursor's wake: the fog is pushed the way the cursor went and parts round where it passed
+      vec3 drag; float wk = wake(p, ro, drag);
+      vec3 pn = p - drag;
       // two scales moving at different speeds, so banks change shape as they drift instead of sliding
-      float lo = low(p);
-      float hi = fine(p, lo);
+      float lo = low(pn);
+      float hi = fine(pn, lo);
       // fog thins where it meets a piece, as it does around anything standing in moving air
       float b = bank(p, lo, hi) * (1.0 - 0.55 * min(part, 1.0));
       // wisps: a third, finer layer eats into the banks and drifts faster, so their edges fray like smoke
       float tw = uTime * uDrift;
-      b *= 0.45 + 1.1 * texture(tNoise, p * vec3(0.85, 1.25, 0.85) + vec3(lo * 0.8 + tw * 0.045, -tw * 0.018, tw * 0.028)).r;
+      b *= 0.45 + 1.1 * texture(tNoise, pn * vec3(0.85, 1.25, 0.85) + vec3(lo * 0.8 + tw * 0.045, -tw * 0.018, tw * 0.028)).r;
+      // the cut is frayed by the fine noise, so it parts like smoke, not a clean tube
+      float cut = smoothstep(0.0, 1.0, clamp(wk * (0.5 + 0.8 * hi), 0.0, 1.0));
+      b *= 1.0 - 0.6 * cut;
       vec3 q = uLight - p; float d2 = dot(q, q); vec3 ld = q * inversesqrt(d2);
       // a thin haze always hangs round the light, so the cylinder always has its halo
       // the thin haze, like the banks, lies mostly behind the pieces: the foreground keeps its blacks
-      float sigma = 0.011 * exp(-max(p.y, 0.0) * 0.45) * mix(0.2, 1.0, smoothstep(4.0, -2.0, p.z)) + 0.95 * b + 0.05 * exp(-d2 * 0.55);
+      float sigma = (0.011 * exp(-max(p.y, 0.0) * 0.45) * mix(0.2, 1.0, smoothstep(4.0, -2.0, p.z)) + 0.05 * exp(-d2 * 0.55)) * (1.0 - 0.2 * cut) + 0.95 * b;
       float cs = dot(rd, ld);
       float ph = 0.6975 / pow(1.3025 - 1.1 * cs, 1.5);        // looking toward the light, fog glows
       vec3 ps = p + ld * 0.6;
@@ -206,11 +285,20 @@ float coc(float z){ float d = 1.0 / uFocus - 1.0 / z; return clamp(abs(d) * uApe
 // edge), take the one whose depth is nearest. Positions come from the pixel index, the same mapping the fog
 // pass used, so they line up at any buffer size, not only multiples of DIV.
 vec4 fogAt(vec2 uv, float z){
-  vec2 f = (uv * uFull - 0.5 - float(DIV / 2)) / float(DIV), b = floor(f), fr = f - b;
+  vec2 f = (uv * uFull - 0.5 - float(DIV / 2)) / float(DIV);
+  // from DIV 4 up a fog texel is wide enough that 3x3 of them, centred on the nearest, smooths as much as
+  // 4x4 does at DIV 3: fewer fetches where there are the most pixels
+#if DIV >= 4
+  vec2 b = floor(f + 0.5), fr = f - b;
+  const int K0 = -1, K1 = 1;
+#else
+  vec2 b = floor(f), fr = f - b;
+  const int K0 = -1, K1 = 2;
+#endif
   ivec2 full = ivec2(uFull) - 1, lim = ivec2(uFogSize) - 1;
   vec4 sum = vec4(0.0), best = vec4(0.0, 0.0, 0.0, 1.0); float wsum = 0.0, bestD = 1e9;
   // a 4x4 soft kernel: wide enough to average away the march jitter, which a 3x3 left as a dot grid
-  for (int j = -1; j <= 2; j++) for (int i = -1; i <= 2; i++) {
+  for (int j = K0; j <= K1; j++) for (int i = K0; i <= K1; i++) {
     ivec2 tc = clamp(ivec2(b) + ivec2(i, j), ivec2(0), lim);
     float zi = linZ(texelFetch(tDepth, min(tc * DIV + DIV / 2, full), 0).x);
     vec4 fi = texelFetch(tFog, tc, 0);
@@ -229,13 +317,14 @@ void main(){
   // the other. Where the depth says "behind" and a nearer, sharper piece is next to it (P, at offset o), blur
   // the background at its full strength and then lay the piece's share of the pixel back on top, so the
   // smooth MSAA edge survives without leaving a sharp ring of background around the piece.
-  vec2 dx = vec2(uPx.x, 0.0), dy = vec2(0.0, uPx.y), o = vec2(0.0); float zn = z, zk;
-  zk = viewZ(vUv + dx); if (zk < zn) { zn = zk; o = dx; }
-  zk = viewZ(vUv - dx); if (zk < zn) { zn = zk; o = -dx; }
-  zk = viewZ(vUv + dy); if (zk < zn) { zn = zk; o = dy; }
-  zk = viewZ(vUv - dy); if (zk < zn) { zn = zk; o = -dy; }
+  vec2 dx = vec2(uPx.x, 0.0), dy = vec2(0.0, uPx.y), o = vec2(0.0); float zn = z, zf = z, zk;
+  zk = viewZ(vUv + dx); if (zk < zn) { zn = zk; o = dx; } zf = max(zf, zk);
+  zk = viewZ(vUv - dx); if (zk < zn) { zn = zk; o = -dx; } zf = max(zf, zk);
+  zk = viewZ(vUv + dy); if (zk < zn) { zn = zk; o = dy; } zf = max(zf, zk);
+  zk = viewZ(vUv - dy); if (zk < zn) { zn = zk; o = -dy; } zf = max(zf, zk);
   bool edge = zn < z * 0.97 && coc(zn) + 1.0 < r0;
-  vec3 C = texture2D(tColor, vUv).rgb, G = edge ? texture2D(tColor, vUv - o).rgb : C;
+  vec4 C4 = texture2D(tColor, vUv);
+  vec3 C = C4.rgb, G = edge ? texture2D(tColor, vUv - o).rgb : C;
   vec3 acc = G; float wsum = 1.0;
   if (r0 > 0.6) {
     for (int i = 1; i <= 14; i++) {
@@ -253,8 +342,20 @@ void main(){
     vec3 P = texture2D(tColor, vUv + o).rgb, d = P - G;
     c = mix(c, P, clamp(dot(C - G, d) / max(dot(d, d), 1e-6), 0.0, 1.0));
   }
-  vec4 fog = fogAt(vUv, z);
-  c = c * fog.a + fog.rgb * fog.rgb;
+  // The fog is added by depth, and a pixel's depth is one sample: on a silhouette it is all piece or all
+  // background, so the glow behind a piece came in whole pixels and the smooth MSAA edge turned into steps.
+  // The scene writes its view depth to alpha, which the MSAA resolve averages: where the near and far
+  // surfaces meet, that average says how much of this pixel the near one covers. Blend the two finished
+  // composites by it (not the fog values: they are stored as square roots, and a half-covered pixel got a
+  // quarter of the glow, which still read as a hard step).
+  if (zf > zn * 1.03) {
+    float cov = clamp((zf - C4.a * ${ZS}) / (zf - zn), 0.0, 1.0);
+    vec4 fF = fogAt(vUv, zf), fN = fogAt(vUv, zn);
+    c = mix(c * fF.a + fF.rgb * fF.rgb, c * fN.a + fN.rgb * fN.rgb, cov);
+  } else {
+    vec4 fog = fogAt(vUv, z);
+    c = c * fog.a + fog.rgb * fog.rgb;
+  }
   c = mix(uInk, c, uFade);
 #ifdef DITHER_POST
   // 8-bit frame buffer (no half float): dither here too, before the composite is rounded
@@ -284,8 +385,18 @@ void main(){
 // sqrt(colour) so the dark edges against the fog are found too.
 const FXAA_FS = `
 uniform sampler2D tIn; uniform vec2 uPx; uniform float uSubpix; uniform float uEdge; uniform float uEdgeMin;
-uniform sampler2D tTight; uniform sampler2D tWide; uniform vec2 uTightPx; uniform float uTightK; uniform float uWideK; uniform vec3 uTint; uniform vec3 uShadow;
+uniform sampler2D tTight; uniform sampler2D tWide; uniform vec2 uTightPx; uniform float uTightK; uniform float uWideK; uniform vec3 uTint; uniform vec3 uShadow; uniform float uIgnite;
+uniform sampler2D tGrain; uniform float uGrainPx; uniform float uGrain; uniform float uGrainSoft; uniform float uGrainSplit;
 varying vec2 vUv;
+// film grain (the grainy-gradients skill): the same feTurbulence tile its CSS uses, laid over the frame in
+// screen space. Centred on mid-grey, so overlay / soft-light leave the average brightness alone.
+vec3 toLin(vec3 v){ return mix(v / 12.92, pow((v + 0.055) / 1.055, vec3(2.4)), step(0.04045, v)); }
+vec3 toSrgb(vec3 v){ return mix(v * 12.92, 1.055 * pow(v, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, v)); }
+vec3 overlayB(vec3 b, vec3 n){ return mix(2.0 * b * n, 1.0 - 2.0 * (1.0 - b) * (1.0 - n), step(0.5, b)); }
+vec3 softB(vec3 b, vec3 n){
+  vec3 d = mix(((16.0 * b - 12.0) * b + 4.0) * b, sqrt(b), step(0.25, b));
+  return mix(b - (1.0 - 2.0 * n) * b * (1.0 - b), b + (2.0 * n - 1.0) * (d - b), step(0.5, n));
+}
 float lum(vec2 uv){ return sqrt(max(dot(texture2D(tIn, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0)); }
 vec3 fxaa(){
   vec3 cM = texture2D(tIn, vUv).rgb;
@@ -334,12 +445,91 @@ void main(){
   vec3 tight = texture2D(tTight, vUv + uTightPx * vec2(-1.5, -1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, -1.5)).rgb
              + texture2D(tTight, vUv + uTightPx * vec2(-1.5, 1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, 1.5)).rgb;
   c += texture2D(tWide, vUv).rgb * uWideK + tight * 0.25 * uTightK;
+  // the light coming on: everything here is lit by it, so the frame scales with it. The dim parts come up
+  // later than the bright core (they go as its square), so the halo is there first and the shafts fan out.
+  float l0 = dot(c, vec3(0.299, 0.587, 0.114));
+  c *= uIgnite * mix(uIgnite, 1.0, smoothstep(0.02, 0.5, l0));
   // grade: the dark and the mid tones lean deep blue, the lit ivory keeps its own colour
   float l = dot(c, vec3(0.299, 0.587, 0.114)), k = 1.0 - smoothstep(0.22, 0.85, l);
   c = mix(c, c * uTint, k) + uShadow * k * (1.0 - smoothstep(0.0, 0.25, l));
   // dark, smooth fog on an 8-bit screen: break the bands up with a little noise
   c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
+  if (uGrain > 0.0 && gl_FragCoord.x >= uGrainSplit) {
+    vec3 b = clamp(c, 0.0, 1.0), n = texture2D(tGrain, gl_FragCoord.xy / uGrainPx).rgb;
+    // mode 2, even: the noise moves L* (perceived lightness) by the same amount everywhere, so the sky, the
+    // lit floor and the ivory all get the same grain. Added as neutral grey in linear light; hue is kept.
+    if (uGrainSoft > 1.5) {
+      vec3 lin = toLin(b);
+      float Y = dot(lin, vec3(0.2126, 0.7152, 0.0722));
+      float L = Y > 0.008856 ? 116.0 * pow(Y, 1.0 / 3.0) - 16.0 : 903.3 * Y;
+      float L2 = max(L + (n.r - 0.5) * uGrain * smoothstep(0.5, 4.0, L), 0.0);   // true black stays black
+      float Y2 = L2 > 8.0 ? pow((L2 + 16.0) / 116.0, 3.0) : L2 / 903.3;
+      c = toSrgb(max(lin + (Y2 - Y), 0.0));
+    } else c = mix(c, mix(overlayB(b, n), softB(b, n), uGrainSoft), uGrain);
+  }
   gl_FragColor = vec4(c, 1.0);
+}`;
+
+// Dust hanging in the air round the light. Lit only by it: bright where you look toward the light, dark in a
+// piece's shadow (the same footprint test as the fog), so the motes show the shafts. The cursor's wake pushes
+// them too. Each flake tumbles, so it catches the light now and then. Drawn after the depth of field (which
+// would smear a 2-pixel mote to nothing): each mote tests the scene depth itself and grows into its own soft
+// disc by its own circle of confusion, keeping its total light.
+const MOTE_VS = `
+uniform float uTime; uniform float uScale; uniform vec3 uLight; uniform vec4 uOcc[6]; uniform vec2 uOccY[6];
+uniform vec3 uLo; uniform vec3 uSize; uniform float uFocus; uniform float uAperture; uniform float uMaxR;
+attribute vec4 aSeed;
+varying float vI; varying float vZ; varying float vSharp;
+${LIGHT_VIS}
+${WAKE_GLSL}
+void main(){
+  float k = aSeed.w;
+  // still air: a slow rise and a lazy wander, wrapped inside the box round the light
+  vec3 p = aSeed.xyz * uSize;
+  // two octaves of slow wander per axis, never in step, so no mote moves on a visible loop
+  float T = uTime;
+  p.y += T * (0.006 + 0.012 * k) + sin(T * 0.11 + k * 17.0) * 0.05;
+  p.x += sin(T * (0.031 + 0.02 * k) + k * 40.0) * 0.22 + sin(T * 0.13 + k * 63.0) * 0.04;
+  p.z += cos(T * (0.023 + 0.02 * k) + k * 23.0) * 0.22 + cos(T * 0.17 + k * 31.0) * 0.04;
+  p = uLo + mod(p, uSize);
+  vec3 e = min(p - uLo, uLo + uSize - p);
+  float edge = smoothstep(0.0, 0.4, min(min(e.x, e.y), e.z));      // no pop where the box wraps
+  vec3 drag; wake(p, cameraPosition, drag);
+  p += drag * 1.4;
+  vec3 q = uLight - p; float d2 = dot(q, q);
+  float cs = dot(normalize(p - cameraPosition), q * inversesqrt(d2));
+  float ph = 0.6975 / pow(1.3025 - 1.1 * cs, 1.5);
+  // a flake turns slowly, so its glint swells and fades over seconds, never blinks
+  float tw = 0.6 + 0.4 * sin(T * (0.15 + 0.25 * k) + k * 91.0);
+  // only the air close to the light is bright enough to show dust: the light falls off steeply
+  float fall = 1.0 / ((0.35 + d2) * (0.35 + d2));
+  vI = ph * tw * edge * lightVis(p) * fall;
+  vec4 mv = modelViewMatrix * vec4(p, 1.0);
+  gl_Position = projectionMatrix * mv;
+  vZ = -mv.z;
+  float px = (0.004 + 0.008 * fract(k * 7.13) * fract(k * 7.13)) * uScale / vZ;
+  vI *= min(1.0, px / 1.5);           // below a pixel and a half they dim instead of shrinking
+  px = max(px, 1.5);
+  float d = 1.0 / uFocus - 1.0 / vZ;
+  float coc = clamp(abs(d) * uAperture, 0.0, 1.0) * uMaxR;
+  // never a hard dot: the lens and the haze always soften it a little
+  float sz = px * 1.6 + 2.0 * coc + 1.5;
+  vI *= (px * px) / (sz * sz);        // out of focus: the same light spread over a bigger disc
+  vSharp = px / sz;
+  gl_PointSize = sz;
+}`;
+const MOTE_FS = `
+uniform vec3 uCol; uniform float uGain; uniform sampler2D tDepth; uniform vec2 uFull; uniform float uNear; uniform float uFar;
+varying float vI; varying float vZ; varying float vSharp;
+void main(){
+  vec2 c = gl_PointCoord * 2.0 - 1.0; float r2 = dot(c, c);
+  if (r2 > 1.0) discard;
+  float d = texelFetch(tDepth, ivec2(gl_FragCoord.xy), 0).x * 2.0 - 1.0;
+  float z = 2.0 * uNear * uFar / (uFar + uNear - d * (uFar - uNear));
+  if (vZ > z + 0.05) discard;         // behind a piece or the board
+  // in focus a soft dot; out of focus a flat disc with a soft rim, like a lens draws it
+  float a = mix(1.0 - smoothstep(0.5, 1.0, r2), exp(-r2 * 4.0) * 2.5, vSharp);
+  gl_FragColor = vec4(uCol * (vI * uGain * a), 1.0);
 }`;
 
 // A 64-cube of smooth noise that tiles in every direction: two octaves of value noise.
@@ -416,7 +606,7 @@ export async function mountHero(stage, layout, opts = {}) {
     depthTest: false, depthWrite: false,
     uniforms: { uHaze: hazeU, uInk: { value: new THREE.Vector3(...INK) } },
     vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }",
-    fragmentShader: "uniform vec3 uHaze; uniform vec3 uInk; varying vec2 vUv; void main(){ gl_FragColor = vec4(mix(uHaze, uInk, smoothstep(0.30, 0.95, vUv.y)), 1.0); }",
+    fragmentShader: "uniform vec3 uHaze; uniform vec3 uInk; varying vec2 vUv; void main(){ gl_FragColor = vec4(mix(uHaze, uInk, smoothstep(0.30, 0.95, vUv.y)), 1.0); }",      // alpha 1: as far as it goes
   });
   const back = new THREE.Mesh(backGeo, backMat);
   back.frustumCulled = false; back.renderOrder = -10;
@@ -437,7 +627,7 @@ export async function mountHero(stage, layout, opts = {}) {
       boardMesh = o;
       o.material = new THREE.ShaderMaterial({
         vertexShader: BOARD_VS, fragmentShader: BOARD_FS,
-        uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uMatte: { value: 0.0 }, uLight: { value: new THREE.Vector3(...LIGHT) },
+        uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uInT: { value: 0 }, uMatte: { value: 0.0 }, uLight: { value: new THREE.Vector3(...LIGHT) },
           uCentre: { value: new THREE.Vector2(layout.board.center[0], layout.board.center[1]) },
           uHalf: { value: new THREE.Vector2(layout.board.size[0] / 2, layout.board.size[1] / 2) } },
       });
@@ -468,6 +658,32 @@ export async function mountHero(stage, layout, opts = {}) {
     };
   }
 
+  // moving parts: each piece's rig comes from the node extras (pieces.py _rig); its parts are marked in COLOR_0
+  const rigs = {};
+  for (const id of IDS) {
+    let parts = [];
+    try { parts = JSON.parse(pieces[id].userData.rig || "[]"); } catch (_) { parts = []; }
+    if (!parts.length) continue;
+    const P = [0, 1, 2].map(() => new THREE.Vector4()), A = [0, 1, 2].map(() => new THREE.Vector4(0, 1, 0, 0));
+    const H = [0, 1, 2].map(() => new THREE.Vector4());
+    for (const r of parts) {
+      const i = r.part - 1;
+      if (i < 0 || i > 2) continue;
+      if (r.mode === "hang") { P[i].w = 1; H[i].set(r.anchor[0], r.anchor[1], r.anchor[2], r.of - 1); }
+      else { P[i].set(r.pivot[0], r.pivot[1], r.pivot[2], 0); A[i].set(r.axis[0], r.axis[1], r.axis[2], 0); }
+    }
+    let rigged = false;
+    pieces[id].traverse(o => {
+      if (!o.isMesh || !o.geometry.attributes.color) return;
+      Object.assign(o.material.uniforms, { uRigP: { value: P }, uRigA: { value: A }, uRigH: { value: H } });
+      o.material.defines = { ...o.material.defines, RIG: 1 };
+      o.material.vertexColors = true;
+      o.material.needsUpdate = true;
+      rigged = true;
+    });
+    if (rigged) rigs[id] = { parts: parts.map(r => ({ r, x: 0, v: 0 })), A, t: 99, was: false };
+  }
+
   // which board corners rise with which piece: the tops of the tiles its platform is made of
   {
     if (!boardMesh) throw new Error("pieces.glb is missing the board");
@@ -479,6 +695,22 @@ export async function mountHero(stage, layout, opts = {}) {
       IDS.forEach((id, k) => { const c = state[id].at; if (Math.abs(cx - c.x) < REACH && Math.abs(cz - c.z) < REACH) a[i] = k; });
     }
     boardMesh.geometry.setAttribute("aLift", new THREE.BufferAttribute(a, 1));
+    // the entrance: about a third of the free blocks start a little high or low and settle once. Picked by a
+    // fixed hash of the tile, so it is the same composition every visit. Platforms (Cyrus's too) stay out.
+    const ain = new Float32Array(pos.count * 3), T = TILE_IN;
+    const hash = (x, z, n) => { const h = Math.sin(x * 127.1 + z * 311.7 + n * 74.7) * 43758.5453; return h - Math.floor(h); };
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(boardMesh.matrixWorld);
+      if (v.y < -0.3) continue;
+      const ix = Math.round(v.x / TILE), iz = Math.round(v.z / TILE);
+      if (IDS.some(id => Math.abs(ix * TILE - state[id].at.x) < REACH && Math.abs(iz * TILE - state[id].at.z) < REACH)) continue;
+      if (hash(ix, iz, 0) > T.share) continue;
+      const mag = T.min + (T.max - T.min) * hash(ix, iz, 1);
+      ain[i * 3] = hash(ix, iz, 2) < 0.5 ? -mag : mag;
+      ain[i * 3 + 1] = T.delay[0] + (T.delay[1] - T.delay[0]) * hash(ix, iz, 3);
+      ain[i * 3 + 2] = T.dur[0] + (T.dur[1] - T.dur[0]) * hash(ix, iz, 4);
+    }
+    boardMesh.geometry.setAttribute("aIn", new THREE.BufferAttribute(ain, 3));
   }
 
   // camera
@@ -487,7 +719,9 @@ export async function mountHero(stage, layout, opts = {}) {
   let focusBase = 10, focusNow = 0;
 
   // the scene: 4x MSAA. Three resolves colour (smooth outlines) and depth (one sample) into textures.
-  const rt = new THREE.WebGLRenderTarget(4, 4, { samples: 4, depthBuffer: true });
+  // half float where it can render to it, so the view depth in alpha (see POST_FS) keeps its precision
+  const rt = new THREE.WebGLRenderTarget(4, 4, { samples: 4, depthBuffer: true,
+    type: renderer.extensions.has("EXT_color_buffer_float") ? THREE.HalfFloatType : THREE.UnsignedByteType });
   rt.depthTexture = new THREE.DepthTexture(4, 4);
   rt.texture.minFilter = rt.texture.magFilter = THREE.LinearFilter;
   const ext = renderer.extensions;
@@ -522,12 +756,55 @@ export async function mountHero(stage, layout, opts = {}) {
     vertexShader: POST_VS, fragmentShader: BLUR_FS, depthTest: false, depthWrite: false,
     uniforms: { tIn: { value: null }, uStep: { value: new THREE.Vector2() } },
   });
+  // grain tile: the skill's noise (feTurbulence fractalNoise 0.8, 3 octaves, 200 px, grey, opaque)
+  const grainCanvas = document.createElement("canvas");
+  grainCanvas.width = grainCanvas.height = 200;
+  const grainTex = new THREE.CanvasTexture(grainCanvas);
+  grainTex.wrapS = grainTex.wrapT = THREE.RepeatWrapping;
+  grainTex.colorSpace = THREE.NoColorSpace; grainTex.generateMipmaps = false; grainTex.minFilter = grainTex.magFilter = THREE.NearestFilter;
+  // drawn at the backing resolution (the SVG's viewBox keeps the noise the same as the 200 CSS px tile),
+  // so it is sampled one texel per pixel and keeps its fine grain
+  let grainSize = 0;
+  function drawGrain(size) {
+    size = Math.max(50, Math.round(size));
+    if (size === grainSize) return;
+    grainSize = size;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 200 200"><filter id="n" color-interpolation-filters="sRGB">`
+      + '<feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/>'
+      + '<feComponentTransfer><feFuncA type="linear" slope="0" intercept="1"/></feComponentTransfer></filter><rect width="200" height="200" filter="url(#n)"/></svg>';
+    const img = new Image();
+    img.onload = () => {
+      if (disposed || size !== grainSize) return;
+      grainCanvas.width = grainCanvas.height = size;
+      grainCanvas.getContext("2d").drawImage(img, 0, 0, size, size);
+      grainTex.dispose(); grainTex.needsUpdate = true; setGrain(grainLevel);
+    };
+    img.src = "data:image/svg+xml," + encodeURIComponent(svg);
+  }
+  // Levels hit the skill's targets (0.5 / 0.8 / 1.4 L*) measured on the live frame, Nov 24. Mode 2 is even:
+  // it moves L* by the same amount on the sky, the lit floor and the ivory. Overlay (the skill's own pick for a
+  // CSS layer, solved from colours read off this frame) gave the sky 0.86 but the lit floor 3.9, so it is
+  // kept only to compare. Then opacity on standard / HDR screens / the high-contrast setting.
+  const GRAIN = { subtle: [2, 5.5, 4.7, 3.85], medium: [2, 9.0, 7.65, 6.3], strong: [2, 16.0, 13.6, 11.2], overlay: [0, 0.96, 0.82, 0.67] };
+  let grainLevel = (new URLSearchParams(location.search).get("grain") || "medium").toLowerCase();
+  let grainReady = false;
+  function setGrain(level) {
+    grainLevel = level in GRAIN || level === "off" ? level : "medium";
+    grainReady = grainReady || !!grainCanvas.getContext("2d").getImageData(0, 0, 1, 1).data[3];
+    const u = fxaaMat.uniforms, g = GRAIN[grainLevel];
+    if (!g || !grainReady) { u.uGrain.value = 0; return grainLevel; }
+    const col = matchMedia("(prefers-contrast: more)").matches ? 3 : matchMedia("(dynamic-range: high)").matches ? 2 : 1;
+    u.uGrainSoft.value = g[0]; u.uGrain.value = g[col];
+    return grainLevel;
+  }
   const fxaaMat = new THREE.ShaderMaterial({
     vertexShader: POST_VS, fragmentShader: FXAA_FS, depthTest: false, depthWrite: false,
     uniforms: { tIn: { value: frameRT.texture }, uPx: { value: new THREE.Vector2() },
       uSubpix: { value: 0.5 }, uEdge: { value: 0.125 }, uEdgeMin: { value: 0.03 },
       tTight: { value: tightRT.texture }, tWide: { value: wideRT.texture }, uTightPx: { value: new THREE.Vector2() },
       uTightK: { value: 0.0 }, uWideK: { value: 0.25 },
+      uIgnite: { value: 0 },
+      tGrain: { value: grainTex }, uGrainPx: { value: 200 }, uGrain: { value: 0 }, uGrainSoft: { value: 0 }, uGrainSplit: { value: 0 },
       uTint: { value: new THREE.Vector3(0.88, 0.95, 1.13) }, uShadow: { value: new THREE.Vector3(0.0, 0.002, 0.007) } },           // no tight glow: it rings each piece (Farhad asked for none); only a faint wide one
   });
   const postGeo = new THREE.PlaneGeometry(2, 2);
@@ -546,6 +823,10 @@ export async function mountHero(stage, layout, opts = {}) {
     return new THREE.Vector4((b.min.x + b.max.x) / 2, (b.min.z + b.max.z) / 2, (b.max.x - b.min.x) * 0.375, (b.max.z - b.min.z) * 0.375); });
   const occY = IDS.map(id => new THREE.Vector2(state[id].box.min.y, state[id].box.max.y));
   const noiseTex = noiseVolume();
+  // the cursor's wake (see WAKE_GLSL): shared by the fog and the dust
+  const wakeD = Array.from({ length: WAKE_N }, () => new THREE.Vector4(0, 0, -1, 0));
+  const wakeV = Array.from({ length: WAKE_N }, () => new THREE.Vector4(0, 0, 0, 1));
+  const wakeU = { uWakeD: { value: wakeD }, uWakeV: { value: wakeV }, uWakeOn: { value: 0 } };
   const fogMat = new THREE.ShaderMaterial({
     vertexShader: POST_VS, fragmentShader: FOG_FS, depthTest: false, depthWrite: false,
     defines: { DIV: FOG_DIV },
@@ -563,9 +844,39 @@ export async function mountHero(stage, layout, opts = {}) {
       uLight: { value: new THREE.Vector3(...LIGHT) },
       uLightCol: { value: new THREE.Vector3(...LIGHT_COL) },
       uAmb: { value: new THREE.Vector3(...FOG_AMB) },
+      ...wakeU,
     },
   });
   const fogScene = pass(fogMat);
+
+  // dust motes round the light, added to the frame after the depth of field (see MOTE_VS)
+  const moteGeo = new THREE.BufferGeometry();
+  {
+    let seed = 11;
+    const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const a = new Float32Array(MOTES * 4);
+    for (let i = 0; i < a.length; i++) a[i] = rnd();
+    moteGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3));
+    moteGeo.setAttribute("aSeed", new THREE.BufferAttribute(a, 4));
+  }
+  const moteMat = new THREE.ShaderMaterial({
+    vertexShader: MOTE_VS, fragmentShader: MOTE_FS,
+    transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime: fogMat.uniforms.uTime, uScale: { value: 1000 }, uLight: fogMat.uniforms.uLight,
+      uOcc: fogMat.uniforms.uOcc, uOccY: fogMat.uniforms.uOccY,
+      uLo: { value: new THREE.Vector3(-1.9, 0.3, -3.4) }, uSize: { value: new THREE.Vector3(3.8, 2.6, 4.0) },
+      uCol: { value: new THREE.Vector3(0.80, 0.86, 1.0) }, uGain: { value: 1.2 },
+      uFocus: postMat.uniforms.uFocus, uAperture: postMat.uniforms.uAperture, uMaxR: postMat.uniforms.uMaxR,
+      tDepth: { value: rt.depthTexture }, uFull: postMat.uniforms.uFull, uNear: { value: camera.near }, uFar: { value: camera.far },
+      ...wakeU,
+    },
+  });
+  const motes = new THREE.Points(moteGeo, moteMat);
+  motes.frustumCulled = false;
+  const moteScene = new THREE.Scene();
+  moteScene.add(motes);
+  disposables.push(moteGeo, moteMat);
   postMat.uniforms.tFog.value = fogRT.texture;
   disposables.push(fogRT, noiseTex, fogMat);
 
@@ -581,18 +892,31 @@ export async function mountHero(stage, layout, opts = {}) {
     camera.updateProjectionMatrix();
     focusBase = camBase.distanceTo(state[layout.focusId].centre);
   }
+  let level = LEVELS[0], fogDiv = FOG_DIV, readout = null, fpsAvg = 60, picked = true;
+  function showReadout() {
+    const i = LEVELS.indexOf(level), names = ["full", "medium", "low"];
+    readout.textContent = "SHARPNESS " + (i + 1) + "/" + LEVELS.length + " (" + names[i] + (picked ? ", auto" : ", forced") + ")\n"
+      + canvas.width + " x " + canvas.height + "  ·  screen " + (window.devicePixelRatio || 1).toFixed(2) + "x\n"
+      + Math.round(fpsAvg) + " fps  ·  keys 1 2 3 switch";
+  }
   function resize() {
     W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
     const coarse = matchMedia("(pointer:coarse)").matches;
     // a soft, foggy image hides the difference; the GPU does not. Cap the pixel ratio, and the total pixel
     // count too, so a big window or a 4K screen costs no more than ~2160x1390.
-    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : 1.5, Math.sqrt(MAX_PIXELS / (W * H)));
+    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : level[0], Math.sqrt(level[1] / (W * H)));
     renderer.setPixelRatio(pr);
     renderer.setSize(W, H, false);
+    fxaaMat.uniforms.uGrainPx.value = Math.round(200 * pr); drawGrain(200 * pr);   // the CSS tile (200 CSS px) in backing pixels
     const bw = Math.round(W * pr), bh = Math.round(H * pr);
     rt.setSize(bw, bh);
     frameRT.setSize(bw, bh);
-    const lw = Math.ceil(bw / FOG_DIV), lh = Math.ceil(bh / FOG_DIV);
+    const div = Math.max(FOG_DIV, Math.ceil(Math.sqrt((bw * bh) / FOG_MAX)));
+    if (div !== fogDiv) {
+      fogDiv = div;
+      for (const m of [fogMat, postMat]) { m.defines.DIV = div; m.needsUpdate = true; }
+    }
+    const lw = Math.ceil(bw / div), lh = Math.ceil(bh / div);
     fogRT.setSize(lw, lh);
     const qw = Math.ceil(bw / 4), qh = Math.ceil(bh / 4), ew = Math.ceil(bw / 8), eh = Math.ceil(bh / 8);
     tightRT.setSize(qw, qh); wideRT.setSize(ew, eh); wideTmp.setSize(ew, eh);
@@ -606,13 +930,18 @@ export async function mountHero(stage, layout, opts = {}) {
     fxaaMat.uniforms.uPx.value.set(1 / bw, 1 / bh);
     postMat.uniforms.uMaxR.value = (bh / 1080) * 13;
     setOrientation(orientation());
+    moteMat.uniforms.uScale.value = bh / (2 * Math.tan((camera.fov * DEG) / 2));
     if (typeof hoverFromPointer === "function" && hoverId) { touchHover = null; hoverFromPointer(null); }
   }
 
   // ---- behaviour state
-  const ndc = new THREE.Vector2();
+  const ndc = new THREE.Vector2(), pointer = new THREE.Vector2(), drift = new THREE.Vector2();
+  const fine = matchMedia("(pointer:fine)");
   const ray = new THREE.Raycaster(), hit = new THREE.Vector3(), tmp = new THREE.Vector3();
   let hoverId = null, scrollP = 0, touchHover = null, touchTimer = 0;
+  let pointerIn = false, wakeSpeed = 0, igT = 0, igHold = -1;
+  const wakeAge = new Float32Array(WAKE_N).fill(99), wakePeak = new Float32Array(WAKE_N);
+  const wakeAt = new THREE.Vector2(), wakePrev = new THREE.Vector3(), wakeTmp = new THREE.Vector3();
   let running = false, raf = 0, last = 0, t = 0, disposed = false, visible = true;
   const handle = { canvas, pieces, camera, frameCount: 0 };
 
@@ -634,7 +963,7 @@ export async function mountHero(stage, layout, opts = {}) {
   function labelAt(id) {
     if (!opts.onHover) return;
     if (!id) return opts.onHover(null, 0, 0);
-    tmp.copy(state[id].top); tmp.y += state[id].lift; tmp.project(camera);
+    tmp.copy(state[id].top); tmp.y += state[id].up || 0; tmp.project(camera);
     opts.onHover(id, (tmp.x * 0.5 + 0.5) * W, (-tmp.y * 0.5 + 0.5) * H - 6);
   }
   function hoverFromPointer(id) {
@@ -644,8 +973,14 @@ export async function mountHero(stage, layout, opts = {}) {
   function clearTouch() { clearTimeout(touchTimer); touchHover = null; hoverFromPointer(null); }
 
   let down = null;
-  on(canvas, "pointermove", e => { if (e.pointerType === "mouse") hoverFromPointer(pick(e)); });
-  on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") hoverFromPointer(null); });
+  on(canvas, "pointermove", e => {
+    if (e.pointerType !== "mouse") return;
+    const r = canvas.getBoundingClientRect();
+    pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
+    if (!pointerIn) { pointerIn = true; wakeAt.copy(pointer); wakePrev.set(0, 0, 0); }
+    hoverFromPointer(pick(e));
+  });
+  on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") { pointer.set(0, 0); pointerIn = false; hoverFromPointer(null); } });
   on(canvas, "pointerdown", e => {
     if (e.button !== 0 || e.isPrimary === false) { down = null; return; }
     down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType };
@@ -665,7 +1000,7 @@ export async function mountHero(stage, layout, opts = {}) {
     if (id) touchTimer = setTimeout(clearTouch, 4000);
   });
   on(canvas, "pointercancel", () => { down = null; });
-  on(window, "blur", clearTouch);
+  on(window, "blur", () => { pointer.set(0, 0); pointerIn = false; clearTouch(); });
   on(window, "scroll", () => { if (touchHover) clearTouch(); }, { passive: true });
   on(window, "resize", resize);
 
@@ -678,27 +1013,104 @@ export async function mountHero(stage, layout, opts = {}) {
 
   function update(dt) {
     t += dt;
-    // camera: fixed where the bakes were made from; it only sinks as the hero scrolls away. The pointer never
-    // moves it, so the light, its halo and the shadows in the fog hold still while you look around.
-    camera.position.copy(camBase); camera.position.y -= 0.5 * scrollP;
+    // camera: a small arc with the mouse (DRIFT_YAW / DRIFT_PITCH degrees at the canvas edge), easing behind it,
+    // and it sinks as the hero scrolls away. The arc is a few degrees about the target, small enough that the
+    // view-dependent bakes still hold; the light stays put in the world, so the halo moves as parallax would.
+    const de = 1 - Math.exp(-dt * 3.5), canDrift = fine.matches;
+    drift.x += ((canDrift ? pointer.x : 0) - drift.x) * de;
+    drift.y += ((canDrift ? pointer.y : 0) - drift.y) * de;
+    tmp.copy(camBase).sub(camTarget);
+    const radius = tmp.length();
+    const yaw = Math.atan2(tmp.x, tmp.z) - drift.x * DRIFT_YAW * DEG;
+    const pitch = Math.asin(tmp.y / radius) + drift.y * DRIFT_PITCH * DEG;
+    camera.position.set(
+      camTarget.x + radius * Math.cos(pitch) * Math.sin(yaw),
+      camTarget.y + radius * Math.sin(pitch) - 0.5 * scrollP,
+      camTarget.z + radius * Math.cos(pitch) * Math.cos(yaw));
     tmp.copy(camTarget); tmp.y += 0.35 * scrollP;
     camera.lookAt(tmp);
     camera.updateMatrixWorld();
+    if (hoverId && Math.abs(drift.x - pointer.x) + Math.abs(drift.y - pointer.y) > 1e-3) labelAt(hoverId);
+
+    // the entrance: the light comes up, pieces rise, blocks settle (replay from the console: heroLive.ignite(); heroLive.ignite(1.5) holds it at 1.5 s)
+    igT = igHold >= 0 ? igHold : igT + dt;
+    fxaaMat.uniforms.uIgnite.value = igniteAt(igT);
+    boardMesh.material.uniforms.uInT.value = igT;
+
+    // the cursor's wake: while the mouse moves over the hero it lays a trail of lines of sight, evenly spaced
+    // along the path it took (WAKE_STEP apart, filled in when the mouse jumps), so the trail is one smooth
+    // stroke, not beads. Each eases in, pushes the fog the way the cursor went, then fades (WAKE_LIFE) and
+    // widens so the fog closes back in. A new one takes the faintest slot, so nothing strong ever vanishes.
+    let wakeSum = 0;
+    for (let i = 0; i < WAKE_N; i++) {
+      wakeAge[i] += dt;
+      const a = wakeAge[i], s = wakePeak[i] * Math.min(1, a / 0.18) * Math.exp(-a / WAKE_LIFE);
+      wakeD[i].w = s < 0.004 ? 0 : s;
+      wakeV[i].w = 0.6 + Math.min(a, 2) * 0.45;
+      wakeSum += wakeD[i].w;
+    }
+    // how fast the cursor goes (canvas halves a second), smoothed: a fast stroke parts the fog more
+    const mv = Math.hypot(pointer.x - wakeAt.x, pointer.y - wakeAt.y);
+    wakeSpeed += ((pointerIn && canDrift ? mv / Math.max(dt, 1e-3) : 0) - wakeSpeed) * (1 - Math.exp(-dt * 8));
+    if (pointerIn && canDrift && mv > WAKE_STEP) {
+      const n = Math.min(4, Math.floor(mv / WAKE_STEP));
+      const peak = Math.min(0.7, 0.2 + wakeSpeed * 0.25);
+      for (let j = 1; j <= n; j++) {
+        const f = j / n;
+        ndc.set(wakeAt.x + (pointer.x - wakeAt.x) * f, -(wakeAt.y + (pointer.y - wakeAt.y) * f));
+        ray.setFromCamera(ndc, camera);
+        const dir = ray.ray.direction;
+        let k = 0;
+        for (let i = 1; i < WAKE_N; i++) if (wakeD[i].w < wakeD[k].w) k = i;
+        wakeD[k].set(dir.x, dir.y, dir.z, 0);
+        wakeAge[k] = 0; wakePeak[k] = peak;
+        // the push: how far the line of sight swept, at about the depth of the pieces
+        if (wakePrev.lengthSq() > 0) wakeTmp.copy(dir).sub(wakePrev).multiplyScalar(9 * 1.2);
+        else wakeTmp.set(0, 0, 0);
+        if (wakeTmp.length() > 0.7) wakeTmp.setLength(0.7);
+        wakeV[k].set(wakeTmp.x, wakeTmp.y, wakeTmp.z, 0.5);
+        wakePrev.copy(dir);
+      }
+      wakeAt.copy(pointer);
+      wakeSum += 1;
+    }
+    fogMat.uniforms.uWakeOn.value = wakeSum > 0 ? 1 : 0;
 
     // The hovered piece rises a little, with its plinth and the tiles under it, and the focus goes to it; with
     // nothing hovered the focus rests on Cyrus. The light never moves. The idle sway is one degree, too little
     // to move the baked light visibly.
     const ease = 1 - Math.exp(-dt * 6);
     IDS.forEach((id, k) => {
-      const s = state[id], to = id === hoverId ? LIFT : 0;
+      // entrance: the piece starts below its place and rises once; hover waits until it has landed
+      const en = ENTER[id], landed = !en || igT >= en[0] + en[2];
+      const sunk = en && !landed ? -en[1] * (1 - outCubic((igT - en[0]) / en[2])) : 0;
+      const s = state[id], to = id === hoverId && landed ? (LIFT_BY[id] ?? LIFT) : 0;
       if (Math.abs(to - s.lift) > 1e-4) {
         s.lift += (to - s.lift) * ease;
         if (id === hoverId) labelAt(id);
       } else s.lift = to;
-      liftAmt[k] = s.lift;
-      pieces[id].position.y = s.pieceY + s.lift; s.plinth.position.y = s.plinthY + s.lift;
-      occY[k].y = s.box.max.y + s.lift;
+      const up = s.lift + sunk;
+      s.up = up; liftAmt[k] = up;
+      pieces[id].position.y = s.pieceY + up; s.plinth.position.y = s.plinthY + up;
+      occY[k].y = s.box.max.y + up;
       pieces[id].rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 1 * DEG;
+      // its moving parts: a turn springs to its angle while hovered and back after; a quiver shakes once
+      const rg = rigs[id];
+      if (rg) {
+        const hov = id === hoverId;
+        if (hov && !rg.was) rg.t = 0;
+        rg.was = hov; rg.t += dt;
+        for (const L of rg.parts) {
+          const r = L.r, i = r.part - 1;
+          if (r.mode === "turn") {
+            const to = hov ? r.angle : 0, kk = r.k || 20, cc = r.c || 9, n = Math.ceil(dt / 0.008), h = dt / n;
+            for (let j = 0; j < n; j++) { L.v += (kk * (to - L.x) - cc * L.v) * h; L.x += L.v * h; }
+            rg.A[i].w = L.x * DEG;
+          } else if (r.mode === "quiver") {
+            rg.A[i].w = r.angle * DEG * Math.exp(-rg.t * r.decay) * Math.sin(rg.t * r.freq);
+          }
+        }
+      }
     });
     const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
     focusNow = focusNow ? focusNow + (focusTo - focusNow) * (1 - Math.exp(-dt * 4)) : focusTo;
@@ -712,6 +1124,9 @@ export async function mountHero(stage, layout, opts = {}) {
     renderer.render(fogScene, postCam);
     renderer.setRenderTarget(frameRT);
     renderer.render(postScene, postCam);
+    renderer.autoClear = false;
+    renderer.render(moteScene, camera);
+    renderer.autoClear = true;
     // bloom
     renderer.setRenderTarget(tightRT);
     renderer.render(brightScene, postCam);
@@ -732,9 +1147,13 @@ export async function mountHero(stage, layout, opts = {}) {
   function frame(now) {
     raf = 0;
     if (!running || disposed) return;
-    const dt = Math.min(0.05, (now - last) / 1000 || 0.016);
+    // never negative: the first frame after the mount test can carry a timestamp from before it, which ran
+    // the entrance clock backwards by half a second
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0.016));
+    if (last) fpsAvg += (1000 / Math.max(now - last, 1) - fpsAvg) * 0.05;
     last = now;
     update(dt); render();
+    if (readout && handle.frameCount % 20 === 0) showReadout();
     raf = requestAnimationFrame(frame);
   }
   function start() {
@@ -758,25 +1177,81 @@ export async function mountHero(stage, layout, opts = {}) {
     if (io) io.disconnect();
     for (const [tg, e, f, o] of listeners) tg.removeEventListener(e, f, o);
     for (const d of disposables) { try { d.dispose(); } catch (_) { /* already gone */ } }
-    canvas.remove();
+    canvas.remove(); if (readout) readout.remove();
   }
 
   // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
-  // weights uTightK, uWideK), .bright (bloom threshold uThresh)
+  // weights uTightK, uWideK, and uIgnite), .bright (bloom threshold uThresh), .motes (uGain, uCol); .ignite() replays the light
   Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize,
+    ignite: s => { igHold = typeof s === "number" ? s : -1; if (igHold < 0) igT = 0; }, grain: setGrain, motes: moteMat.uniforms,
+    setLevel: i => { level = LEVELS[i] || level; handle.level = LEVELS.indexOf(level); resize(); },
     board: boardMesh.material.uniforms, fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
 
   stage.appendChild(canvas);
   resize();
+  if (new URLSearchParams(location.search).has("compare")) grainCompare();
+
+  // ?compare: a before/after slider over the live hero. Left of the line has no grain, right has the
+  // chosen level; the buttons switch the level. A review tool only, never shown without the parameter.
+  function grainCompare() {
+    const box = document.createElement("div");
+    box.style.cssText = "position:absolute;inset:0;z-index:5;pointer-events:none;font:11px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:#ECE7DC";
+    box.innerHTML = '<div data-line style="position:absolute;top:0;bottom:0;width:1px;background:#E9A03B;box-shadow:0 0 0 .5px rgba(0,0,0,.4)">'
+      + '<div data-knob style="position:absolute;top:50%;left:-18px;width:36px;height:36px;margin-top:-18px;border-radius:50%;border:1px solid #E9A03B;background:rgba(12,12,14,.7);cursor:ew-resize;pointer-events:auto;touch-action:none;display:grid;place-items:center;color:#E9A03B">&#8596;</div></div>'
+      + '<div style="position:absolute;left:24px;bottom:24px">Before &middot; no grain</div>'
+      + '<div data-levels style="position:absolute;right:24px;bottom:24px;display:flex;gap:6px;pointer-events:auto"></div>';
+    stage.appendChild(box);
+    const line = box.querySelector("[data-line]"), knob = box.querySelector("[data-knob]"), levels = box.querySelector("[data-levels]");
+    let frac = 0.5, pick = grainLevel === "off" ? "medium" : grainLevel;
+    const place = () => {
+      line.style.left = (frac * 100) + "%";
+      fxaaMat.uniforms.uGrainSplit.value = frac * canvas.width;
+    };
+    const paint = () => {
+      setGrain(pick);
+      levels.innerHTML = "<span style='opacity:.6;padding:7px 4px'>After &middot;</span>" + ["subtle", "medium", "strong", "overlay"].map(l =>
+        `<button data-l="${l}" style="font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:6px 9px;border:1px solid ${l === pick ? "#E9A03B" : "#26262A"};background:rgba(12,12,14,.7);color:${l === pick ? "#E9A03B" : "#A8A49C"}">${l}</button>`).join("");
+    };
+    levels.addEventListener("click", e => { const b = e.target.closest("[data-l]"); if (b) { pick = b.dataset.l; paint(); } });
+    const drag = e => { const r = stage.getBoundingClientRect(); frac = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); place(); };
+    knob.addEventListener("pointerdown", e => { knob.setPointerCapture(e.pointerId); drag(e); e.preventDefault(); e.stopPropagation(); });
+    knob.addEventListener("pointermove", e => { if (knob.hasPointerCapture(e.pointerId)) drag(e); });
+    on(window, "resize", place);
+    paint(); place();
+  }
   update(0); render();          // first frame is on screen before the caller fades the stage in
   // Does this GPU keep up? Time real frames, forced to finish by a 1-pixel readback. Frame
   // intervals are no use here: a throttled or background tab would look like a slow device.
   {
     const gl = renderer.getContext(), px = new Uint8Array(4);
-    render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);      // warm-up: shader compile, uploads
-    const t0 = performance.now();
-    for (let i = 0; i < 6; i++) { render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); }
-    if ((performance.now() - t0) / 6 > 20) throw new Error("too slow");
+    let ms = 0;
+    for (let i = 0; i < LEVELS.length; i++) {
+      if (i) { level = LEVELS[i]; resize(); }
+      // two warm-ups (shader compile, uploads, new buffers after a level change), then the median of seven
+      // frames: one late frame (another tab, a compile finishing) must not send a good GPU to the poster
+      const one = () => { const t0 = performance.now(); render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return performance.now() - t0; };
+      one(); one();
+      ms = Array.from({ length: 7 }, one).sort((a, b) => a - b)[3];
+      if (ms <= level[2]) break;
+    }
+    handle.level = LEVELS.indexOf(level); handle.mountMs = ms;
+    if (ms > level[2]) throw new Error("too slow");
+  }
+  // On localhost only: a small readout in the corner (which sharpness level, the buffer size, frames a
+  // second) and keys 1 / 2 / 3 to switch level, so the levels can be compared by eye. Off unless
+  // localStorage.heroReadout = "1".
+  let wantReadout = false;
+  try { wantReadout = localStorage.getItem("heroReadout") === "1"; } catch (e) {}
+  if (wantReadout && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+    readout = document.createElement("div");
+    readout.style.cssText = "position:absolute;left:12px;bottom:12px;z-index:5;font:11px/1.4 'IBM Plex Mono',monospace;letter-spacing:.06em;color:#A8A49C;background:rgba(12,12,14,.7);padding:6px 9px;pointer-events:none;white-space:pre";
+    stage.appendChild(readout);
+    on(window, "keydown", e => {
+      const i = ["1", "2", "3"].indexOf(e.key);
+      if (i < 0 || i >= LEVELS.length || e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+      picked = false; handle.setLevel(i); showReadout();
+    });
+    showReadout();
   }
   start();
   return handle;

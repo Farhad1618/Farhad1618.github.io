@@ -153,7 +153,7 @@ check("hero: live scene is lazy and pinned", () => {
 check("who copy: headline, photo slot, no origin line", () => {
   const errs = [];
   if (!src.includes("I'm Farhad. I turn chaos into systems that think.")) errs.push("who headline missing");
-  if (!/<figure class="photo[^"]*" data-photo="">/.test(src)) errs.push('photo slot <figure class="photo" data-photo=""> missing');
+  if (!/<span class="pill" data-photo="">/.test(src)) errs.push('photo slot <span class="pill" data-photo=""> missing');
   if (/origin (story|line)/i.test(src)) errs.push("origin text present");
   return errs;
 });

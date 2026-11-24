@@ -302,7 +302,8 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
     raw = os.path.join(out_dir, "pieces.raw.glb")
     bpy.ops.export_scene.gltf(filepath=raw, export_format="GLB", use_selection=True, export_yup=True,
                               export_apply=True, export_normals=True, export_tangents=False,
-                              export_cameras=False, export_lights=False, export_materials="EXPORT")
+                              export_cameras=False, export_lights=False, export_materials="EXPORT",
+                              export_vertex_color="ACTIVE", export_extras=True)   # part ids (COLOR_0) and rigs (extras) for the hover moves
     mid = os.path.join(out_dir, "pieces.webp.glb")
     cli = ["npx", "--yes", "@gltf-transform/cli@4.1.0"]
     subprocess.run(cli + ["webp", raw, mid, "--quality", "82"], check=True)

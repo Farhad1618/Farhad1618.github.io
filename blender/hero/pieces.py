@@ -3,6 +3,7 @@
 Every builder returns an object named piece-<id>, origin at the base centre,
 standing on z=0, between 1.0 and 1.3 m tall, smooth-shaded and UV-unwrapped.
 """
+import json
 import math
 import random
 
@@ -114,6 +115,56 @@ def shell(bm, R, depth, thick, matrix, ribs=13, na=30, nr=8):
 
 # ---------- finishing ----------
 
+# ---------- moving parts (hover animations in hero.js) ----------
+# A piece stays one mesh with one bake. Faces of a part that moves on hover carry a part number (face int
+# layer "part", 0 = still); _finish turns it into the active colour attribute (red = part / 8), which the glTF
+# export keeps as COLOR_0. How each part moves goes on the object as "rig" (a JSON list, exported as node
+# extras), in glTF local coordinates (x, z, -y):
+#   turn    rotate by angle (degrees) about axis through pivot, eased by a spring (k stiffness, c damping)
+#   hang    hangs from anchor on part `of`: follows that point as the part turns, without tilting
+#   quiver  a damped shake of `angle` degrees about axis through pivot when the hover starts (freq, decay)
+
+def _tag(bm, start, part, end=None):
+    """Mark faces [start:end] as moving part `part`."""
+    layer = bm.faces.layers.int.get("part") or bm.faces.layers.int.new("part")
+    bm.faces.ensure_lookup_table()
+    for f in bm.faces[start:end]:
+        f[layer] = part
+
+
+def _g(v):
+    return [round(v[0], 5), round(v[2], 5), round(-v[1], 5)]
+
+
+def _rig(ob, parts):
+    out = []
+    for p in parts:
+        q = dict(p)
+        for key in ("pivot", "axis", "anchor"):
+            if key in q:
+                v = Vector(q[key])
+                q[key] = _g(v.normalized() if key == "axis" else v)
+        out.append(q)
+    ob["rig"] = json.dumps(out)
+    return ob
+
+
+def _part_colours(me):
+    """Face attribute "part" -> active colour attribute, red = part / 8."""
+    if "part" not in me.attributes:
+        return
+    parts = [0] * len(me.polygons)
+    me.attributes["part"].data.foreach_get("value", parts)
+    col = me.color_attributes.new("rig", "FLOAT_COLOR", "CORNER")
+    vals = [0.0] * (len(me.loops) * 4)
+    for poly, k in zip(me.polygons, parts):
+        for li in poly.loop_indices:
+            vals[li * 4:li * 4 + 4] = (k / 8.0, 0.0, 0.0, 1.0)
+    col.data.foreach_set("color", vals)
+    me.color_attributes.active_color = col
+    me.color_attributes.render_color_index = me.color_attributes.active_color_index
+
+
 def _finish(bm, name, bevel=0.006, bevel_angle=38.0, unwrap=True):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
     me = bpy.data.meshes.new(name)
@@ -139,6 +190,7 @@ def _finish(bm, name, bevel=0.006, bevel_angle=38.0, unwrap=True):
     ob.data = baked
     baked.name = name
     bpy.data.meshes.remove(old)
+    _part_colours(baked)
     if unwrap:
         _unwrap(ob)
     return ob
@@ -213,12 +265,16 @@ def build_cyrus():
         return rend + (rmax - rend) * math.sin(math.pi * (0.08 + 0.84 * t)) ** 0.9
 
     prof = [(0.0, -L / 2), (rend * 0.72, -L / 2), (rend, -L / 2 + 0.02)]
-    for i in range(23):
-        t = 0.03 + 0.94 * i / 22
+    # Fine enough that the outline is a curve, not a run of straight pieces: at 23 rings every ring showed as
+    # a corner on the silhouette against the light, and the fine noise below, sampled that coarsely, came out
+    # as a zigzag (Farhad, Nov 24).
+    RINGS = 60
+    for i in range(RINGS):
+        t = 0.03 + 0.94 * i / (RINGS - 1)
         prof.append((radius(t), -L / 2 + t * L))
     prof += [(rend, L / 2 - 0.02), (rend * 0.72, L / 2), (0.0, L / 2)]
     v0 = len(bm.verts)
-    lathe(bm, prof, segs=72, matrix=_T(0, 0, cz) @ Matrix.Rotation(math.pi / 2, 4, "Y"))
+    lathe(bm, prof, segs=96, matrix=_T(0, 0, cz) @ Matrix.Rotation(math.pi / 2, 4, "Y"))
     # Age it: an uneven surface, and one end broken away in a rough bite.
     bm.verts.ensure_lookup_table()
     for v in bm.verts[v0:]:
@@ -226,16 +282,19 @@ def build_cyrus():
         if math.hypot(ry, rz) < 1e-5:
             continue
         ang = math.atan2(rz, ry)
-        k = 1.0 + 0.014 * noise.noise(v.co * 7.0) + 0.006 * noise.noise(v.co * 23.0)
+        k = 1.0 + 0.014 * noise.noise(v.co * 7.0) + 0.004 * noise.noise(v.co * 14.0)
         fx = min(1.0, max(0.0, (v.co.x - 0.16) / 0.22))
         fa = min(1.0, max(0.0, 1.0 - abs(ang - math.radians(118)) / math.radians(62)))
         bite = (fx * fx * (3 - 2 * fx)) * (fa * fa * (3 - 2 * fa))
-        k *= 1.0 - 0.46 * bite * (0.75 + 0.25 * noise.noise(v.co * 15.0))
+        k *= 1.0 - 0.46 * bite * (0.75 + 0.25 * noise.noise(v.co * 9.0))
         v.co.y, v.co.z = ry * k, cz + rz * k
     bm.faces.ensure_lookup_table()
     for f in bm.faces[:mount_faces]:
         f.material_index = 1
-    return _finish(bm, "piece-cyrus", bevel=0.004, bevel_angle=80.0)
+    _tag(bm, mount_faces, 1)
+    ob = _finish(bm, "piece-cyrus", bevel=0.004, bevel_angle=80.0)
+    # the barrel rolls a few degrees in its saddles, and the light runs over the writing
+    return _rig(ob, [{"part": 1, "mode": "turn", "pivot": (0, 0, cz), "axis": (1, 0, 0), "angle": 9, "k": 9, "c": 5}])
 
 
 def build_zagros():
@@ -263,8 +322,14 @@ def build_zagros():
         centre = base + out * 0.19
         normal = out.cross(side).normalized()
         m = Matrix.Translation(centre) @ normal.to_track_quat("Z", "Y").to_matrix().to_4x4()
+        s = len(bm.faces)
         torus(bm, 0.07, 0.018, m, seg_major=24, seg_minor=8)
-    return _finish(bm, "piece-zagros", bevel=0.007)
+        if k == 4:                                      # the key facing the camera: it turns on hover
+            _tag(bm, s, 1)
+            key_at, key_axis = base, out
+    ob = _finish(bm, "piece-zagros", bevel=0.007)
+    # one more key turns: four of five, one short of opening
+    return _rig(ob, [{"part": 1, "mode": "turn", "pivot": key_at, "axis": key_axis, "angle": 90, "k": 40, "c": 9}])
 
 
 def build_onepharma():
@@ -272,6 +337,7 @@ def build_onepharma():
     bm = bmesh.new()
     lathe(bm, [(0.0, 0.0), (0.24, 0.0), (0.24, 0.03), (0.19, 0.055), (0.06, 0.085), (0.032, 0.14),
                (0.026, 0.50), (0.0, 0.50)], segs=36)
+    graph = len(bm.faces)
     rng = random.Random(7)
     centre = Vector((0, 0, 0.84))
     nodes = [(centre, 0.105)]
@@ -293,7 +359,10 @@ def build_onepharma():
         j = min((k for k in range(1, len(nodes)) if k != i), key=lambda k: (nodes[k][0] - p).length)
         if j > i:
             rod(bm, p, nodes[j][0], 0.010, segs=8)
-    return _finish(bm, "piece-onepharma", bevel=0.0)
+    _tag(bm, graph, 1)
+    ob = _finish(bm, "piece-onepharma", bevel=0.0)
+    # the graph turns slowly on its stem, as if being explored
+    return _rig(ob, [{"part": 1, "mode": "turn", "pivot": centre, "axis": (0, 0, 1), "angle": 40, "k": 5, "c": 4.2}])
 
 
 def build_pearl():
@@ -314,6 +383,7 @@ def build_pearl():
     n0 = len(bm.faces)
     hinge = (-0.27, 0, 0.715)
     shell(bm, 0.54, 0.105, 0.016, _T(*hinge))
+    upper = len(bm.faces)
     up = _T(hinge[0], 0, hinge[2] + 0.012) @ Matrix.Rotation(math.radians(-62), 4, "Y") @ Matrix.Diagonal((1, 1, -1, 1))
     shell(bm, 0.54, 0.105, 0.016, up)
     n1 = len(bm.faces)
@@ -323,7 +393,11 @@ def build_pearl():
         f.material_index = 1
     for f in bm.faces[n1:]:
         f.material_index = 2
-    return _finish(bm, "piece-pearl", bevel=0.006, bevel_angle=50.0)
+    _tag(bm, upper, 1, n1)
+    ob = _finish(bm, "piece-pearl", bevel=0.006, bevel_angle=50.0)
+    # the shell opens a little wider on the pearl
+    return _rig(ob, [{"part": 1, "mode": "turn", "pivot": (hinge[0], 0, hinge[2] + 0.012), "axis": (0, 1, 0),
+                      "angle": -11, "k": 14, "c": 6}])
 
 
 def _half_disc(bm, R, t, matrix, segs=32):
@@ -397,6 +471,7 @@ def build_falah():
     sphere(bm, 0.026, top + Vector((0, 0, 0.012)), u=12, v=7)
     lathe(bm, [(0.0, 0.03), (0.012, 0.034), (0.0, 0.085)], segs=12, matrix=_T(*top))
     # the pointer, fixed to the beam: it swings with it
+    beam = len(bm.faces)
     lathe(bm, [(0.0, 0.0), (0.016, 0.0), (0.011, 0.11), (0.024, 0.15), (0.0, 0.205)], segs=4,
           matrix=T @ _T(0, -0.05, 0))
     # the beam: turned, thick at the middle, beaded near the ends
@@ -405,11 +480,17 @@ def build_falah():
                (0.022, -0.12), (0.030, -0.05), (0.030, 0.05), (0.022, 0.12), (0.014, 0.25),
                (0.011, L - 0.03), (0.018, L - 0.012), (0.011, L), (0.0, L + 0.012)],
           segs=12, matrix=T @ Matrix.Rotation(math.pi / 2, 4, "Y"))
+    _tag(bm, beam, 1)
+    hooks = {}
     for sx in (-1, 1):
         tip = T @ Vector((sx * (L - 0.01), 0, 0))
+        s = len(bm.faces)
         torus(bm, 0.024, 0.0065, _T(*(tip - Vector((0, 0, 0.022)))) @ Matrix.Rotation(math.pi / 2, 4, "X"),
               seg_major=14, seg_minor=6)
+        _tag(bm, s, 1)
+        pan = len(bm.faces)
         hook = tip - Vector((0, 0, 0.046))
+        hooks[sx] = tip
         pan_z = hook.z - 0.40
         pr = 0.175
         lathe(bm, [(0.0, pan_z - 0.075), (pr * 0.45, pan_z - 0.072), (pr * 0.8, pan_z - 0.05), (pr * 0.97, pan_z - 0.015),
@@ -435,9 +516,16 @@ def build_falah():
             # the budget: one small weight
             lathe(bm, [(0.0, 0.0), (0.058, 0.0), (0.058, 0.045), (0.042, 0.056), (0.034, 0.08), (0.02, 0.088),
                        (0.027, 0.108), (0.0, 0.122)], segs=20, matrix=_T(hook.x, 0, floor))
+        _tag(bm, pan, 2 if sx < 0 else 3)
     # and one that already went over, lying on the base step
     _coin(bm, (-0.262, -0.085, 0.035), r=0.036, rot=Matrix.Rotation(math.radians(-7), 4, "Y"))
-    return _finish(bm, "piece-falah", bevel=0.003, bevel_angle=80.0)
+    ob = _finish(bm, "piece-falah", bevel=0.003, bevel_angle=80.0)
+    # the spending side sinks further and the beam rocks to rest; the pans hang from its ends
+    return _rig(ob, [
+        {"part": 1, "mode": "turn", "pivot": P, "axis": (0, 1, 0), "angle": -6, "k": 22, "c": 2.6},
+        {"part": 2, "mode": "hang", "of": 1, "anchor": hooks[-1]},
+        {"part": 3, "mode": "hang", "of": 1, "anchor": hooks[1]},
+    ])
 
 
 def build_nids():
@@ -455,12 +543,14 @@ def build_nids():
         sphere(bm, 0.019, M @ Vector((0.385 * math.cos(a), 0.385 * math.sin(a), 0.030)), u=10, v=6)
     rod(bm, (0, 0.24, 0.12), M @ Vector((0, 0.16, -0.035)), 0.026)
     # arrows: where they struck (on the face), where they came from, how much shaft is left
+    arrow = None
     for (hx, hy), d, length, whole in (((0.13, 0.17), (-0.28, -1.0, 0.36), 0.56, True),
                                        ((-0.21, -0.04), (0.30, -1.0, 0.16), 0.50, True),
                                        ((0.04, -0.23), (0.10, -1.0, 0.50), 0.17, False)):
         d = Vector(d).normalized()
         p = M @ Vector((hx, hy, 0.02))
         end = p + d * length
+        s = len(bm.faces)
         rod(bm, p - d * 0.03, end, 0.016, segs=8)
         if not whole:
             continue                                  # snapped off: no fletching
@@ -468,7 +558,12 @@ def build_nids():
         for k in range(3):
             R = Q @ Matrix.Rotation(2 * math.pi * k / 3, 4, "Z")
             box(bm, 0.05, 0.005, 0.13, (end - d * 0.08) + (R @ Vector((0.03, 0, 0))), rot=R)
-    return _finish(bm, "piece-nids", bevel=0.004)
+        if arrow is None:                             # the first arrow: it quivers, as if it just struck
+            _tag(bm, s, 1)
+            arrow = (p, d.cross(Vector((0, 0, 1))).normalized())
+    ob = _finish(bm, "piece-nids", bevel=0.004)
+    return _rig(ob, [{"part": 1, "mode": "quiver", "pivot": arrow[0], "axis": arrow[1], "angle": 3.5,
+                      "freq": 30, "decay": 3.2}])
 
 
 def build_plinth(piece_id):
