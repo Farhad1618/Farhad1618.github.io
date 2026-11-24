@@ -230,6 +230,7 @@ export function createSoloWorld(core, gltf, layout, opts = {}) {
   });
   const motes = new THREE.Points(moteGeo, moteMat);
   motes.frustumCulled = false;
+  motes.visible = false;                       // Farhad: no dust in the chapters (the hero keeps its own)
   const moteScene = new THREE.Scene();
   moteScene.add(motes);
   disposables.push(moteGeo, moteMat);
