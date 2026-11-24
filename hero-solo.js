@@ -25,7 +25,10 @@ const FOCAL_REF = 1080 / (2 * Math.tan((25.361 * DEG) / 2));
 export const SOLO_DEFAULTS = {
   specK: 0.012,          // the live highlight's strength (PIECE_FS SOLO), times the light's energy in watts
   sheen: { piece: 0.03, plinth: 0.16 },   // the faint matcap glint, as the hero's Cyrus and plinths
-  fit: 0.8,              // the piece box stays inside this share of the plate's height (wide) or width (tall)
+  fit: 0.8,              // the piece box stays inside this share of its part of the screen (below)
+  // the plate is the whole screen with the copy over it: wide plates keep the piece in the left part, tall ones
+  // (phones) in the upper part. [centre of that part, its size], as shares of the width or the height
+  wide: [0.33, 0.62], tall: [0.36, 0.66],
   ease: 3.5,             // per second: how fast the tilt follows the pointer
   touch: [3, 14],        // touch screens: the view drifts this many degrees of yaw, over this many seconds
   tapHold: 2.2,          // a tap plays the moving part for this long, then it goes back
@@ -222,7 +225,10 @@ export function createSoloWorld(core, gltf, layout, opts = {}) {
       const z = Math.max(-tmp.z, 1e-3);
       ty = Math.max(ty, Math.abs(tmp.y) / z); tx = Math.max(tx, Math.abs(tmp.x) / z);
     }
-    const half = Math.max(Math.tan((cam0.fovY * DEG) / 2), ty / D.fit, tx / (D.fit * aspect));
+    const isWide = aspect >= 1, [at, size] = isWide ? D.wide : D.tall;
+    const half = Math.max(Math.tan((cam0.fovY * DEG) / 2), ty / (D.fit * (isWide ? 1 : size)), tx / (D.fit * aspect * (isWide ? size : 1)));
+    // slide the picture, not the camera: the view (and so the bake's angle) stays the layout's
+    camera.setViewOffset(core.W, core.H, isWide ? (0.5 - at) * core.W : 0, isWide ? 0 : (0.5 - at) * core.H, core.W, core.H);
     camera.fov = (2 * Math.atan(half)) / DEG;
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
