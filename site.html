@@ -27,15 +27,15 @@
       + (m("(prefers-reduced-motion: reduce)") ? " · REDUCED MOTION" : "") + (window.WebGL2RenderingContext ? "" : " · NO WEBGL2"));
     if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) { window.heroWhy("poster from the start" + (weak ? " (weak device)" : "")); return posterFirst(); }
     var html = document.documentElement;
-    /* the poster is not pinned (see html.hero-pin in the styles), unless they have already scrolled into the
+    /* the poster is not pinned (see html.hero-pinned in the styles), unless they have already scrolled into the
        pinned stretch: taking the extra height away then would jump the page */
     window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait");
-      if (html.classList.contains("hero-pin") && (window.scrollY || 0) < innerHeight * 0.5) {
-        html.classList.remove("hero-pin");
+      if (html.classList.contains("hero-pinned") && (window.scrollY || 0) < innerHeight * 0.5) {
+        html.classList.remove("hero-pinned");
         if (window.heroPosterPush) window.heroPosterPush();
         if (window.ScrollTrigger) window.ScrollTrigger.refresh();
       } };
-    html.classList.add("hero-wait", "hero-pin"); window.heroTry = true;
+    html.classList.add("hero-wait", "hero-pinned"); window.heroTry = true;
     window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000);
     var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
     [["modulepreload", "hero.js"], ["modulepreload", "hero-core.js"], ["modulepreload", "hero-shaders.js"],
@@ -46,7 +46,7 @@
       if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
       head.appendChild(l);
     });
-  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pin"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
+  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pinned"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
   /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
      on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
   function posterFirst(){
@@ -95,12 +95,12 @@ section{position:relative;padding:0 var(--g)}
 
 /* 01 hero: a marble chessboard, one piece per project. Where the live scene (hero.js) will be tried, the hero
    starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback.
-   Everything sits in .hero-pin. Where the scene is tried (html.hero-pin, set with hero-wait) the hero is 170svh
+   Everything sits in .hero-pin. Where the scene is tried (html.hero-pinned, set with hero-wait) the hero is 170svh
    and .hero-pin sticks for the extra 0.7 of a screen while the scene plays its scroll move (hero.js SCROLL).
    Elsewhere (poster, reduced motion) both are one screen and nothing sticks. .hero itself must not clip
    (overflow:hidden would make it the scroll box and sticky would never stick); .hero-pin clips instead. */
 .hero{height:100svh;min-height:560px;padding:0;text-align:center;background:var(--ink)}
-html.hero-pin .hero{height:170svh;min-height:952px}
+html.hero-pinned .hero{height:170svh;min-height:952px}
 .hero-pin{position:sticky;top:0;height:100svh;min-height:560px;overflow:hidden}
 .hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
 /* the poster always fits the width, so no piece is ever cropped out; top and bottom melt into the ground */
@@ -147,7 +147,7 @@ html.hero-wait .hero-poster{opacity:0}
    of the phone framing) the pin holds for 3 screens, the first 2.3 for the seven stops (about a third of a
    screen each), the last 0.7 for the exit as on desktop. The same query is heroTourQ below. */
 @media (orientation:portrait) and (max-aspect-ratio:18/25){
-  html.hero-pin .hero{height:400svh;min-height:2240px}
+  html.hero-pinned .hero{height:400svh;min-height:2240px}
 }
 /* the presented piece's label on the tour sits under its plinth, on the dark board, with its number */
 .hero-label.under{transform:translate(-50%,0);padding:10px 0 0;font-size:10.5px;color:var(--bone);text-shadow:0 0 10px var(--ink),0 0 3px var(--ink)}
@@ -554,7 +554,7 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
         heroSettle("up"); soloHook.heroUp(h);
         /* up after a timer had already given up on it: pin again, if they have not scrolled into the hero yet */
         var de = document.documentElement;
-        if (!de.classList.contains("hero-pin") && (window.scrollY || 0) < innerHeight * 0.5) { de.classList.add("hero-pin"); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
+        if (!de.classList.contains("hero-pinned") && (window.scrollY || 0) < innerHeight * 0.5) { de.classList.add("hero-pinned"); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
         feedScroll();
         window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms"
           + (h.ladder ? " · " + h.ladder : "") + (h.phone ? " · phone " + h.phone : "") + (h.pr != null ? " · pr " + h.pr.toFixed(2) : "") + (h.buf ? " · " + h.buf : "")
@@ -805,7 +805,7 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   document.documentElement.classList.add("motion");
   var EASE = "expo.out";
   gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
-  /* The hero. Pinned (html.hero-pin): the title and the cue clear in the first 0.3 of the extra height, the
+  /* The hero. Pinned (html.hero-pinned): the title and the cue clear in the first 0.3 of the extra height, the
      scene plays its scroll move over the first 0.7 (fed from the hero block above, not from here), and the
      picture fades from 0.8 until the pin has let go and half of it has gone, so the page hands over to 01.
      Not pinned: as before (title by 60% of the hero, the picture over all of it), and the poster pushes in.
@@ -825,7 +825,7 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
     gsap.fromTo(".hero-poster img", { yPercent:-50, y:0, scale:1 }, { yPercent:-46, y:0, scale:1.06, ease:"none",
       scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true } });
   };
-  if (!document.documentElement.classList.contains("hero-pin")) window.heroPosterPush();
+  if (!document.documentElement.classList.contains("hero-pinned")) window.heroPosterPush();
   ScrollTrigger.batch(".rv", {
     start:"top 88%", once:true,
     onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
