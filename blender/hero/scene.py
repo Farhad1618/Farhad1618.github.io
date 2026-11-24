@@ -13,20 +13,23 @@ from . import pieces
 # x, y (metres, +y is away from the camera), yaw in degrees
 PLACEMENT = {
     "cyrus": (0.0, 0.0, 14.0),          # centre: the piece everything else stands around
-    "pearl": (-2.0, 2.0, -62.0),
-    "onepharma": (1.35, 4.0, 15.0),
-    "falah": (2.33, 1.2, -18.0),
-    "nids": (2.9, -1.2, -22.0),
-    "zagros": (-2.5, -2.2, 12.0),
+    # Each piece stands on the centre of one tile (multiples of TILE), or astride two where the picture
+    # needs it between tiles: so one tile, at most two, rises with it on hover. Never four.
+    "pearl": (-1.5, 1.5, -62.0),
+    "onepharma": (1.5, 4.5, 15.0),
+    "falah": (2.25, 1.5, -18.0),         # astride two tiles, side by side
+    "nids": (3.0, -0.75, -22.0),         # astride two, front and back
+    "zagros": (-3.0, -0.75, 12.0),       # astride two, front and back
 }
 FOCUS_ID = "cyrus"
 # The board is not a flat floor: every tile is its own block, standing at its own height.
 # Each piece stands on a platform of tiles raised to the height given here.
-PLATFORM = {"cyrus": 0.34, "pearl": 0.20, "onepharma": 0.26, "falah": 0.14, "nids": 0.22, "zagros": 0.10}
+PLATFORM = {"cyrus": 0.36, "pearl": 0.34, "onepharma": 0.46, "falah": 0.26, "nids": 0.38, "zagros": 0.20}
 TILE_GAP = 0.05
 BOARD_CENTER = (0.0, -2.0)
 BOARD_SIZE = (20.0, 20.0)
 TILE = 1.5
+REACH = TILE / 2 + 0.05      # a tile belongs to a piece's platform if its centre is this near (hero.js REACH)
 PLINTH_H = pieces.PLINTH_SIZE[2]
 
 CAMERAS = {
@@ -229,11 +232,23 @@ def board_material():
     stone.inputs["Color2"].default_value = (0.10, 0.058, 0.028, 1)     # warm carved tiles, as in the reference
     L.new(chk.outputs["Fac"], stone.inputs["Fac"])
     col = N.new("ShaderNodeMixRGB")
-    col.inputs["Color2"].default_value = (0.85, 0.52, 0.16, 1)   # brass, toward --sig
+    col.inputs["Color2"].default_value = (1.0, 0.66, 0.24, 1)    # brass, toward --sig
     L.new(mask.outputs[0], col.inputs["Fac"])
     L.new(stone.outputs["Color"], col.inputs["Color1"])
     L.new(col.outputs["Color"], bsdf.inputs["Base Color"])
-    L.new(mask.outputs[0], bsdf.inputs["Metallic"])
+    # only part metal: a full mirror shows the dark around it and the pattern disappears
+    met = N.new("ShaderNodeMath")
+    met.operation = "MULTIPLY"
+    met.inputs[1].default_value = 0.35
+    L.new(mask.outputs[0], met.inputs[0])
+    L.new(met.outputs[0], bsdf.inputs["Metallic"])
+    # the inlay keeps a faint glow of its own, so the designs still read on tiles the one light does not reach
+    glow = N.new("ShaderNodeMath")
+    glow.operation = "MULTIPLY"
+    glow.inputs[1].default_value = 0.04
+    L.new(mask.outputs[0], glow.inputs[0])
+    bsdf.inputs["Emission Color"].default_value = (1.0, 0.62, 0.22, 1)
+    L.new(glow.outputs[0], bsdf.inputs["Emission Strength"])
     rough = N.new("ShaderNodeMapRange")
     rough.inputs["To Min"].default_value = 0.6       # honed stone, not polished: no mirror streaks
     rough.inputs["To Max"].default_value = 0.72
@@ -252,14 +267,14 @@ def build_board():
     ky = range(int(math.floor(y0 / TILE)), int(math.ceil((y0 + BOARD_SIZE[1]) / TILE)) + 1)
     W, D = len(kx) * TILE, len(ky) * TILE
     ox, oy = (kx[0] - 0.5) * TILE, (ky[0] - 0.5) * TILE
-    reach = TILE / 2 + pieces.PLINTH_SIZE[0] / 2
+    reach = REACH
     bm = bmesh.new()
     uv = bm.loops.layers.uv.new("UVMap")
     sides = []
     for i in kx:
         for j in ky:
             cx, cy = i * TILE, j * TILE
-            h = rng.choice((0.0, 0.0, 0.05, 0.09, 0.14, 0.2, 0.28))
+            h = rng.choice((0.0, 0.0, 0.07, 0.14, 0.22, 0.32, 0.44))     # steps deep enough to throw a shadow
             for pid, (px, py, _yaw) in PLACEMENT.items():
                 if abs(cx - px) < reach and abs(cy - py) < reach:
                     h = PLATFORM[pid]
@@ -382,19 +397,25 @@ def build_scene():
     sc = bpy.context.scene
     # ivory with only a whisper of veining: the reference statues are almost plain
     # ivory marble: light comes through where it is thin (wings, rims, chains) and not where it is thick
-    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.70, 0.655, 0.57), vein_scale=0.9, sss=0.45, aged=True, sss_scale=0.06)
+    pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.60, 0.555, 0.48), vein_scale=1.1, rough=0.42, sss=0.14, aged=True, sss_scale=0.03)
     # the Cyrus Cylinder is fired clay: buff, matte, opaque, written over
     clay = marble("clay", (0.58, 0.47, 0.34), (0.45, 0.36, 0.25), vein_scale=1.6, rough=0.78, sss=0.0, text_bump=True, aged=True)
     clay_lines(clay, pieces.CYRUS_AXIS_Z)
     # its museum mount is alabaster: milky, and it glows where the saddles are thin
-    alabaster = marble("alabaster", (0.74, 0.70, 0.62), (0.64, 0.60, 0.52), vein_scale=0.7, rough=0.4, sss=0.7, sss_scale=0.022)
+    # (it was translucent alabaster and read as crystal with the light behind it: now opaque veined marble)
+    alabaster = marble("mount-marble", (0.66, 0.62, 0.55), (0.24, 0.22, 0.19), vein_scale=1.5, rough=0.2, sss=0.0)
+    _set(alabaster.node_tree.nodes["Principled BSDF"], **{"Coat Weight": 0.6, "Coat Roughness": 0.06})
+    alabaster.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.10
     gem = bpy.data.materials.new("pearl-black")
     gem.use_nodes = True
     _set(gem.node_tree.nodes["Principled BSDF"], **{"Base Color": (0.006, 0.006, 0.009, 1), "Roughness": 0.08,
                                                      "Coat Weight": 1.0, "Coat Roughness": 0.03})
-    dark = marble("marble-dark", (0.012, 0.012, 0.014), (0.42, 0.40, 0.36), vein_scale=0.9, rough=0.16, sss=0.0)
+    dark = marble("marble-dark", (0.012, 0.012, 0.014), (0.42, 0.40, 0.36), vein_scale=0.9, rough=0.2, sss=0.0)
     dark.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.025
-    plinth_mat = marble("plinth", (0.02, 0.019, 0.018), (0.035, 0.032, 0.03), vein_scale=1.0, rough=0.3, sss=0.0)
+    plinth_mat = marble("plinth", (0.02, 0.019, 0.018), (0.20, 0.19, 0.17), vein_scale=1.3, rough=0.18, sss=0.0)
+    # polished marble takes the light as a clear, tight highlight: unlike the satin ivory, the matte clay or the honed tiles
+    _set(plinth_mat.node_tree.nodes["Principled BSDF"], **{"Coat Weight": 0.6, "Coat Roughness": 0.06})
+    plinth_mat.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.04
 
     out = {"pieces": {}, "plinths": {}}
     for pid in pieces.PIECE_IDS:

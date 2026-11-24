@@ -13,14 +13,16 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 const IDS = ["cyrus", "zagros", "onepharma", "pearl", "falah", "nids"];
 const BASE = new URL("./assets/hero/", import.meta.url).href;
 const INK = [12 / 255, 12 / 255, 14 / 255];
-const HAZE = [0.016, 0.021, 0.036];      // what distance fades to: blue-black
+const HAZE = [0.011, 0.019, 0.044];      // what distance fades to: deep blue-black
 // The one light in blender/hero/scene.py, hidden behind the Cyrus Cylinder at the barrel's height.
-// Blender (0, 1.5, 0.34 + 0.35 + 0.80) in this scene's axes (x, z, -y). The fog is lit by it, live.
-const LIGHT = [0, 1.49, -1.5];
-const LIGHT_COL = [8.6, 8.6, 8.9];        // near white: in the posters the smoke round the light is grey, not gold
-const FOG_AMB = [0.020, 0.027, 0.045];    // what the fog shows away from the light: almost nothing, a cold edge
+// Blender (0, 1.5, 0.36 + 0.35 + 0.80) in this scene's axes (x, z, -y). The fog is lit by it, live.
+const LIGHT = [0, 1.51, -1.5];
+const LIGHT_COL = [6.6, 7.1, 8.3];        // cold moonlight: the smoke round the light is blue-grey, never pure white
+const FOG_AMB = [0.022, 0.036, 0.070];    // what the fog shows away from the light: a faint deep blue
 const FOG_DIV = 3;                         // fog is marched at 1/FOG_DIV of the size
 const MAX_PIXELS = 3.0e6;                  // backing buffer cap: every pass but the scene scales with pixels
+const TILE = 1.5, REACH = 0.8;            // blender/hero/scene.py TILE and REACH: a piece's platform is the one tile under it, or the two it stands astride
+const LIFT = 0.16;                         // how far a hovered piece rises, with its plinth and the tiles under it
 const DEG = Math.PI / 180;
 
 const PIECE_VS = `
@@ -40,12 +42,37 @@ void main(){
   vec3 c = texture2D(map, vUv).rgb + texture2D(matcap, n.xy * 0.5 + 0.5).rgb * uSheen;
   gl_FragColor = vec4(c, 1.0);
 }`;
+// The board. The tiles under a piece rise with it on hover: only their top corners move (aLift = the piece's
+// index, -1 elsewhere), so the block's sides stretch down to where they always ended and nothing opens beneath.
+const BOARD_VS = `
+attribute float aLift; uniform float uLiftAmt[6];
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY;
+void main(){
+  vUv = uv; vWN = normalize(mat3(modelMatrix) * normal);
+  vec4 w = modelMatrix * vec4(position, 1.0);
+  vBaseY = w.y;
+  if (aLift > -0.5) w.y += uLiftAmt[int(aLift + 0.5)];
+  vWorld = w.xyz;
+  gl_Position = projectionMatrix * viewMatrix * w;
+}`;
 const BOARD_FS = `
-uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf;
-varying vec2 vUv; varying vec3 vN; varying float vDepth; varying vec3 vWorld;
+uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte;
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
   c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
+  // A block's sides are honed stone, drawn here and not from the bake: their cells in the texture are a few
+  // pixels each and bled into one another, which read as pale glass under the pieces. Dark, matte, a touch
+  // of the one light where a side faces it, darker toward the bottom.
+  vec3 n = normalize(vWN);
+  // The tops: the bake holds the light's mirror image in the stone, a colourless sheen that read as glass.
+  // Take most of that grey part out; the warm stone and the brass inlay keep their colour.
+  c -= min(c.r, min(c.g, c.b)) * uMatte;
+  if (n.y < 0.5) {
+    vec3 q = uLight - vWorld; float d2 = dot(q, q);
+    float lam = max(dot(n, q * inversesqrt(d2)), 0.0) / (1.0 + d2 * 0.35);
+    c = (vec3(0.0075, 0.0085, 0.0115) + vec3(0.014, 0.016, 0.021) * lam) * (0.45 + 0.55 * smoothstep(-0.5, 0.3, vWorld.y));
+  }
   // the board has no edge: its outer blocks sink into the fog
   vec2 e = abs(vWorld.xz - uCentre) / uHalf;
   c = mix(c, uHaze, smoothstep(0.72, 0.97, max(e.x, e.y)));
@@ -68,7 +95,7 @@ uniform sampler2D tDepth; uniform sampler3D tNoise;
 uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uFull;
 uniform float uNear; uniform float uFar; uniform float uTime; uniform float uDrift;
 uniform vec3 uP[6]; uniform vec3 uLight; uniform vec3 uLightCol; uniform vec3 uAmb;
-uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor;
+uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor; uniform float uKnee; uniform float uJitT;
 varying vec2 vUv;
 const int STEPS = 16;
 // how much of the light reaches p past the pieces. uOcc = footprint centre (x, z) and half size; uOccY = bottom
@@ -99,10 +126,10 @@ float fine(vec3 p, float lo){
   return texture(tNoise, p * vec3(0.26, 0.40, 0.26) + w + vec3(-tt * 0.020, tt * 0.0095, 0.37 - tt * 0.031)).r;
 }
 float bank(vec3 p, float lo, float hi){
-  float top = 0.35 + 2.4 * smoothstep(0.40, 0.72, lo);      // a thick bank also stands taller
+  float top = 0.5 + 2.8 * smoothstep(0.40, 0.72, lo);       // a thick bank also stands taller
   float h = 1.0 - smoothstep(0.0, top, p.y);
   // more of it lies behind the pieces than between them and the eye
-  return smoothstep(0.47, 0.62, lo * 0.66 + hi * 0.34) * h * h * mix(0.14, 1.0, smoothstep(6.0, -1.5, p.z));
+  return smoothstep(0.40, 0.68, lo * 0.62 + hi * 0.38) * h * h * mix(0.08, 1.0, smoothstep(1.5, -4.0, p.z));
 }
 void main(){
   ivec2 lp = ivec2(gl_FragCoord.xy);
@@ -119,11 +146,18 @@ void main(){
   else if (ro.y > TOP) t0 = rd.y < -1e-4 ? (TOP - ro.y) / rd.y : tEnd;
   vec3 Sa = vec3(0.0), Sl = vec3(0.0); float T = 1.0;
   if (tEnd > t0) {
-    // jitter that moves on every frame (golden-ratio steps), so what the upsample leaves is grain, not a fixed grid
-    float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + floor(uTime * 60.0) * 0.6180339);
-    float dt = (tEnd - t0) / float(STEPS);
+    // jitter per pixel; held still in time (uJitT 0), because moving it every frame read as rain
+    float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))) + floor(uTime * 60.0) * 0.6180339 * uJitT);
+    // Steps are not evenly spaced: they crowd where the ray passes the light (equal angles as seen from the
+    // light), because that is where the glow changes fastest. Even steps were far too coarse there, and the
+    // moving jitter showed as rain in the bright fog seen through narrow gaps.
+    float tl = dot(uLight - ro, rd), Dl = max(length(ro + rd * tl - uLight), 0.08);
+    float thA = atan((t0 - tl) / Dl), thB = atan((tEnd - tl) / Dl), ta = t0;
     for (int i = 0; i < STEPS; i++) {
-      vec3 p = ro + rd * (t0 + (float(i) + jit) * dt);
+      float tb = i == STEPS - 1 ? tEnd : tl + Dl * tan(mix(thA, thB, float(i + 1) / float(STEPS)));
+      float dt = tb - ta;
+      vec3 p = ro + rd * (tl + Dl * tan(mix(thA, thB, (float(i) + jit) / float(STEPS))));
+      ta = tb;
       float part = 0.0;
       for (int k = 0; k < 6; k++) { vec3 q = p - uP[k]; float w = 1.0 / (1.0 + dot(q.xz, q.xz) * 1.6); part += w * w; }
       // two scales moving at different speeds, so banks change shape as they drift instead of sliding
@@ -131,9 +165,13 @@ void main(){
       float hi = fine(p, lo);
       // fog thins where it meets a piece, as it does around anything standing in moving air
       float b = bank(p, lo, hi) * (1.0 - 0.55 * min(part, 1.0));
+      // wisps: a third, finer layer eats into the banks and drifts faster, so their edges fray like smoke
+      float tw = uTime * uDrift;
+      b *= 0.45 + 1.1 * texture(tNoise, p * vec3(0.85, 1.25, 0.85) + vec3(lo * 0.8 + tw * 0.045, -tw * 0.018, tw * 0.028)).r;
       vec3 q = uLight - p; float d2 = dot(q, q); vec3 ld = q * inversesqrt(d2);
       // a thin haze always hangs round the light, so the cylinder always has its halo
-      float sigma = 0.010 * exp(-max(p.y, 0.0) * 0.45) + 0.85 * b + 0.06 * exp(-d2 * 0.55);
+      // the thin haze, like the banks, lies mostly behind the pieces: the foreground keeps its blacks
+      float sigma = 0.011 * exp(-max(p.y, 0.0) * 0.45) * mix(0.2, 1.0, smoothstep(4.0, -2.0, p.z)) + 0.95 * b + 0.05 * exp(-d2 * 0.55);
       float cs = dot(rd, ld);
       float ph = 0.6975 / pow(1.3025 - 1.1 * cs, 1.5);        // looking toward the light, fog glows
       vec3 ps = p + ld * 0.6;
@@ -147,6 +185,8 @@ void main(){
   }
   // fog in a piece's shadow is near black, as in Blender: the dim ambient is almost all that is left there
   vec3 S = uAmb * Sa + uLightCol * Sl;
+  // a shoulder: a bank drifting across the light glows, it never burns out to a white patch that travels
+  S /= 1.0 + dot(S, vec3(0.3333)) * uKnee;
   gl_FragColor = vec4(sqrt(S), T);
 }`;
 const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`;
@@ -244,7 +284,7 @@ void main(){
 // sqrt(colour) so the dark edges against the fog are found too.
 const FXAA_FS = `
 uniform sampler2D tIn; uniform vec2 uPx; uniform float uSubpix; uniform float uEdge; uniform float uEdgeMin;
-uniform sampler2D tTight; uniform sampler2D tWide; uniform vec2 uTightPx; uniform float uTightK; uniform float uWideK;
+uniform sampler2D tTight; uniform sampler2D tWide; uniform vec2 uTightPx; uniform float uTightK; uniform float uWideK; uniform vec3 uTint; uniform vec3 uShadow;
 varying vec2 vUv;
 float lum(vec2 uv){ return sqrt(max(dot(texture2D(tIn, uv).rgb, vec3(0.299, 0.587, 0.114)), 0.0)); }
 vec3 fxaa(){
@@ -294,6 +334,9 @@ void main(){
   vec3 tight = texture2D(tTight, vUv + uTightPx * vec2(-1.5, -1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, -1.5)).rgb
              + texture2D(tTight, vUv + uTightPx * vec2(-1.5, 1.5)).rgb + texture2D(tTight, vUv + uTightPx * vec2(1.5, 1.5)).rgb;
   c += texture2D(tWide, vUv).rgb * uWideK + tight * 0.25 * uTightK;
+  // grade: the dark and the mid tones lean deep blue, the lit ivory keeps its own colour
+  float l = dot(c, vec3(0.299, 0.587, 0.114)), k = 1.0 - smoothstep(0.22, 0.85, l);
+  c = mix(c, c * uTint, k) + uShadow * k * (1.0 - smoothstep(0.0, 0.25, l));
   // dark, smooth fog on an 8-bit screen: break the bands up with a little noise
   c += (fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5) / 255.0;
   gl_FragColor = vec4(c, 1.0);
@@ -381,7 +424,8 @@ export async function mountHero(stage, layout, opts = {}) {
   disposables.push(backGeo, backMat);
 
   // pieces and plinths: swap the exported materials for the unlit baked shader
-  const pieces = {}, state = {};
+  const pieces = {}, state = {}, liftAmt = new Float32Array(6);
+  let boardMesh = null;
   scene.add(gltf.scene);
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse(o => {
@@ -390,9 +434,10 @@ export async function mountHero(stage, layout, opts = {}) {
     if (o.name === "board") {
       // blocks of stone at uneven heights, one baked texture (reflections included)
       map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      boardMesh = o;
       o.material = new THREE.ShaderMaterial({
-        vertexShader: PIECE_VS, fragmentShader: BOARD_FS,
-        uniforms: { map: { value: map }, uHaze: hazeU,
+        vertexShader: BOARD_VS, fragmentShader: BOARD_FS,
+        uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uMatte: { value: 0.0 }, uLight: { value: new THREE.Vector3(...LIGHT) },
           uCentre: { value: new THREE.Vector2(layout.board.center[0], layout.board.center[1]) },
           uHalf: { value: new THREE.Vector2(layout.board.size[0] / 2, layout.board.size[1] / 2) } },
       });
@@ -404,7 +449,7 @@ export async function mountHero(stage, layout, opts = {}) {
     o.material = new THREE.ShaderMaterial({
       vertexShader: PIECE_VS, fragmentShader: PIECE_FS,
       // the pearl's gloss is baked like everything else, so it gets the same faint glint, not a second highlight
-    uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: 0.06 }, uHaze: hazeU },
+    uniforms: { map: { value: map }, matcap: { value: matcapTex }, uSheen: { value: /^plinth-/.test(o.name) ? 0.16 : o.name === "piece-cyrus" ? 0.03 : 0.06 }, uHaze: hazeU },
     });
     disposables.push(o.geometry, o.material, map);
     src.dispose();
@@ -415,17 +460,31 @@ export async function mountHero(stage, layout, opts = {}) {
     pieces[id] = p;
     const box = new THREE.Box3().setFromObject(p).union(new THREE.Box3().setFromObject(pl));
     state[id] = {
-      box, baseRot: p.rotation.y,
+      box, baseRot: p.rotation.y, plinth: pl, pieceY: p.position.y, plinthY: pl.position.y, lift: 0,
+      at: new THREE.Box3().setFromObject(pl).getCenter(new THREE.Vector3()),
       period: 11 + (IDS.indexOf(id) * 8) / 5, phase: IDS.indexOf(id) * 1.7,
       top: new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y, (box.min.z + box.max.z) / 2),
       centre: box.getCenter(new THREE.Vector3()),
     };
   }
 
+  // which board corners rise with which piece: the tops of the tiles its platform is made of
+  {
+    if (!boardMesh) throw new Error("pieces.glb is missing the board");
+    const pos = boardMesh.geometry.attributes.position, v = new THREE.Vector3(), a = new Float32Array(pos.count).fill(-1);
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(boardMesh.matrixWorld);
+      if (v.y < -0.3) continue;                       // the foot of a block stays where it is
+      const cx = Math.round(v.x / TILE) * TILE, cz = Math.round(v.z / TILE) * TILE;
+      IDS.forEach((id, k) => { const c = state[id].at; if (Math.abs(cx - c.x) < REACH && Math.abs(cz - c.z) < REACH) a[i] = k; });
+    }
+    boardMesh.geometry.setAttribute("aLift", new THREE.BufferAttribute(a, 1));
+  }
+
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 60);
   const camBase = new THREE.Vector3(), camTarget = new THREE.Vector3();
-  let focusBase = 10;
+  let focusBase = 10, focusNow = 0;
 
   // the scene: 4x MSAA. Three resolves colour (smooth outlines) and depth (one sample) into textures.
   const rt = new THREE.WebGLRenderTarget(4, 4, { samples: 4, depthBuffer: true });
@@ -468,7 +527,8 @@ export async function mountHero(stage, layout, opts = {}) {
     uniforms: { tIn: { value: frameRT.texture }, uPx: { value: new THREE.Vector2() },
       uSubpix: { value: 0.5 }, uEdge: { value: 0.125 }, uEdgeMin: { value: 0.03 },
       tTight: { value: tightRT.texture }, tWide: { value: wideRT.texture }, uTightPx: { value: new THREE.Vector2() },
-      uTightK: { value: 0.0 }, uWideK: { value: 0.25 } },           // no tight glow: it rings each piece (Farhad asked for none); only a faint wide one
+      uTightK: { value: 0.0 }, uWideK: { value: 0.25 },
+      uTint: { value: new THREE.Vector3(0.88, 0.95, 1.13) }, uShadow: { value: new THREE.Vector3(0.0, 0.002, 0.007) } },           // no tight glow: it rings each piece (Farhad asked for none); only a faint wide one
   });
   const postGeo = new THREE.PlaneGeometry(2, 2);
   const postCam = new THREE.Camera();
@@ -491,9 +551,11 @@ export async function mountHero(stage, layout, opts = {}) {
     defines: { DIV: FOG_DIV },
     uniforms: {
       uFull: postMat.uniforms.uFull,
-      uDrift: { value: 1 },            // 0 holds the fog still, 2 doubles its drift
+      uDrift: { value: 0.75 },         // 0 holds the fog still, 2 doubles its drift
       tDepth: { value: rt.depthTexture }, tNoise: { value: noiseTex },
       uOcc: { value: occ }, uOccY: { value: occY },
+      uKnee: { value: 1.1 },
+      uJitT: { value: 0 },             // 1 moves the march jitter every frame: smoother stills, but it shimmers like rain in bright fog
       uShadowFloor: { value: 0.02 },   // what a piece's shadow lets through: near black, as in Blender
       uInvProj: { value: camera.projectionMatrixInverse }, uCamWorld: { value: camera.matrixWorld },
       uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 },
@@ -572,7 +634,7 @@ export async function mountHero(stage, layout, opts = {}) {
   function labelAt(id) {
     if (!opts.onHover) return;
     if (!id) return opts.onHover(null, 0, 0);
-    tmp.copy(state[id].top).project(camera);
+    tmp.copy(state[id].top); tmp.y += state[id].lift; tmp.project(camera);
     opts.onHover(id, (tmp.x * 0.5 + 0.5) * W, (-tmp.y * 0.5 + 0.5) * H - 6);
   }
   function hoverFromPointer(id) {
@@ -623,14 +685,24 @@ export async function mountHero(stage, layout, opts = {}) {
     camera.lookAt(tmp);
     camera.updateMatrixWorld();
 
-    // Pieces stay on their marks: hover only names a piece. It never lifts or brightens it, moves the camera
-    // or pulls focus off Cyrus, so the light, the shadows in the fog and the glow round the light never
-    // change. The idle sway is one degree, too little to move the baked light visibly.
-    for (const id of IDS) {
-      const s = state[id];
+    // The hovered piece rises a little, with its plinth and the tiles under it, and the focus goes to it; with
+    // nothing hovered the focus rests on Cyrus. The light never moves. The idle sway is one degree, too little
+    // to move the baked light visibly.
+    const ease = 1 - Math.exp(-dt * 6);
+    IDS.forEach((id, k) => {
+      const s = state[id], to = id === hoverId ? LIFT : 0;
+      if (Math.abs(to - s.lift) > 1e-4) {
+        s.lift += (to - s.lift) * ease;
+        if (id === hoverId) labelAt(id);
+      } else s.lift = to;
+      liftAmt[k] = s.lift;
+      pieces[id].position.y = s.pieceY + s.lift; s.plinth.position.y = s.plinthY + s.lift;
+      occY[k].y = s.box.max.y + s.lift;
       pieces[id].rotation.y = s.baseRot + Math.sin((t / s.period) * Math.PI * 2 + s.phase) * 1 * DEG;
-    }
-    postMat.uniforms.uFocus.value = focusBase;
+    });
+    const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
+    focusNow = focusNow ? focusNow + (focusTo - focusNow) * (1 - Math.exp(-dt * 4)) : focusTo;
+    postMat.uniforms.uFocus.value = focusNow;
     fogMat.uniforms.uTime.value = t;
   }
   function render() {
@@ -692,7 +764,7 @@ export async function mountHero(stage, layout, opts = {}) {
   // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
   // weights uTightK, uWideK), .bright (bloom threshold uThresh)
   Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize,
-    fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
+    board: boardMesh.material.uniforms, fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
 
   stage.appendChild(canvas);
   resize();

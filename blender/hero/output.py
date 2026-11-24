@@ -267,7 +267,9 @@ def _matcap(path, size=256):
 
 def bake_and_export(objs, assets_dir, out_dir, draft):
     sc = bpy.context.scene
-    objs["haze"].hide_render = True
+    # The fog stays in for the bakes: it is what throws the one light back onto the faces turned to the camera
+    # (the lit marble fronts and their highlights in the posters). Without it those faces bake near black.
+    objs["haze"].hide_render = False
     scene.set_camera(objs, "landscape")
 
     baked = []
