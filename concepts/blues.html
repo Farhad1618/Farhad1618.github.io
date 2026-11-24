@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Blues: background study</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,200..500,0..100,0..1;1,9..144,200..500,0..100,0..1&display=swap">
+<style>
+:root{--bone:#ECE7DC;--dim:#A8A49C;--muted:#716E68;--sig:#E9A03B}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;color:var(--bone);font:12px/1.4 'IBM Plex Mono',monospace}
+body{display:grid;grid-template-columns:300px 1fr;height:100vh}
+aside{overflow:auto;padding:16px;border-right:1px solid #222;background:#050505}
+h1{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+.sw{display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:center;width:100%;padding:8px;margin-bottom:6px;border:1px solid #1c1c1c;border-radius:6px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.sw:hover{border-color:#444}.sw.on{border-color:var(--sig)}
+.chip{height:40px;border-radius:4px;position:relative;overflow:hidden}
+.chip i{position:absolute;right:6px;top:50%;width:22px;height:10px;margin-top:-5px;border-radius:9px}
+.sw b{display:block;font-weight:500;color:var(--bone)}.sw small{color:var(--muted)}
+.kbd{margin-top:14px;color:var(--muted);line-height:1.6}
+.custom{margin-top:14px;display:grid;gap:6px}
+.custom input{width:100%;background:#111;border:1px solid #333;color:var(--bone);font:inherit;padding:6px 8px;border-radius:4px}
+.custom input[type=range]{padding:0}
+main{position:relative}
+iframe{width:100%;height:100%;border:0;display:block}
+#tag{position:absolute;left:12px;bottom:12px;padding:6px 10px;background:rgba(0,0,0,.6);border-radius:4px;pointer-events:none}
+.view{margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap}
+.view button{background:none;border:1px solid #333;color:var(--dim);font:inherit;padding:4px 8px;border-radius:4px;cursor:pointer}
+.view button:hover{color:var(--bone);border-color:#666}
+</style></head><body>
+<aside>
+  <h1>Background blues</h1>
+  <div class="view">
+    <button data-go="#who">Who</button><button data-go="#work">Work</button><button data-go="#proj-cyrus">Cyrus</button><button data-go="#paper">Research</button><button data-go="#contact">Contact</button><button data-go="top">Hero</button>
+  </div>
+  <div id="list"></div>
+  <div class="custom">
+    <span style="color:var(--dim)">Custom: hue / saturation / lightness</span>
+    <input id="h" type="range" min="190" max="250" value="222">
+    <input id="s" type="range" min="0" max="60" value="40">
+    <input id="l" type="range" min="2" max="12" step=".25" value="4.9">
+    <input id="hex" placeholder="#070A11" spellcheck="false">
+  </div>
+  <p class="kbd">↑ / ↓ steps through the list.<br>The page on the right is the real site; only the colours change.</p>
+</aside>
+<main><iframe id="f" src="/"></iframe><div id="tag"></div></main>
+<script>
+// [name, ink, note]. ink-2 and the hairlines are derived from ink (same hue, lighter).
+var BLUES = [
+  ["Old neutral", "#0C0C0E", "before today: no blue"],
+  ["Hero haze", "#070A11", "the fog's far colour"],
+  ["Night", "#080C16", "a touch more blue"],
+  ["Midnight", "#0A0F1C", "on the site now; clearly blue, still near-black"],
+  ["Ink", "#0B1222", "blue-black ink"],
+  ["Prussian", "#08121E", "greener blue, like the fog's teal edge"],
+  ["Slate", "#0D1118", "grey-blue, quiet"],
+  ["Indigo", "#0B0B1A", "violet-leaning"],
+  ["Deep navy", "#0C1529", "strongest; near the v1 navy"],
+  ["v1 navy", "#0A111A", "the old v1/v2 ground"]
+];
+function hexToHsl(h){var n=parseInt(h.slice(1),16),r=(n>>16&255)/255,g=(n>>8&255)/255,b=(n&255)/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,s=0,hh=0,d=mx-mn;
+  if(d){s=d/(1-Math.abs(2*l-1));hh=mx==r?((g-b)/d)%6:mx==g?(b-r)/d+2:(r-g)/d+4;hh*=60;if(hh<0)hh+=360}return[hh,s*100,l*100]}
+function hsl(h,s,l){s/=100;l/=100;var c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2,r=0,g=0,b=0;
+  if(h<60){r=c;g=x}else if(h<120){r=x;g=c}else if(h<180){g=c;b=x}else if(h<240){g=x;b=c}else if(h<300){r=x;b=c}else{r=c;b=x}
+  return"#"+[r,g,b].map(function(v){return Math.round((v+m)*255).toString(16).padStart(2,"0")}).join("").toUpperCase()}
+function set(ink){var t=hexToHsl(ink),s=Math.min(t[1],45);
+  return{ink:ink.toUpperCase(),ink2:hsl(t[0],s*.9,t[2]+4.5),rule:hsl(t[0],s*.7,t[2]+9.5),ruleSoft:hsl(t[0],s*.8,t[2]+5.5)}}
+var f=document.getElementById("f"),tag=document.getElementById("tag"),list=document.getElementById("list"),cur=1;
+function apply(ink,name){var p=set(ink),d=f.contentDocument;if(!d||!d.documentElement)return;
+  var st=d.getElementById("blue-study");if(!st){st=d.createElement("style");st.id="blue-study";d.head.appendChild(st)}
+  st.textContent=":root{--ink:"+p.ink+"!important;--ink-2:"+p.ink2+"!important;--rule:"+p.rule+"!important;--rule-soft:"+p.ruleSoft+"!important}";
+  tag.textContent=(name||"Custom")+"  ·  ink "+p.ink+"  ink-2 "+p.ink2+"  rule "+p.rule+"  rule-soft "+p.ruleSoft;
+  document.getElementById("hex").value=p.ink}
+BLUES.forEach(function(b,i){var p=set(b[1]),el=document.createElement("button");el.className="sw";
+  el.innerHTML='<span class="chip" style="background:'+p.ink+';box-shadow:inset 0 0 0 1px '+p.rule+'"><i style="background:'+p.ink2+';box-shadow:0 0 0 1px '+p.rule+'"></i></span><span><b>'+b[0]+'</b><small>'+p.ink+' · '+b[2]+'</small></span>';
+  el.onclick=function(){pick(i)};list.appendChild(el)});
+function pick(i){cur=(i+BLUES.length)%BLUES.length;[].forEach.call(list.children,function(c,j){c.classList.toggle("on",j==cur)});
+  var t=hexToHsl(BLUES[cur][1]);h.value=Math.round(t[0]);s.value=Math.round(t[1]);l.value=t[2].toFixed(2);apply(BLUES[cur][1],BLUES[cur][0])}
+var h=document.getElementById("h"),s=document.getElementById("s"),l=document.getElementById("l");
+[h,s,l].forEach(function(r){r.oninput=function(){[].forEach.call(list.children,function(c){c.classList.remove("on")});apply(hsl(+h.value,+s.value,+l.value))}});
+document.getElementById("hex").onchange=function(e){var v=e.target.value.trim();if(/^#?[0-9a-f]{6}$/i.test(v)){v=v[0]=="#"?v:"#"+v;apply(v)}};
+addEventListener("keydown",function(e){if(e.key=="ArrowDown"){pick(cur+1);e.preventDefault()}if(e.key=="ArrowUp"){pick(cur-1);e.preventDefault()}});
+f.onload=function(){pick(cur);f.contentWindow.addEventListener("keydown",function(e){if(e.key=="ArrowDown"&&e.altKey)pick(cur+1)})};
+[].forEach.call(document.querySelectorAll("[data-go]"),function(b){b.onclick=function(){var w=f.contentWindow,d=f.contentDocument,g=b.dataset.go;
+  if(g=="top")return w.scrollTo(0,0);var el=d.querySelector(g)||d.querySelector("."+g.slice(1));if(el)el.scrollIntoView()}});
+</script>
+</body></html>

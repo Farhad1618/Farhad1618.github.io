@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mark sketch</title>
+<style>
+  :root{--ink:#0C0C0E;--rule:#26262A;--bone:#ECE7DC;--sig:#E9A03B;--dim:#A8A49C}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ink);color:var(--bone);font:14px system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
+  .bar{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--rule);flex-wrap:wrap}
+  button{background:#18181C;color:var(--bone);border:1px solid var(--rule);border-radius:6px;padding:7px 12px;cursor:pointer;font:inherit}
+  button.on{border-color:var(--sig);color:var(--sig)}
+  label{color:var(--dim);display:flex;gap:6px;align-items:center}
+  .wrap{flex:1;display:grid;place-items:center;padding:14px;min-height:0}
+  canvas{background:#111114;border:1px solid var(--rule);border-radius:8px;touch-action:none;--s:min(calc(100vh - 100px),calc(100vw - 28px));width:var(--s);height:var(--s);cursor:crosshair}
+</style></head><body>
+<div class="bar">
+  <button id="pen" class="on">Pen</button>
+  <button id="eraser">Eraser</button>
+  <label>Size <input id="size" type="range" min="1" max="30" value="6"></label>
+  <button id="guide" class="on">Circle guide</button>
+  <button id="undo">Undo</button>
+  <button id="clear">Clear</button>
+  <button id="save">Save PNG</button>
+</div>
+<div class="wrap"><canvas id="c" width="1000" height="1000"></canvas></div>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+let tool='pen',guide=true,drawing=false,last=null,strokes=[],cur=null;
+function render(){
+  ctx.clearRect(0,0,1000,1000);
+  if(guide){ctx.strokeStyle='#3a3a40';ctx.lineWidth=2;ctx.setLineDash([8,8]);
+    ctx.beginPath();ctx.arc(500,500,420,0,7);ctx.stroke();ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(500,60);ctx.lineTo(500,940);ctx.moveTo(60,500);ctx.lineTo(940,500);ctx.strokeStyle='#202024';ctx.stroke();}
+  for(const s of strokes.concat(cur?[cur]:[])){
+    ctx.globalCompositeOperation=s.e?'destination-out':'source-over';
+    ctx.strokeStyle='#E9A03B';ctx.lineWidth=s.w;ctx.lineCap=ctx.lineJoin='round';
+    ctx.beginPath();s.p.forEach((q,i)=>i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]));
+    if(s.p.length===1)ctx.lineTo(s.p[0][0]+.1,s.p[0][1]);ctx.stroke();
+  }
+  ctx.globalCompositeOperation='source-over';
+}
+function pt(e){const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*1000/r.width,(e.clientY-r.top)*1000/r.height]}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);cur={e:tool==='eraser',w:+$('size').value*(tool==='eraser'?3:1),p:[pt(e)]};render()});
+cv.addEventListener('pointermove',e=>{if(cur){cur.p.push(pt(e));render()}});
+const end=()=>{if(cur){strokes.push(cur);cur=null;render()}};
+cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+$('pen').onclick=()=>{tool='pen';$('pen').classList.add('on');$('eraser').classList.remove('on')};
+$('eraser').onclick=()=>{tool='eraser';$('eraser').classList.add('on');$('pen').classList.remove('on')};
+$('guide').onclick=()=>{guide=!guide;$('guide').classList.toggle('on',guide);render()};
+$('undo').onclick=()=>{strokes.pop();render()};
+$('clear').onclick=()=>{strokes=[];render()};
+$('save').onclick=()=>{const o=document.createElement('canvas');o.width=o.height=1000;const x=o.getContext('2d');
+  x.fillStyle='#0C0C0E';x.fillRect(0,0,1000,1000);const g=guide;guide=false;render();x.drawImage(cv,0,0);guide=g;render();
+  const a=document.createElement('a');a.href=o.toDataURL('image/png');a.download='mark-sketch.png';a.click()};
+render();
+</script></body></html>
