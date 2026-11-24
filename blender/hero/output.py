@@ -459,25 +459,47 @@ def _emit_spec(ob):
 
 
 def _mask(ob, size, haze, draft):
-    """The piece's live-highlight mask: R gloss (1 - roughness), G direct light from the one light (no colour,
-    over its 99th percentile), B highlight strength per material."""
+    """The piece's live-highlight mask: R gloss (1 - roughness), G how much of the one light reaches the
+    surface (1 lit, 0 in shadow), B highlight strength per material.
+    G is a ratio of two DIFFUSE DIRECT bakes without colour, one with shadows and one with every object's
+    shadow switched off: the cosine and the distance falloff cancel, so G is visibility alone, and the live
+    shader brings its own N.L and falloff. (A first version divided the shadowed bake by its 99th percentile;
+    the barrel's top, close to the light, set that scale and every mount face came out near 0.)"""
     sc = bpy.context.scene
     rough = _bake(ob, size, glossy=False, kind="ROUGHNESS")[..., 0]
     haze.hide_render = True                       # visibility of the light itself, not of the fog
     samples = sc.cycles.samples
     sc.cycles.samples = 32 if draft else 128
-    direct = _denoise(_bake(ob, size, glossy=False, kind="DIFFUSE", direct=True, indirect=False, color=False))
+
+    def direct():
+        return _denoise(_bake(ob, size, glossy=False, kind="DIFFUSE", direct=True, indirect=False,
+                              color=False)).mean(axis=-1)
+    lit = direct()
+    meshes = [o for o in sc.objects if o.type == "MESH"]
+    was = [o.visible_shadow for o in meshes]
+    for o in meshes:
+        o.visible_shadow = False
+    free = direct()
+    for o, w in zip(meshes, was):
+        o.visible_shadow = w
     sc.cycles.samples = samples
     haze.hide_render = False
-    g = direct.mean(axis=-1)
-    lit = g[g > 1e-5]
-    p99 = float(np.percentile(lit, 99)) if lit.size else 1.0
-    g = np.clip(g / max(p99, 1e-6), 0, 1)
+    # where the unshadowed light is itself ~0 (faces turned away) both bakes are denoiser noise and their
+    # ratio means nothing: fade G out below a few percent of the typical unshadowed level
+    ref = float(np.percentile(free[free > 1e-6], 95)) if (free > 1e-6).any() else 1.0
+    t = np.clip((free / ref - 0.01) / 0.04, 0, 1)
+    g = np.clip(lit / np.maximum(free, 1e-6), 0, 1) * t * t * (3 - 2 * t)
+    free = free / ref
     restore = _emit_spec(ob)
     spec = _bake(ob, size, glossy=False, kind="EMIT")[..., 0]
     restore()
     m = np.stack([np.clip(1 - rough, 0, 1), g, np.clip(spec, 0, 1)], axis=-1)
-    print(f"mask {ob.name}: gloss {m[..., 0].mean():.2f} light p99 {p99:.4f} spec {m[..., 2].mean():.2f}")
+    for name, sel in (("mount (spec > 0.5)", spec > 0.5), ("clay (spec < 0.1)", (spec > 0.01) & (spec < 0.1))):
+        if sel.any():
+            gg = g[sel]
+            facing = free[sel] > 0.05
+            print(f"mask {ob.name} {name}: mean G {gg.mean():.2f}, on faces turned to the light "
+                  f"{gg[facing].mean() if facing.any() else 0:.2f} ({facing.mean() * 100:.0f}% of texels)")
     return m
 
 

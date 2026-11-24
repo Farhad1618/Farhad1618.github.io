@@ -535,11 +535,11 @@ def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens
     return haze
 
 
-def haze_mapping(loc, scale):
+def haze_mapping(loc, scale, top=None):
     """noise_scale and low_z for build_haze so a box at loc of size scale has the hero's banks, metre for metre
     (same bank size, same height falloff from z 0 to HAZE_TOP)."""
     ns = tuple(round(f * s, 4) for f, s in zip(HAZE_FREQ, scale))
-    lo = ((0.0 - loc[2]) / scale[2], (HAZE_TOP - loc[2]) / scale[2])
+    lo = ((0.0 - loc[2]) / scale[2], ((HAZE_TOP if top is None else top) - loc[2]) / scale[2])
     return ns, lo
 
 

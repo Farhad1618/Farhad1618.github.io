@@ -29,7 +29,12 @@ SOLO = {
         energy=763,                          # d = 1.381 m to the centre of the piece (bounding box)
         # low, as in the hero, so the tile tops are seen at a slant and stay dark; from the front left
         cam=dict(pos=(-1.00, -4.00, 1.38), target=(0.04, 0.0, 1.04), lens=62.0, fstop=2.0, res=(1600, 1400)),
-        tex=dict(piece=2048, mask=1024, plinth=1024, board=2048),
+        # the fog lies behind and beside the piece, as the hero's banks do from its camera: the box starts
+        # just in front of the piece and runs back, so the foreground keeps its blacks
+        # and lower than the hero's (top 1.9 m, not 2.9): up close the camera looks into the banks, and the
+        # hero's height filled the upper frame with grey
+        haze=dict(front=-0.9, depth=9.0, width=12.0, top=1.9, dens=0.75),
+        tex=dict(piece=4096, mask=1024, plinth=1024, board=2048),
         samples=256,
         tilt=(20, 6),
     ),
@@ -114,6 +119,16 @@ def build_solo(pid, draft=False):
     centre, size, extent = patch(pid)
     board = scene.build_board(center=centre, size=size, placement={pid: (ox, oy, yaw)}, platform={pid: platform},
                               seed=seed_for(pid), back=True)
+    # the inlay's own glow is for the far hero board; at a few metres it reads too hot
+    for n in M["board"].node_tree.nodes:
+        if n.bl_idname == "ShaderNodeMath" and n.operation == "MULTIPLY" and abs(n.inputs[1].default_value - 0.04) < 1e-6:
+            n.inputs[1].default_value = 0.012
+    # the warm tiles: the hero sees them from 10 m at a slant; here they fill the foreground and outshone the piece
+    for n in M["board"].node_tree.nodes:
+        if n.bl_idname == "ShaderNodeMixRGB" and tuple(round(c, 3) for c in n.inputs["Color2"].default_value[:3]) == (0.1, 0.058, 0.028):
+            n.inputs["Color2"].default_value = (0.055, 0.032, 0.016, 1)
+    # honed stone seen close and low: less sheen, or the tops mirror the lit fog to white
+    scene._set(M["board"].node_tree.nodes["Principled BSDF"], **{"Specular IOR Level": 0.15})
     board.data.materials.append(M["board"])
     board.data.materials.append(M["tile-side"])
 
@@ -129,9 +144,11 @@ def build_solo(pid, draft=False):
 
     # the fog: a smaller box round the patch, with the hero's banks metre for metre. A little thinner than the
     # hero's: the camera is close to the light, and 1.6x (then 1.15x) washed the frame out round it
-    hloc, hscale = (centre[0], centre[1], 2.5), (12.0, 12.0, 5.0)
-    ns, lo = scene.haze_mapping(hloc, hscale)
-    haze = scene.build_haze(loc=hloc, scale=hscale, noise_loc=(3.1, 0.7, 0.0), dens=(0.0035 * 0.9, 0.15 * 0.9),
+    hz = S["haze"]
+    hloc = (centre[0], oy + hz["front"] + hz["depth"] / 2, 2.5)
+    hscale = (hz["width"], hz["depth"], 5.0)
+    ns, lo = scene.haze_mapping(hloc, hscale, hz["top"])
+    haze = scene.build_haze(loc=hloc, scale=hscale, noise_loc=(3.1, 0.7, 0.0), dens=(0.0035 * hz["dens"], 0.15 * hz["dens"]),
                             noise_scale=ns, low_z=lo)
     _clear_round(haze, light.location, S.get("clear", (0.25, 1.0)))
 

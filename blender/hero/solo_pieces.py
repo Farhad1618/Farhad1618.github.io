@@ -373,8 +373,33 @@ def _edge_chips(rng, size, loc, n, rmin, rmax, weight=(3.0, 1.0, 0.5)):
     return out
 
 
-def _cut(build, chips, bevel, name, seed):
-    """Build one closed part in its own mesh, bevel it, take the chips out (exact boolean), return the mesh."""
+def _check_part(me, name, lo, hi, min_vol):
+    """A mount part must come out of its cuts whole: faces, closed, outward, the size it was built."""
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    errs = []
+    if not bm.faces:
+        errs.append("no faces")
+    else:
+        open_edges = sum(1 for e in bm.edges if not e.is_manifold)
+        if open_edges:
+            errs.append(f"{open_edges} open or non-manifold edges")
+        vol = bm.calc_volume(signed=True)
+        if vol < min_vol:
+            errs.append(f"volume {vol:.5f} m3 under {min_vol:.5f} (empty or inside out)")
+        xs = [v.co for v in bm.verts]
+        for a in range(3):
+            mn, mx = min(c[a] for c in xs), max(c[a] for c in xs)
+            if mn < lo[a] - 0.002 or mx > hi[a] + 0.002 or mn > lo[a] + 0.01 or mx < hi[a] - 0.01:
+                errs.append(f"axis {a} spans {mn:.3f}..{mx:.3f}, expected {lo[a]:.3f}..{hi[a]:.3f}")
+    bm.free()
+    if errs:
+        raise RuntimeError(f"mount part {name}: " + "; ".join(errs))
+
+
+def _cut(build, chips, bevel, name, seed, bounds, min_vol):
+    """Build one closed part in its own mesh, bevel it, then take the chips out one at a time (exact
+    boolean, each cutter a single closed lumpy ellipsoid), checking the part after every step."""
     bm = bmesh.new()
     build(bm)
     me = bpy.data.meshes.new(name)
@@ -382,35 +407,49 @@ def _cut(build, chips, bevel, name, seed):
     bm.free()
     ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
+
+    def apply():
+        bpy.context.view_layer.update()
+        dg = bpy.context.evaluated_depsgraph_get()
+        new = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), depsgraph=dg)
+        ob.modifiers.clear()
+        old = ob.data
+        ob.data = new
+        bpy.data.meshes.remove(old)
+
     if bevel:
         m = ob.modifiers.new("bevel", "BEVEL")
         m.width, m.segments = bevel, 3
         m.limit_method = "ANGLE"
         m.angle_limit = math.radians(30)
-    cut_ob = None
-    if chips:
+        apply()
+    _check_part(ob.data, name, *bounds, min_vol)
+    for k, (c, axes, rot) in enumerate(chips):
         cb = bmesh.new()
-        for k, (c, axes, rot) in enumerate(chips):
-            _chip_cutter(cb, c, axes, rot, seed + k * 1.37)
-        cme = bpy.data.meshes.new(name + "-chips")
+        _chip_cutter(cb, c, axes, rot, seed + k * 1.37)
+        bmesh.ops.recalc_face_normals(cb, faces=cb.faces[:])
+        cme = bpy.data.meshes.new(name + "-chip")
         cb.to_mesh(cme)
         cb.free()
-        cut_ob = bpy.data.objects.new(name + "-chips", cme)
+        cut_ob = bpy.data.objects.new(name + "-chip", cme)
         bpy.context.scene.collection.objects.link(cut_ob)
-        bo = ob.modifiers.new("chips", "BOOLEAN")
+        bo = ob.modifiers.new("chip", "BOOLEAN")
         bo.operation = "DIFFERENCE"
         bo.solver = "EXACT"
         bo.object = cut_ob
-    bpy.context.view_layer.update()
-    dg = bpy.context.evaluated_depsgraph_get()
-    out = bpy.data.meshes.new_from_object(ob.evaluated_get(dg), depsgraph=dg)
-    bpy.data.objects.remove(ob)
-    bpy.data.meshes.remove(me)
-    if cut_ob:
+        apply()
         bpy.data.objects.remove(cut_ob)
         bpy.data.meshes.remove(cme)
+        _check_part(ob.data, f"{name} after chip {k}", *bounds, min_vol)
+    out = ob.data
+    bpy.data.objects.remove(ob)
     bpy.context.view_layer.update()
     return out
+
+
+def _on_plane(z0):
+    """Faces lying in the plane z = z0 (a face another part covers)."""
+    return lambda f: all(abs(v.co.z - z0) < 2e-4 for v in f.verts)
 
 
 def _saddle_chips(rng, x, w, cz, R):
@@ -462,26 +501,32 @@ def build_cyrus():
                    ((0.70, 0.42, 0.30), (0, 0, 0.21), 7, (0.0, 3.0, 0.8)),
                    ((0.76, 0.48, 0.05), (0, 0, 0.385), 9, (3.0, 1.0, 0.6)))
     # faces nobody sees are dropped after the cut, so the bake spends its texels on the rest: the base's
-    # underside, the body's top and bottom (under the slab, on the base), the slab's and saddles' undersides
-    down = lambda f: f.normal.z < -0.9                         # noqa: E731
-    flat = lambda f: abs(f.normal.z) > 0.9                     # noqa: E731
-    hidden = (down, flat, down)
+    # underside, the body's top and bottom (under the slab, on the base), the slab's and saddles' undersides.
+    # Picked by position (the plane they lie in), never by normal sign.
+    hidden = ((0.0,), (0.06, 0.36), (0.36,))
     for k, (size, loc, n, wts) in enumerate(mount_boxes):
         chips = _edge_chips(rng, size, loc, n, 0.007, 0.022, wts)
-        parts.append((_cut(lambda bm, s=size, l=loc: box(bm, *s, l), chips, 0.005, f"mount-{k}", 11 + k * 7),
-                      hidden[k]))
+        lo = tuple(l - s_ / 2 for l, s_ in zip(loc, size))
+        hi = tuple(l + s_ / 2 for l, s_ in zip(loc, size))
+        vol = size[0] * size[1] * size[2]
+        parts.append((_cut(lambda bm, s=size, l=loc: box(bm, *s, l), chips, 0.005, f"mount-{k}", 11 + k * 7,
+                           (lo, hi), 0.85 * vol), [_on_plane(z) for z in hidden[k]]))
     for k, x in enumerate((-0.25, 0.25)):
         chips = _saddle_chips(rng, x, 0.026, CZ, R_SAD)
         parts.append((_cut(lambda bm, xx=x: pieces._saddle(bm, xx, 0.026, 0.2, 0.41, CZ, R_SAD), chips, 0.003,
-                           f"saddle-{k}", 40 + k * 5), down))
+                           f"saddle-{k}", 40 + k * 5, ((x - 0.013, -0.25, 0.41), (x + 0.013, 0.25, CZ - R_SAD * 0.6)),
+                           0.0015), [_on_plane(0.41)]))
 
     bm = bmesh.new()
-    for me, gone in parts:
+    for me, rules in parts:
         pb = bmesh.new()
         pb.from_mesh(me)
-        pb.normal_update()
-        bmesh.ops.delete(pb, geom=[f for f in pb.faces if gone(f)],
-                         context="FACES")
+        n0 = len(pb.faces)
+        gone = [f for f in pb.faces if any(r(f) for r in rules)]
+        bmesh.ops.delete(pb, geom=gone, context="FACES")
+        if not pb.faces:
+            raise RuntimeError(f"mount part {me.name}: nothing left after dropping hidden faces")
+        print(f"  {me.name}: {n0} faces, {len(gone)} hidden dropped")
         pb.to_mesh(me)
         pb.free()
         bm.from_mesh(me)
