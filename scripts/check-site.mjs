@@ -53,7 +53,7 @@ check("script hosts allowed", () => {
 
 check("section ids appear once", () => {
   const errs = [];
-  for (const id of ["top", "who", "drive", "work", "paper", "contact"]) {
+  for (const id of ["top", "who", "work", "paper", "contact"]) {
     const n = (src.match(new RegExp(`\\bid=["']${id}["']`, "g")) || []).length;
     if (n !== 1) errs.push(`id="${id}" appears ${n} times`);
   }
@@ -119,7 +119,7 @@ check("no family name in visible copy", () =>
   /Farhad Maleki|FARHAD MALEKI/.test(src) ? ['"Farhad Maleki" present; use "Farhad"'] : []);
 
 check("hero and who copy present", () => {
-  const need = ['aria-label="Farhad"', "Software Developer", "Featured systems", "CTO at OnePharma"];
+  const need = ['aria-label="Farhad"', "Software Developer"];
   return need.filter((s) => !src.includes(s)).map((s) => `missing "${s}"`);
 });
 
@@ -165,12 +165,10 @@ check("photo slot: swap removes monogram, caption not unfinished", () => {
   return errs;
 });
 
-check("drive section: headline and 4 moments", () => {
+check("drive section removed, work intro reads Selected work", () => {
   const errs = [];
-  if (!src.includes("Obsessed with the")) errs.push('"Obsessed with the" missing');
-  if (!/<em>hardest<\/em>/.test(src)) errs.push("<em>hardest</em> missing");
-  const n = (src.match(/class="moment[\s"]/g) || []).length;
-  if (n !== 4) errs.push(`found ${n} class="moment" elements, want 4`);
+  if (src.includes('id="drive"') || src.includes("Obsessed with the")) errs.push("drive section still present");
+  if (!src.includes("Selected <em>work</em>")) errs.push("Selected work heading missing");
   return errs;
 });
 

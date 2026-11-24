@@ -28,12 +28,43 @@ const FOG_MAX = 0.34e6;                    // and never on more fog texels than 
 // and the per-pixel post passes only. Every level keeps 4x MSAA: with 2x on the sharp levels Farhad found the
 // old low level looked best, because 2x gives an outline only one in-between tone.
 const LEVELS = [[2, 7.5e6, 11.5], [2, 5.0e6, 11.5], [1.5, 3.0e6, 20]];
+// The same on touch screens (pointer:coarse), chosen once at mount. A phone used to get a flat 1.25x at every
+// level, so an iPhone (3x) drew about 490 x 830 and the browser stretched it 2.4x: blurred, with stair-step
+// outlines (Farhad, Nov 24). 2x is the top: 3x costs 2.25x the pixels for a gain lost in the fog and depth of
+// field. The budgets are looser than on desktop; the runtime step-down (frame()) catches a phone that heats up.
+const TOUCH_LEVELS = [[2, 1.6e6, 14], [1.6, 1.1e6, 16], [1.25, 0.6e6, 22]];
 const TILE = 1.5, REACH = 0.8;            // blender/hero/scene.py TILE and REACH: a piece's platform is the one tile under it, or the two it stands astride
 const LIFT = 0.16;                         // how far a hovered piece rises, with its plinth and the tiles under it
 const LIFT_BY = { cyrus: 0.06 };             // Cyrus, the centre piece, barely rises (Farhad: not as high as the rest)
 const DEG = Math.PI / 180;
 const ZS = "60.0";                          // the camera's far plane: scene alpha = view depth / ZS
 const DRIFT_YAW = 2.5, DRIFT_PITCH = 1.0;    // camera arc with the mouse, degrees at the canvas edge
+// Phones: the poster's portrait camera fits all six across the width, so on a phone each piece was about 46 px
+// wide and far off (Farhad, Nov 24). Narrow portrait gets a closer, lower camera instead (pieces ~1.8x, the
+// band at ~34-56% of the height, the board filling the lower half), and the row, now wider than the screen, is
+// reached by a sideways drag that turns the view in place. Turning in place keeps every piece at the angle it
+// was baked from; orbiting would swing the camera ~2 m off the bake view. Fully on at aspect PHONE_AT[0] and
+// below, back to the poster's camera by PHONE_AT[1], so portrait tablets (0.7 and up) still see all six.
+// Phones in Safari are 0.55-0.6 (svh, toolbars shown); an iPhone SE at the 560 px min-height is ~0.67.
+const PHONE_CAM = { position: [0, 1.45, 8.6], target: [0, 0.35, -1.0], hfov: 32 };
+const PHONE_AT = [0.6, 0.72];
+const PAN_MARGIN = 5;                        // degrees a drag can turn past the outer pieces' edges
+const PAN_NUDGE = [6, 2.4, 3.2];             // the hint on first view: [degrees right and back, seconds, start s]
+// Scroll. Where the live scene runs the hero is pinned for 0.7 of a screen, and site.html feeds 0..1 over the
+// first 0.7 of that stretch (setScroll). All in the scene's own language, nothing flashy: the camera leans in,
+// the stone blocks answer in a ripple out from the Cyrus Cylinder while the pieces rise a little on their
+// platforms, then the fog banks thicken and rise and the one light goes down. update() reads it through
+// scrollNow, which eases after the page, so a flick of the finger still moves the scene smoothly.
+const SCROLL = {
+  dolly: 0.14,          // how much nearer the camera comes, a share of its distance to the target: small, the bakes are view-dependent
+  dip: 0.25,            // how far the look drops as it leans in
+  ease: 5,              // per second: how fast the scene catches up with the page
+  rise: 0.18,           // how far a piece rises with its platform; Cyrus no more than LIFT_BY (the light hides behind it)
+  block: [0.06, 0.36],  // how far a free block's top moves, least and most; three in ten sink (0.6 of it) instead
+  reach: 14,            // the ripple: a block this far from the cylinder or more starts last
+  fog: [0.35, 0.5, 0.6], // the fog: [starts at, extra density, extra height of the banks]
+  dim: [0.55, 0.55],    // the light: [starts at, how much of it goes]
+};
 const WAKE_LIFE = 1.4;                       // seconds for the cursor's wake in the fog to close to a third
 const WAKE_STEP = 0.08;                      // spacing of the wake along the cursor's path, in canvas halves
 const MOTES = 420;                           // dust in the air round the light
@@ -52,6 +83,7 @@ const ENTER = {                                // [delay s, distance below rest,
 };
 const TILE_IN = { share: 0.36, min: 0.05, max: 0.2, delay: [0.5, 1.9], dur: [1.2, 1.9] };
 const outCubic = x => { x = Math.min(1, Math.max(0, x)); return 1 - (1 - x) * (1 - x) * (1 - x); };
+const smooth = (a, b, x) => { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
 
 // RIG: a piece with moving parts (see blender/hero/pieces.py, "moving parts"). COLOR_0 red = part / 8; per part
 // uRigP = pivot and mode (w 0 turns, 1 hangs), uRigA = axis and angle (radians), uRigH = anchor and the part
@@ -94,6 +126,7 @@ void main(){
 const BOARD_VS = `
 attribute float aLift; uniform float uLiftAmt[6];
 attribute vec3 aIn; uniform float uInT;      // entrance: a block's top starts aIn.x off its height, settles after aIn.y s over aIn.z s
+attribute vec2 aScr; uniform float uScroll; uniform float uNearZ;   // scroll: a free block's top moves aScr.y, starting at aScr.x
 varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
 void main(){
   vUv = uv; vWN = normalize(mat3(modelMatrix) * normal);
@@ -101,13 +134,15 @@ void main(){
   vBaseY = w.y;
   if (aLift > -0.5) w.y += uLiftAmt[int(aLift + 0.5)];
   if (aIn.z > 0.0) { float x = 1.0 - clamp((uInT - aIn.y) / aIn.z, 0.0, 1.0); w.y += aIn.x * x * x * x; }
+  // the ripple; blocks right in front of the lens stay put (they would loom), fading in from uNearZ back
+  if (aScr.y != 0.0) { float s = smoothstep(aScr.x, aScr.x + 0.35, uScroll); w.y += aScr.y * s * (1.0 - smoothstep(uNearZ - 3.0, uNearZ, w.z)); }
   vWorld = w.xyz;
   vec4 mv = viewMatrix * w;
   vDepth = -mv.z;
   gl_Position = projectionMatrix * mv;
 }`;
 const BOARD_FS = `
-uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte;
+uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte; uniform float uLightK;
 varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
@@ -122,7 +157,7 @@ void main(){
   if (n.y < 0.5) {
     vec3 q = uLight - vWorld; float d2 = dot(q, q);
     float lam = max(dot(n, q * inversesqrt(d2)), 0.0) / (1.0 + d2 * 0.35);
-    c = (vec3(0.0075, 0.0085, 0.0115) + vec3(0.014, 0.016, 0.021) * lam) * (0.45 + 0.55 * smoothstep(-0.5, 0.3, vWorld.y));
+    c = (vec3(0.0075, 0.0085, 0.0115) + vec3(0.014, 0.016, 0.021) * lam * uLightK) * (0.45 + 0.55 * smoothstep(-0.5, 0.3, vWorld.y));
   }
   // the board has no edge: its outer blocks sink into the fog
   vec2 e = abs(vWorld.xz - uCentre) / uHalf;
@@ -182,6 +217,7 @@ uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uFull;
 uniform float uNear; uniform float uFar; uniform float uTime; uniform float uDrift;
 uniform vec3 uP[6]; uniform vec3 uLight; uniform vec3 uLightCol; uniform vec3 uAmb;
 uniform vec4 uOcc[6]; uniform vec2 uOccY[6]; uniform float uShadowFloor; uniform float uKnee; uniform float uJitT;
+uniform float uDense; uniform float uRise; uniform float uLightK;     // scroll: thicker, taller banks; the light going down
 varying vec2 vUv;
 const int STEPS = 16;
 ${LIGHT_VIS}
@@ -200,7 +236,7 @@ float fine(vec3 p, float lo){
 }
 float bank(vec3 p, float lo, float hi){
   float top = 0.5 + 2.8 * smoothstep(0.40, 0.72, lo);       // a thick bank also stands taller
-  float h = 1.0 - smoothstep(0.0, top, p.y);
+  float h = 1.0 - smoothstep(0.0, top + uRise, p.y);        // TOP still caps it
   // more of it lies behind the pieces than between them and the eye
   return smoothstep(0.40, 0.68, lo * 0.62 + hi * 0.38) * h * h * mix(0.08, 1.0, smoothstep(1.5, -4.0, p.z));
 }
@@ -240,7 +276,7 @@ void main(){
       float lo = low(pn);
       float hi = fine(pn, lo);
       // fog thins where it meets a piece, as it does around anything standing in moving air
-      float b = bank(p, lo, hi) * (1.0 - 0.55 * min(part, 1.0));
+      float b = bank(p, lo, hi) * uDense * (1.0 - 0.55 * min(part, 1.0));
       // wisps: a third, finer layer eats into the banks and drifts faster, so their edges fray like smoke
       float tw = uTime * uDrift;
       b *= 0.45 + 1.1 * texture(tNoise, pn * vec3(0.85, 1.25, 0.85) + vec3(lo * 0.8 + tw * 0.045, -tw * 0.018, tw * 0.028)).r;
@@ -263,7 +299,7 @@ void main(){
     }
   }
   // fog in a piece's shadow is near black, as in Blender: the dim ambient is almost all that is left there
-  vec3 S = uAmb * Sa + uLightCol * Sl;
+  vec3 S = uAmb * Sa + uLightCol * uLightK * Sl;
   // a shoulder: a bank drifting across the light glows, it never burns out to a white patch that travels
   S /= 1.0 + dot(S, vec3(0.3333)) * uKnee;
   gl_FragColor = vec4(sqrt(S), T);
@@ -519,7 +555,7 @@ void main(){
   gl_PointSize = sz;
 }`;
 const MOTE_FS = `
-uniform vec3 uCol; uniform float uGain; uniform sampler2D tDepth; uniform vec2 uFull; uniform float uNear; uniform float uFar;
+uniform vec3 uCol; uniform float uGain; uniform float uLightK; uniform sampler2D tDepth; uniform vec2 uFull; uniform float uNear; uniform float uFar;
 varying float vI; varying float vZ; varying float vSharp;
 void main(){
   vec2 c = gl_PointCoord * 2.0 - 1.0; float r2 = dot(c, c);
@@ -529,7 +565,7 @@ void main(){
   if (vZ > z + 0.05) discard;         // behind a piece or the board
   // in focus a soft dot; out of focus a flat disc with a soft rim, like a lens draws it
   float a = mix(1.0 - smoothstep(0.5, 1.0, r2), exp(-r2 * 4.0) * 2.5, vSharp);
-  gl_FragColor = vec4(uCol * (vI * uGain * a), 1.0);
+  gl_FragColor = vec4(uCol * (vI * uGain * uLightK * a), 1.0);
 }`;
 
 // A 64-cube of smooth noise that tiles in every direction: two octaves of value noise.
@@ -598,6 +634,7 @@ export async function mountHero(stage, layout, opts = {}) {
 
   const scene = new THREE.Scene();
   const hazeU = { value: new THREE.Vector3(...HAZE) };
+  const lightK = { value: 1 };          // the light's strength under scroll (SCROLL.dim): fog, block sides and dust share it
 
   // backdrop: the night behind the board, blue-black at the horizon melting up into the ground colour.
   // The fog pass lights it around the hidden light.
@@ -627,7 +664,8 @@ export async function mountHero(stage, layout, opts = {}) {
       boardMesh = o;
       o.material = new THREE.ShaderMaterial({
         vertexShader: BOARD_VS, fragmentShader: BOARD_FS,
-        uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uInT: { value: 0 }, uMatte: { value: 0.0 }, uLight: { value: new THREE.Vector3(...LIGHT) },
+        uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uInT: { value: 0 }, uMatte: { value: 0.0 },
+          uScroll: { value: 0 }, uNearZ: { value: 99 }, uLightK: lightK, uLight: { value: new THREE.Vector3(...LIGHT) },
           uCentre: { value: new THREE.Vector2(layout.board.center[0], layout.board.center[1]) },
           uHalf: { value: new THREE.Vector2(layout.board.size[0] / 2, layout.board.size[1] / 2) } },
       });
@@ -698,12 +736,18 @@ export async function mountHero(stage, layout, opts = {}) {
     // the entrance: about a third of the free blocks start a little high or low and settle once. Picked by a
     // fixed hash of the tile, so it is the same composition every visit. Platforms (Cyrus's too) stay out.
     const ain = new Float32Array(pos.count * 3), T = TILE_IN;
+    // the scroll ripple: every free block, starting later the farther it is from the cylinder, each by its own
+    // amount, most up and some down. Worked out here in float64 and stored: a GPU sin-hash would not match.
+    const ascr = new Float32Array(pos.count * 2), c0 = state.cyrus.at, S = SCROLL;
     const hash = (x, z, n) => { const h = Math.sin(x * 127.1 + z * 311.7 + n * 74.7) * 43758.5453; return h - Math.floor(h); };
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(boardMesh.matrixWorld);
       if (v.y < -0.3) continue;
       const ix = Math.round(v.x / TILE), iz = Math.round(v.z / TILE);
       if (IDS.some(id => Math.abs(ix * TILE - state[id].at.x) < REACH && Math.abs(iz * TILE - state[id].at.z) < REACH)) continue;
+      const amp = S.block[0] + (S.block[1] - S.block[0]) * hash(ix, iz, 6);
+      ascr[i * 2] = Math.min(1, Math.hypot(ix * TILE - c0.x, iz * TILE - c0.z) / S.reach) * 0.5 + 0.15 * hash(ix, iz, 5);
+      ascr[i * 2 + 1] = hash(ix, iz, 7) < 0.3 ? -0.6 * amp : amp;
       if (hash(ix, iz, 0) > T.share) continue;
       const mag = T.min + (T.max - T.min) * hash(ix, iz, 1);
       ain[i * 3] = hash(ix, iz, 2) < 0.5 ? -mag : mag;
@@ -711,12 +755,15 @@ export async function mountHero(stage, layout, opts = {}) {
       ain[i * 3 + 2] = T.dur[0] + (T.dur[1] - T.dur[0]) * hash(ix, iz, 4);
     }
     boardMesh.geometry.setAttribute("aIn", new THREE.BufferAttribute(ain, 3));
+    boardMesh.geometry.setAttribute("aScr", new THREE.BufferAttribute(ascr, 2));
+    // the pieces rise as the ripple reaches their platforms
+    for (const id of IDS) state[id].riseAt = Math.min(1, Math.hypot(state[id].at.x - c0.x, state[id].at.z - c0.z) / S.reach) * 0.5 + 0.05;
   }
 
   // camera
   const camera = new THREE.PerspectiveCamera(30, 1, 0.5, 60);
   const camBase = new THREE.Vector3(), camTarget = new THREE.Vector3();
-  let focusBase = 10, focusNow = 0;
+  let focusNow = 0;
 
   // the scene: 4x MSAA. Three resolves colour (smooth outlines) and depth (one sample) into textures.
   // half float where it can render to it, so the view depth in alpha (see POST_FS) keeps its precision
@@ -785,8 +832,12 @@ export async function mountHero(stage, layout, opts = {}) {
   // it moves L* by the same amount on the sky, the lit floor and the ivory. Overlay (the skill's own pick for a
   // CSS layer, solved from colours read off this frame) gave the sky 0.86 but the lit floor 3.9, so it is
   // kept only to compare. Then opacity on standard / HDR screens / the high-contrast setting.
+  // touch screens: one ladder for the whole mount, so `level` is always one of its entries (indexOf never -1)
+  const COARSE = matchMedia("(pointer:coarse)").matches;
+  const LADDER = COARSE ? TOUCH_LEVELS : LEVELS;
   const GRAIN = { subtle: [2, 5.5, 4.7, 3.85], medium: [2, 9.0, 7.65, 6.3], strong: [2, 16.0, 13.6, 11.2], overlay: [0, 0.96, 0.82, 0.67] };
-  let grainLevel = (new URLSearchParams(location.search).get("grain") || "medium").toLowerCase();
+  // phones default to subtle: one grain cell is ~1 CSS px at any pixel ratio, so 3 device px on a 3x screen
+  let grainLevel = (new URLSearchParams(location.search).get("grain") || (COARSE ? "subtle" : "medium")).toLowerCase();
   let grainReady = false;
   function setGrain(level) {
     grainLevel = level in GRAIN || level === "off" ? level : "medium";
@@ -842,7 +893,8 @@ export async function mountHero(stage, layout, opts = {}) {
       uNear: { value: camera.near }, uFar: { value: camera.far }, uTime: { value: 0 },
       uP: { value: IDS.map(id => state[id].centre) },
       uLight: { value: new THREE.Vector3(...LIGHT) },
-      uLightCol: { value: new THREE.Vector3(...LIGHT_COL) },
+      uLightCol: { value: new THREE.Vector3(...LIGHT_COL) }, uLightK: lightK,
+      uDense: { value: 1 }, uRise: { value: 0 },
       uAmb: { value: new THREE.Vector3(...FOG_AMB) },
       ...wakeU,
     },
@@ -866,7 +918,7 @@ export async function mountHero(stage, layout, opts = {}) {
       uTime: fogMat.uniforms.uTime, uScale: { value: 1000 }, uLight: fogMat.uniforms.uLight,
       uOcc: fogMat.uniforms.uOcc, uOccY: fogMat.uniforms.uOccY,
       uLo: { value: new THREE.Vector3(-1.9, 0.3, -3.4) }, uSize: { value: new THREE.Vector3(3.8, 2.6, 4.0) },
-      uCol: { value: new THREE.Vector3(0.80, 0.86, 1.0) }, uGain: { value: 1.2 },
+      uCol: { value: new THREE.Vector3(0.80, 0.86, 1.0) }, uGain: { value: 1.2 }, uLightK: lightK,
       uFocus: postMat.uniforms.uFocus, uAperture: postMat.uniforms.uAperture, uMaxR: postMat.uniforms.uMaxR,
       tDepth: { value: rt.depthTexture }, uFull: postMat.uniforms.uFull, uNear: { value: camera.near }, uFar: { value: camera.far },
       ...wakeU,
@@ -880,31 +932,66 @@ export async function mountHero(stage, layout, opts = {}) {
   postMat.uniforms.tFog.value = fogRT.texture;
   disposables.push(fogRT, noiseTex, fogMat);
 
-  let W = 1, H = 1, current = null;
+  let W = 1, H = 1, current = null, phone = 0, panLo = 0, panHi = 0, boxesDirty = true;
+  const camV = new THREE.Vector3();
   function setOrientation(o) {
     current = o;
     const v = layout[o], c = v.camera, aspect = W / H;
-    camBase.fromArray(c.position); camTarget.fromArray(c.target);
     // match the poster, which always fits the width: keep the horizontal view at every aspect
-    const half = Math.tan((c.fovY * DEG) / 2);
-    camera.fov = (2 * Math.atan((half * v.aspect) / aspect)) / DEG;
+    const fitH = 2 * Math.atan(Math.tan((c.fovY * DEG) / 2) * v.aspect);
+    // narrow portrait: blend to the closer phone camera (PHONE_CAM), horizontal view and all
+    const x = o === "portrait" ? Math.min(1, Math.max(0, (PHONE_AT[1] - aspect) / (PHONE_AT[1] - PHONE_AT[0]))) : 0;
+    phone = x * x * (3 - 2 * x);
+    camBase.fromArray(c.position).lerp(camV.fromArray(PHONE_CAM.position), phone);
+    camTarget.fromArray(c.target).lerp(camV.fromArray(PHONE_CAM.target), phone);
+    const hfov = fitH + (PHONE_CAM.hfov * DEG - fitH) * phone;
+    camera.fov = (2 * Math.atan(Math.tan(hfov / 2) / aspect)) / DEG;
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
-    focusBase = camBase.distanceTo(state[layout.focusId].centre);
+    // how far a drag may turn each way: until the outermost piece's edge is PAN_MARGIN inside the frame
+    panLo = panHi = 0;
+    if (phone > 0) {
+      const look = Math.atan2(camTarget.x - camBase.x, camBase.z - camTarget.z);
+      for (const id of IDS) {
+        const b = state[id].box;
+        for (const bx of [b.min.x, b.max.x]) for (const bz of [b.min.z, b.max.z]) {
+          const a = Math.atan2(bx - camBase.x, camBase.z - bz) - look;
+          panHi = Math.max(panHi, a + PAN_MARGIN * DEG - hfov / 2);
+          panLo = Math.max(panLo, -a + PAN_MARGIN * DEG - hfov / 2);
+        }
+      }
+    }
+    panGoal = Math.min(panHi, Math.max(-panLo, panGoal));
+    boxesDirty = true;
+    // depth of field and the wide glow are sized by the focal length in backing pixels, not the buffer
+    // height: a portrait phone shows the board at its width, so a height rule blurred it ~3x too much there.
+    // FOCAL_REF is the landscape camera's focal length at 1080 px high, so a 16:9 window is as before.
+    // Landscape keeps the old height rule exactly, so a 16:10 desktop looks as it did.
+    const fpx = postMat.uniforms.uFull.value.y / (2 * Math.tan((camera.fov * DEG) / 2));
+    const k = o === "landscape" ? postMat.uniforms.uFull.value.y / 1080 : fpx / FOCAL_REF;
+    postMat.uniforms.uMaxR.value = 13 * k;           // shared with the motes
+    wideSigma = (1080 * k) / 60 / 8;                  // the posters' wide glow: sigma ~ h/60 at 16:9, in eighth-size texels
+    moteMat.uniforms.uScale.value = fpx;
   }
-  let level = LEVELS[0], fogDiv = FOG_DIV, readout = null, fpsAvg = 60, picked = true;
+  const FOCAL_REF = 1080 / (2 * Math.tan((layout.landscape.camera.fovY * DEG) / 2));
+  let level = LADDER[0], fogDiv = FOG_DIV, readout = null, fpsAvg = 60, picked = true;
   function showReadout() {
-    const i = LEVELS.indexOf(level), names = ["full", "medium", "low"];
-    readout.textContent = "SHARPNESS " + (i + 1) + "/" + LEVELS.length + " (" + names[i] + (picked ? ", auto" : ", forced") + ")\n"
+    const i = LADDER.indexOf(level), names = ["full", "medium", "low"];
+    readout.textContent = "SHARPNESS " + (i + 1) + "/" + LADDER.length + " (" + names[i] + (picked ? ", auto" : ", forced") + ")\n"
       + canvas.width + " x " + canvas.height + "  ·  screen " + (window.devicePixelRatio || 1).toFixed(2) + "x\n"
       + Math.round(fpsAvg) + " fps  ·  keys 1 2 3 switch";
   }
+  let lastW = 0, lastH = 0, lastPr = 0;
   function resize() {
-    W = Math.max(1, stage.clientWidth); H = Math.max(1, stage.clientHeight);
-    const coarse = matchMedia("(pointer:coarse)").matches;
+    const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
     // a soft, foggy image hides the difference; the GPU does not. Cap the pixel ratio, and the total pixel
     // count too, so a big window or a 4K screen costs no more than ~2160x1390.
-    const pr = Math.min(window.devicePixelRatio || 1, coarse ? 1.25 : level[0], Math.sqrt(level[1] / (W * H)));
+    const pr = Math.min(window.devicePixelRatio || 1, level[0], Math.sqrt(level[1] / (w * h)));
+    // iOS fires resize whenever the Safari toolbar shows or hides while scrolling, though the svh stage keeps
+    // its size. setSize would clear and reallocate the drawing buffer (and drop a tap hover) each time. A level
+    // change always passes: it changes pr.
+    if (w === lastW && h === lastH && pr === lastPr && current === orientation()) return;
+    W = lastW = w; H = lastH = h; lastPr = pr;
     renderer.setPixelRatio(pr);
     renderer.setSize(W, H, false);
     fxaaMat.uniforms.uGrainPx.value = Math.round(200 * pr); drawGrain(200 * pr);   // the CSS tile (200 CSS px) in backing pixels
@@ -923,14 +1010,12 @@ export async function mountHero(stage, layout, opts = {}) {
     brightMat.uniforms.uSrcPx.value.set(1 / bw, 1 / bh);
     down8Mat.uniforms.uSrcPx.value.set(1 / qw, 1 / qh);
     fxaaMat.uniforms.uTightPx.value.set(1 / qw, 1 / qh);
-    wideSigma = bh / 60 / 8;          // the posters' wide glow: sigma ~ h/60
     postMat.uniforms.uFogSize.value.set(lw, lh);
     postMat.uniforms.uFull.value.set(bw, bh);
     postMat.uniforms.uPx.value.set(1 / bw, 1 / bh);
     fxaaMat.uniforms.uPx.value.set(1 / bw, 1 / bh);
-    postMat.uniforms.uMaxR.value = (bh / 1080) * 13;
-    setOrientation(orientation());
-    moteMat.uniforms.uScale.value = bh / (2 * Math.tan((camera.fov * DEG) / 2));
+    setOrientation(orientation());        // also sizes the depth of field, the wide glow and the motes
+    Object.assign(handle, { pr, buf: canvas.width + "x" + canvas.height, phone: Math.round(phone * 100) / 100 });
     if (typeof hoverFromPointer === "function" && hoverId) { touchHover = null; hoverFromPointer(null); }
   }
 
@@ -938,15 +1023,24 @@ export async function mountHero(stage, layout, opts = {}) {
   const ndc = new THREE.Vector2(), pointer = new THREE.Vector2(), drift = new THREE.Vector2();
   const fine = matchMedia("(pointer:fine)");
   const ray = new THREE.Raycaster(), hit = new THREE.Vector3(), tmp = new THREE.Vector3();
-  let hoverId = null, scrollP = 0, touchHover = null, touchTimer = 0;
+  let hoverId = null, scrollP = 0, scrollNow = 0, scrollFed = false, pickS = 0, touchHover = null, touchTimer = 0;
+  const lastMouse = { clientX: 0, clientY: 0 };
   let pointerIn = false, wakeSpeed = 0, igT = 0, igHold = -1;
   const wakeAge = new Float32Array(WAKE_N).fill(99), wakePeak = new Float32Array(WAKE_N);
   const wakeAt = new THREE.Vector2(), wakePrev = new THREE.Vector3(), wakeTmp = new THREE.Vector3();
   let running = false, raf = 0, last = 0, t = 0, disposed = false, visible = true;
-  const handle = { canvas, pieces, camera, frameCount: 0 };
+  // the phone pan (see PHONE_CAM): the look turns about the camera's own position. panGoal is where the
+  // finger (or the glide after it) puts it, panNow eases after; radians, positive looks right.
+  let panGoal = 0, panNow = 0, panVel = 0, drag = null, nudge = -1, boxKey = NaN, boxAt = 0;
+  const UP = new THREE.Vector3(0, 1, 0);
+  // render state for ?why: the rung ladder, scene target MSAA and half float (post targets checked apart)
+  const handle = { canvas, pieces, camera, frameCount: 0, ladder: COARSE ? "touch" : "desk",
+    msaa: Math.min(rt.samples, renderer.capabilities.maxSamples), half: rt.texture.type === THREE.HalfFloatType, halfPost: halfFloat };
 
   function setHover(id) { hoverId = id && state[id] ? id : null; }
-  function setScroll(p) { scrollP = Math.min(1, Math.max(0, p)); }
+  // the raw scroll position (0..1 of the pinned stretch); the first one is taken as is, so a reload partway down
+  // starts where the page is
+  function setScroll(p) { scrollP = Math.min(1, Math.max(0, p || 0)); if (!scrollFed) { scrollFed = true; scrollNow = scrollP; } }
   function pick(e) {
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
@@ -973,20 +1067,48 @@ export async function mountHero(stage, layout, opts = {}) {
   function clearTouch() { clearTimeout(touchTimer); touchHover = null; hoverFromPointer(null); }
 
   let down = null;
+  // A sideways drag turns the view where the phone framing leaves pieces outside the frame (panLo/panHi).
+  // The canvas keeps touch-action:pan-y, so an upright drag still scrolls the page: the browser takes it and
+  // sends pointercancel. Past 8 px, mostly sideways, it is a drag and no longer a tap.
   on(canvas, "pointermove", e => {
-    if (e.pointerType !== "mouse") return;
+    if (!down || down.id !== e.pointerId || panLo + panHi <= 0) return;
+    if (e.pointerType === "mouse" && !(e.buttons & 1)) return;
+    const now = performance.now();
+    if (!drag) {
+      const dx = e.clientX - down.x, dy = e.clientY - down.y;
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+      drag = { x: e.clientX, from: Math.min(panHi, Math.max(-panLo, panNow)), px: e.clientX, pt: now };
+      nudge = -2; panVel = 0;                        // they found it: no hint
+      if (e.pointerType === "mouse") { try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* gone */ } }
+    }
+    // the board stays under the finger: the canvas width is the horizontal view
+    const per = (2 * Math.atan(Math.tan((camera.fov * DEG) / 2) * camera.aspect)) / W;
+    panGoal = Math.min(panHi, Math.max(-panLo, drag.from - (e.clientX - drag.x) * per));
+    panVel += ((-(e.clientX - drag.px) * per * 1000) / Math.max(1, now - drag.pt) - panVel) * 0.5;
+    drag.px = e.clientX; drag.pt = now;
+  });
+  on(canvas, "pointermove", e => {
+    if (e.pointerType !== "mouse" || drag) return;
     const r = canvas.getBoundingClientRect();
     pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1);
+    lastMouse.clientX = e.clientX; lastMouse.clientY = e.clientY; pickS = scrollNow;
     if (!pointerIn) { pointerIn = true; wakeAt.copy(pointer); wakePrev.set(0, 0, 0); }
     hoverFromPointer(pick(e));
   });
   on(canvas, "pointerleave", e => { if (e.pointerType === "mouse") { pointer.set(0, 0); pointerIn = false; hoverFromPointer(null); } });
   on(canvas, "pointerdown", e => {
     if (e.button !== 0 || e.isPrimary === false) { down = null; return; }
-    down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType };
+    down = { x: e.clientX, y: e.clientY, t: performance.now(), type: e.pointerType, id: e.pointerId };
+    if (!drag) panVel = 0;                           // a touch catches the glide
   });
   on(canvas, "pointerup", e => {
     if (!down) return;
+    if (drag) {
+      // let go: it glides on (update()) unless the finger had stopped
+      if (performance.now() - drag.pt > 80) panVel = 0;
+      drag = null; down = null;
+      return;
+    }
     const quick = down.type === "mouse" || performance.now() - down.t < 300;
     const tap = quick && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 10;
     const type = down.type; down = null;
@@ -999,10 +1121,10 @@ export async function mountHero(stage, layout, opts = {}) {
     touchHover = id; hoverFromPointer(id);
     if (id) touchTimer = setTimeout(clearTouch, 4000);
   });
-  on(canvas, "pointercancel", () => { down = null; });
+  on(canvas, "pointercancel", () => { down = null; drag = null; });
   on(window, "blur", () => { pointer.set(0, 0); pointerIn = false; clearTouch(); });
   on(window, "scroll", () => { if (touchHover) clearTouch(); }, { passive: true });
-  on(window, "resize", resize);
+  on(window, "resize", () => resize());
 
   function exit(reason) {
     if (disposed) return;
@@ -1014,23 +1136,58 @@ export async function mountHero(stage, layout, opts = {}) {
   function update(dt) {
     t += dt;
     // camera: a small arc with the mouse (DRIFT_YAW / DRIFT_PITCH degrees at the canvas edge), easing behind it,
-    // and it sinks as the hero scrolls away. The arc is a few degrees about the target, small enough that the
-    // view-dependent bakes still hold; the light stays put in the world, so the halo moves as parallax would.
+    // and it leans in as the hero is scrolled (SCROLL.dolly, SCROLL.dip), from wherever the base camera is
+    // (phone framing included; camBase itself never moves). The arc is a few degrees about the target, small
+    // enough that the view-dependent bakes still hold; the light stays put in the world, so the halo moves as
+    // parallax would.
+    const sWas = scrollNow;
+    scrollNow += (scrollP - scrollNow) * (1 - Math.exp(-dt * SCROLL.ease));
+    if (Math.abs(scrollP - scrollNow) < 1e-4) scrollNow = scrollP;
+    const sp = scrollNow, se = sp < 0.5 ? 4 * sp * sp * sp : 1 - Math.pow(2 - 2 * sp, 3) / 2;
     const de = 1 - Math.exp(-dt * 3.5), canDrift = fine.matches;
     drift.x += ((canDrift ? pointer.x : 0) - drift.x) * de;
     drift.y += ((canDrift ? pointer.y : 0) - drift.y) * de;
     tmp.copy(camBase).sub(camTarget);
-    const radius = tmp.length();
+    const radius = tmp.length() * (1 - SCROLL.dolly * se);
     const yaw = Math.atan2(tmp.x, tmp.z) - drift.x * DRIFT_YAW * DEG;
     const pitch = Math.asin(tmp.y / radius) + drift.y * DRIFT_PITCH * DEG;
     camera.position.set(
       camTarget.x + radius * Math.cos(pitch) * Math.sin(yaw),
-      camTarget.y + radius * Math.sin(pitch) - 0.5 * scrollP,
+      camTarget.y + radius * Math.sin(pitch),
       camTarget.z + radius * Math.cos(pitch) * Math.cos(yaw));
-    tmp.copy(camTarget); tmp.y += 0.35 * scrollP;
+    tmp.copy(camTarget); tmp.y -= SCROLL.dip * se;
     camera.lookAt(tmp);
+    // the phone pan: a glide after the finger lets go, then the look turns about the camera's own position.
+    // The hint on first view (PAN_NUDGE) turns it a few degrees right and back, once, unless they drag first.
+    if (!drag && panVel) {
+      const g = panGoal + panVel * dt;
+      panGoal = Math.min(panHi, Math.max(-panLo, g));
+      panVel = g !== panGoal || Math.abs(panVel) < 1e-3 ? 0 : panVel * Math.exp(-dt * 5);
+    }
+    let hint = 0;
+    if (nudge === -1 && panHi > 0 && igT >= PAN_NUDGE[2]) nudge = matchMedia("(prefers-reduced-motion: reduce)").matches ? -2 : 0;
+    if (nudge >= 0) {
+      nudge += dt;
+      const x = nudge / PAN_NUDGE[1];
+      if (x >= 1) nudge = -2;
+      else hint = Math.min(panHi, PAN_NUDGE[0] * DEG) * (0.5 - 0.5 * Math.cos(2 * Math.PI * x));
+    }
+    const panWas = panNow;
+    panNow += (panGoal + hint - panNow) * (drag || hint ? 1 : 1 - Math.exp(-dt * 12));
+    if (Math.abs(panNow) < 1e-6) panNow = 0;
+    if (panNow) camera.rotateOnWorldAxis(UP, -panNow);
     camera.updateMatrixWorld();
-    if (hoverId && Math.abs(drift.x - pointer.x) + Math.abs(drift.y - pointer.y) > 1e-3) labelAt(hoverId);
+    if (hoverId && (Math.abs(drift.x - pointer.x) + Math.abs(drift.y - pointer.y) > 1e-3 || Math.abs(panNow - panWas) > 1e-5
+      || Math.abs(scrollNow - sWas) > 1e-4)) labelAt(hoverId);
+    // the wheel moves the scene under a still mouse: look again at what is under it
+    if (pointerIn && canDrift && !drag && Math.abs(scrollNow - pickS) > 2e-3) { pickS = scrollNow; hoverFromPointer(pick(lastMouse)); }
+    // the scroll's board and air: the ripple (none right in front of the lens), the banks thicken and rise
+    // from SCROLL.fog[0], the light goes down from SCROLL.dim[0]
+    const bu = boardMesh.material.uniforms, fc = smooth(SCROLL.fog[0], 1, sp);
+    bu.uScroll.value = sp; bu.uNearZ.value = camera.position.z - 1.5;
+    fogMat.uniforms.uDense.value = 1 + SCROLL.fog[1] * fc;
+    fogMat.uniforms.uRise.value = SCROLL.fog[2] * fc;
+    lightK.value = 1 - SCROLL.dim[1] * smooth(SCROLL.dim[0], 1, sp);
 
     // the entrance: the light comes up, pieces rise, blocks settle (replay from the console: heroLive.ignite(); heroLive.ignite(1.5) holds it at 1.5 s)
     igT = igHold >= 0 ? igHold : igT + dt;
@@ -1089,7 +1246,10 @@ export async function mountHero(stage, layout, opts = {}) {
         s.lift += (to - s.lift) * ease;
         if (id === hoverId) labelAt(id);
       } else s.lift = to;
-      const up = s.lift + sunk;
+      // the scroll: the piece rises with its platform as the ripple reaches it. Cyrus only as high as its hover,
+      // and the two do not add: the light is hidden right behind the cylinder and must stay hidden.
+      const capped = id in LIFT_BY, rise = (capped ? Math.min(SCROLL.rise, LIFT_BY[id]) : SCROLL.rise) * smooth(s.riseAt, s.riseAt + 0.35, sp);
+      const up = (capped ? Math.max(s.lift, rise) : s.lift + rise) + sunk;
       s.up = up; liftAmt[k] = up;
       pieces[id].position.y = s.pieceY + up; s.plinth.position.y = s.plinthY + up;
       occY[k].y = s.box.max.y + up;
@@ -1112,10 +1272,38 @@ export async function mountHero(stage, layout, opts = {}) {
         }
       }
     });
-    const focusTo = hoverId ? camera.position.distanceTo(state[hoverId].centre) : focusBase;
+    // from where the camera is now (phone framing, scroll, drift), so Cyrus stays sharp wherever it stands
+    const focusTo = camera.position.distanceTo(state[hoverId || layout.focusId].centre);
     focusNow = focusNow ? focusNow + (focusTo - focusNow) * (1 - Math.exp(-dt * 4)) : focusTo;
     postMat.uniforms.uFocus.value = focusNow;
     fogMat.uniforms.uTime.value = t;
+    // the page's link boxes follow the live view: at once after a resize, then at most every 0.12 s while the
+    // pan, the scroll or a piece's rise moves them (the last move always lands: the key still differs)
+    if (opts.onBoxes) {
+      let key = panNow + scrollNow * 10;
+      for (const id of IDS) key += (state[id].up || 0) * 3;
+      if (boxesDirty || (Math.abs(key - boxKey) > 1e-4 && t - boxAt > 0.12)) {
+        boxesDirty = false; boxKey = key; boxAt = t;
+        opts.onBoxes(boxes());
+      }
+    }
+  }
+  // each piece's box (piece and plinth, risen by its lift) through the live camera, in CSS px of the stage.
+  // on: its centre is inside the stage
+  function boxes() {
+    const out = {};
+    for (const id of IDS) {
+      const b = state[id].box, up = state[id].up || 0;
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        tmp.set(i & 1 ? b.max.x : b.min.x, (i & 2 ? b.max.y : b.min.y) + up, i & 4 ? b.max.z : b.min.z).project(camera);
+        const x = (tmp.x * 0.5 + 0.5) * W, y = (-tmp.y * 0.5 + 0.5) * H;
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+      const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      out[id] = { x: x0, y: y0, w: x1 - x0, h: y1 - y0, on: cx >= 0 && cx <= W && cy >= 0 && cy <= H };
+    }
+    return out;
   }
   function render() {
     renderer.setRenderTarget(rt);
@@ -1150,15 +1338,31 @@ export async function mountHero(stage, layout, opts = {}) {
     // never negative: the first frame after the mount test can carry a timestamp from before it, which ran
     // the entrance clock backwards by half a second
     const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0.016));
-    if (last) fpsAvg += (1000 / Math.max(now - last, 1) - fpsAvg) * 0.05;
+    if (last) { fpsAvg += (1000 / Math.max(now - last, 1) - fpsAvg) * 0.05; stepDown(now - last, now); }
     last = now;
     update(dt); render();
     if (readout && handle.frameCount % 20 === 0) showReadout();
     raf = requestAnimationFrame(frame);
   }
+  // Runtime step-down: the mount test runs cold, and a phone that heats up later would stay on its level.
+  // A smoothed frame interval that stays above 40 ms, or above 28 ms and erratic, for 3 s while drawing steps
+  // one level down, at most once per 5 s, never past the last level (never to the poster). A steady 33 ms is
+  // left alone: iOS Low Power Mode caps rAF at 30 fps on any GPU. Not while a level is forced by key.
+  let ivAvg = 16.7, ivJit = 0, badSince = 0, lastStep = 0;
+  function stepDown(iv, now) {
+    if (iv > 250) { badSince = 0; return; }           // a stall (tab switch, alert): no evidence either way
+    ivAvg += (iv - ivAvg) * 0.1; ivJit += (Math.abs(iv - ivAvg) - ivJit) * 0.1;
+    const bad = ivAvg > 40 || (ivAvg > 28 && ivJit > 6);
+    if (!bad) { badSince = 0; return; }
+    if (!badSince) badSince = now;
+    const i = LADDER.indexOf(level);
+    if (now - badSince < 3000 || now - lastStep < 5000 || !picked || i < 0 || i >= LADDER.length - 1) return;
+    lastStep = now; badSince = 0; ivAvg = 16.7; ivJit = 0;
+    handle.setLevel(i + 1); handle.stepped = (handle.stepped || 0) + 1;
+  }
   function start() {
     if (running || disposed || !visible || document.hidden) return;
-    running = true; last = performance.now();
+    running = true; last = performance.now(); badSince = 0;
     raf = requestAnimationFrame(frame);
   }
   function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
@@ -1182,9 +1386,9 @@ export async function mountHero(stage, layout, opts = {}) {
 
   // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
   // weights uTightK, uWideK, and uIgnite), .bright (bloom threshold uThresh), .motes (uGain, uCol); .ignite() replays the light
-  Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize,
+  Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize, boxes,
     ignite: s => { igHold = typeof s === "number" ? s : -1; if (igHold < 0) igT = 0; }, grain: setGrain, motes: moteMat.uniforms,
-    setLevel: i => { level = LEVELS[i] || level; handle.level = LEVELS.indexOf(level); resize(); },
+    setLevel: i => { level = LADDER[i] || level; handle.level = LADDER.indexOf(level); resize(); },
     board: boardMesh.material.uniforms, fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
 
   stage.appendChild(canvas);
@@ -1225,8 +1429,8 @@ export async function mountHero(stage, layout, opts = {}) {
   {
     const gl = renderer.getContext(), px = new Uint8Array(4);
     let ms = 0;
-    for (let i = 0; i < LEVELS.length; i++) {
-      if (i) { level = LEVELS[i]; resize(); }
+    for (let i = 0; i < LADDER.length; i++) {
+      if (i) { level = LADDER[i]; resize(); }
       // two warm-ups (shader compile, uploads, new buffers after a level change), then the median of seven
       // frames: one late frame (another tab, a compile finishing) must not send a good GPU to the poster
       const one = () => { const t0 = performance.now(); render(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return performance.now() - t0; };
@@ -1234,7 +1438,7 @@ export async function mountHero(stage, layout, opts = {}) {
       ms = Array.from({ length: 7 }, one).sort((a, b) => a - b)[3];
       if (ms <= level[2]) break;
     }
-    handle.level = LEVELS.indexOf(level); handle.mountMs = ms;
+    handle.level = LADDER.indexOf(level); handle.mountMs = ms;
     if (ms > level[2]) throw new Error("too slow");
   }
   // On localhost only: a small readout in the corner (which sharpness level, the buffer size, frames a
@@ -1248,7 +1452,7 @@ export async function mountHero(stage, layout, opts = {}) {
     stage.appendChild(readout);
     on(window, "keydown", e => {
       const i = ["1", "2", "3"].indexOf(e.key);
-      if (i < 0 || i >= LEVELS.length || e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+      if (i < 0 || i >= LADDER.length || e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
       picked = false; handle.setLevel(i); showReadout();
     });
     showReadout();

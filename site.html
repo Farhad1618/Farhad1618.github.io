@@ -27,8 +27,15 @@
       + (m("(prefers-reduced-motion: reduce)") ? " · REDUCED MOTION" : "") + (window.WebGL2RenderingContext ? "" : " · NO WEBGL2"));
     if (m("(prefers-reduced-motion: reduce)") || (weak && !forced) || !window.WebGL2RenderingContext || !window.fetch) { window.heroWhy("poster from the start" + (weak ? " (weak device)" : "")); return posterFirst(); }
     var html = document.documentElement;
-    window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait"); };
-    html.classList.add("hero-wait"); window.heroTry = true;
+    /* the poster is not pinned (see html.hero-pin in the styles), unless they have already scrolled into the
+       pinned stretch: taking the extra height away then would jump the page */
+    window.heroPosterBack = function(why){ window.heroWhy("poster back: " + (typeof why === "string" ? why : "timeout or failure")); clearTimeout(window.heroWaitTimer); html.classList.remove("hero-wait");
+      if (html.classList.contains("hero-pin") && (window.scrollY || 0) < innerHeight * 0.5) {
+        html.classList.remove("hero-pin");
+        if (window.heroPosterPush) window.heroPosterPush();
+        if (window.ScrollTrigger) window.ScrollTrigger.refresh();
+      } };
+    html.classList.add("hero-wait", "hero-pin"); window.heroTry = true;
     window.heroWaitTimer = setTimeout(function(){ window.heroPosterBack("6 s and the mount has not started"); }, 6000);
     var j = "https://cdn.jsdelivr.net/npm/three@0.170.0/", head = document.head || html;
     [["modulepreload", "hero.js"], ["modulepreload", j + "build/three.module.js"],
@@ -38,7 +45,7 @@
       if (r[0] === "preload") { l.as = "fetch"; l.crossOrigin = "anonymous"; }
       head.appendChild(l);
     });
-  } catch(e){ document.documentElement.classList.remove("hero-wait"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
+  } catch(e){ document.documentElement.classList.remove("hero-wait", "hero-pin"); window.heroTry = false; window.heroWhy && window.heroWhy("first-paint test threw: " + e); posterFirst(); }
   /* the poster is these devices' first paint: fetch it first. (The <img> itself carries no fetchpriority, so
      on devices that try the scene the hidden poster does not compete with three.js and pieces.glb.) */
   function posterFirst(){
@@ -52,18 +59,18 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,600;1,6..96,400&family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,200..500,0..100,0..1;1,9..144,200..500,0..100,0..1&family=IBM+Plex+Mono:wght@400;500&display=swap">
 
 <style>
 /* ============================================================
    FARHAD — one scrolling story page.
-   Sections: top, who, drive, work, paper, contact.
+   Sections: top, who, work, paper, contact.
    Content is visible without JS; hide-before-reveal only under html.motion.
    ============================================================ */
 :root{
   --ink:#0C0C0E; --ink-2:#18181C; --rule:#26262A; --rule-soft:#1B1B1E;
   --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --sig:#E9A03B; --trace:#5FA8B8;
-  --disp:'Bodoni Moda',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
+  --disp:'Bodoni Moda',serif; --who:'Fraunces',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
   --g:clamp(16px,4vw,56px);
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -80,16 +87,20 @@ body::after{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:50;
 @media (prefers-reduced-motion:reduce){body::after{animation:none}}
 @keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-4%,3%)}66%{transform:translate(3%,-5%)}100%{transform:translate(0,0)}}
 
-/* top bar */
-.progress{position:fixed;top:0;left:0;height:2px;width:100%;background:var(--sig);z-index:45;transform:scaleX(0);transform-origin:left}
 
 section{position:relative;padding:0 var(--g)}
 .chap{display:flex;gap:14px;align-items:center;margin-bottom:40px}
 .chap i{display:block;width:48px;height:1px;background:var(--rule)}
 
 /* 01 hero: a marble chessboard, one piece per project. Where the live scene (hero.js) will be tried, the hero
-   starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback. */
-.hero{height:100svh;min-height:560px;overflow:hidden;padding:0;text-align:center;background:var(--ink)}
+   starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback.
+   Everything sits in .hero-pin. Where the scene is tried (html.hero-pin, set with hero-wait) the hero is 170svh
+   and .hero-pin sticks for the extra 0.7 of a screen while the scene plays its scroll move (hero.js SCROLL).
+   Elsewhere (poster, reduced motion) both are one screen and nothing sticks. .hero itself must not clip
+   (overflow:hidden would make it the scroll box and sticky would never stick); .hero-pin clips instead. */
+.hero{height:100svh;min-height:560px;padding:0;text-align:center;background:var(--ink)}
+html.hero-pin .hero{height:170svh;min-height:952px}
+.hero-pin{position:sticky;top:0;height:100svh;min-height:560px;overflow:hidden}
 .hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
 /* the poster always fits the width, so no piece is ever cropped out; top and bottom melt into the ground */
 .hero-poster img{position:absolute;left:0;top:50%;width:100%;height:auto;transform:translateY(-50%);display:block;
@@ -99,11 +110,11 @@ html.hero-wait .hero-poster{opacity:0}
 .hero-stage{opacity:0;transition:opacity .9s ease}
 .hero.live .hero-stage{opacity:1}
 .hero-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
-.hero::before,.hero::after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
-.hero::before{top:0;height:34%;background:linear-gradient(180deg,var(--ink) 8%,transparent)}
+.hero-pin::before,.hero-pin::after{content:"";position:absolute;left:0;right:0;z-index:2;pointer-events:none}
+.hero-pin::before{top:0;height:34%;background:linear-gradient(180deg,var(--ink) 8%,transparent)}
 /* vignette: the edges fall away into the dark, the centre holds the light */
 .hero-view::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 58%,transparent 40%,rgba(8,8,11,.78) 100%)}
-.hero::after{bottom:0;height:18%;background:linear-gradient(0deg,var(--ink),transparent)}
+.hero-pin::after{bottom:0;height:18%;background:linear-gradient(0deg,var(--ink),transparent)}
 .hero-head{position:absolute;z-index:3;left:0;right:0;top:19%;pointer-events:none}
 .hero-mark{position:absolute;left:50%;bottom:100%;width:clamp(64px,7.5vw,104px);aspect-ratio:1;margin:0 0 clamp(14px,2.4vh,26px) calc(clamp(64px,7.5vw,104px) / -2);opacity:0;transition:opacity .4s}
 .hero-mark.on{opacity:1}
@@ -120,40 +131,45 @@ html.hero-wait .hero-poster{opacity:0}
 .hero.live .hero-pieces a{pointer-events:none}
 .hero-label{position:absolute;z-index:4;left:0;top:0;transform:translate(-50%,-100%);padding-bottom:12px;color:var(--bone);white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
 .hero-label.on{opacity:1}
+/* phones: a tighter title block (it ends at ~16% of the height, clear of the pieces, which the live scene's
+   closer phone camera puts at ~34-56%) and a wider vignette, so the outer pieces are not dimmed */
+@media (orientation:portrait) and (max-width:600px){
+  .hero-head{top:10svh}
+  .hero-mark{width:44px;margin:0 0 10px -22px}
+  .hero-title{font-size:22px}
+  .hero .sub{margin-top:8px;font-size:9.5px}
+  .hero-pin::before{height:22%}
+  .hero-view::after{background:radial-gradient(ellipse 110% 70% at 50% 50%,transparent 40%,rgba(8,8,11,.78) 100%)}
+}
 .line{display:block;overflow:hidden;padding:0 .14em .06em 0;margin-right:-.14em}
 .line>span{display:block}
 html.motion .line>span{transform:translateY(105%)}
 
-/* 02 who: a centred headline with live "windows" set into the sentence. Each pill unfolds from an amber dot
-   on the baseline; the words around it part to make room. Pill contents are sized to the open pill and centred,
-   so the opening reads as an aperture, not a squash. */
-.who{padding-top:22vh;padding-bottom:20vh;text-align:center}
-.who .chap{justify-content:center;flex-wrap:wrap}
-.who-head{font-family:var(--disp);font-weight:400;font-size:clamp(32px,10vw,116px);line-height:1.08;letter-spacing:-.02em;margin:0 auto 5vh}
+/* 02 who: an editorial staircase set in Fraunces (variable: soft roman, wonky italic), used only here.
+   A small name line, then the statement: line two flush left, line three flush right.
+   Each pill is always full size in the layout (nothing reflows); it opens from an amber dot by clip-path,
+   so the reveal is transform/clip only. "chaos" arrives as scattered letters that settle into the word. */
+.who{padding-top:24vh;padding-bottom:22vh;text-align:center}
+.who-in{max-width:1560px;margin:0 auto}
+.who-head{font-family:var(--who);font-weight:300;font-variation-settings:"opsz" 144,"SOFT" 50,"WONK" 0;
+  font-size:clamp(32px,9vw,116px);line-height:1.08;letter-spacing:-.035em;margin:0 auto;color:var(--bone)}
 .who-head .ln{display:block;white-space:nowrap}
 .who-head .w{display:inline-block}
-.who-head em{font-style:italic;color:var(--dim)}
-.who-head em.sig{color:var(--sig)}
-.pill{--pw:1.72em;--ph:.8em;display:inline-block;position:relative;width:var(--pw);height:var(--ph);margin:0 .2em;vertical-align:-.03em;
+.who-head em{font-style:italic;font-weight:300;font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1;color:var(--dim);letter-spacing:-.03em}
+.who-head em.sig{color:var(--sig);font-weight:380}
+.who-head .ch{display:inline-block}
+.pill{--pw:1.72em;--ph:.78em;display:inline-block;position:relative;width:var(--pw);height:var(--ph);margin:0 .22em;vertical-align:-.02em;
   border-radius:999px;overflow:hidden;background:var(--ink-2);
   box-shadow:0 0 0 .05em #060607,0 0 0 calc(.05em + 1px) #2c2b2e,0 .2em .5em rgba(0,0,0,.55)}
 .pill-in,.pill .dot{position:absolute;left:50%;top:50%;width:var(--pw);height:var(--ph);transform:translate(-50%,-50%);border-radius:999px}
 .pill-in{transition:transform .8s cubic-bezier(.16,1,.3,1)}
 .pill:hover .pill-in{transform:translate(-50%,-50%) scale(1.1)}
-.pill .dot{width:100%;height:100%;background:var(--sig);opacity:0}
+.pill .dot{width:100%;height:100%;background:var(--sig);opacity:0;z-index:2}
 .pill canvas,.pill img,.pill .ph{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pill img{object-fit:cover;filter:grayscale(1) sepia(.35) contrast(1.05)}
 .pill .ph{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 40%,#3a2c1b 0%,#1a1612 60%,#100f0e 100%)}
 .pill .ph span{font-style:italic;font-size:.62em;line-height:1;color:#8a6a40;letter-spacing:-.04em}
 .pill::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 .12em rgba(0,0,0,.8),inset 0 1px 0 rgba(236,231,220,.08)}
-.who-body{max-width:56ch;margin:0 auto}
-.who p{color:var(--dim);margin-bottom:18px}
-.who p em{color:var(--bone)}
-.who .btn{margin-top:18px}
-.who .btn span{font-family:var(--body);font-size:14px;letter-spacing:0}
-.facts{display:grid;grid-template-columns:repeat(3,1fr);max-width:760px;margin:8vh auto 0;border-top:1px solid var(--rule)}
-.facts div{padding:18px 8px 0}
-.facts b{display:block;font-family:var(--disp);font-weight:400;font-size:clamp(28px,3vw,44px);color:var(--bone)}
 
 footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:22px var(--g) 80px;border-top:1px solid var(--rule)}
 footer a{color:var(--dim);text-decoration:none}
@@ -172,18 +188,10 @@ html.motion .chroma{color:transparent;-webkit-background-clip:text;background-cl
   background-image:linear-gradient(90deg,var(--sig) 0%,var(--sig) calc(var(--sw) - 14%),#F4C77A calc(var(--sw) - 9%),var(--bone) calc(var(--sw) - 3%),#9FD2DC calc(var(--sw) + 3%),var(--trace) calc(var(--sw) + 9%),transparent calc(var(--sw) + 14%),transparent 100%)}
 html.motion .chroma::after{background:var(--sig);transform:scaleX(var(--ul,1))}
 
-.drive{padding-top:14vh;padding-bottom:14vh;border-top:1px solid var(--rule-soft)}
-.drive h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em;max-width:14ch;margin-bottom:8vh}
-.drive h2 em{font-style:italic;color:var(--sig)}
-.moments{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft)}
-.moment{background:var(--ink);padding:28px 22px 32px;min-height:300px;display:flex;flex-direction:column;justify-content:space-between;transition:background .4s}
-.moment:hover{background:var(--ink-2)}
-.moment .t{font-family:var(--mono);font-size:44px;color:var(--sig);letter-spacing:-.02em}
-.moment h3{font-family:var(--disp);font-weight:400;font-size:24px;line-height:1.15;margin:18px 0 10px}
-.moment p{color:var(--dim);font-size:15px}
 /* 03 work */
 .work-intro{padding-top:16vh;padding-bottom:6vh;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
-.work-intro h2{font-family:var(--disp);font-weight:400;font-size:clamp(40px,7vw,112px);line-height:.95;letter-spacing:-.02em}
+.work-intro h2{font-family:var(--who);font-weight:300;font-variation-settings:"opsz" 144,"SOFT" 50,"WONK" 0;font-size:clamp(28px,3.6vw,56px);line-height:1;letter-spacing:-.03em}
+.work-intro h2 em{font-style:italic;font-variation-settings:"opsz" 144,"SOFT" 100,"WONK" 1}
 .proj{position:relative;min-height:100svh;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);border-top:1px solid var(--rule-soft);padding:0}
 .proj .plate{position:relative;min-height:70svh;overflow:hidden;background:#0E0E11}
 .proj canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -220,14 +228,13 @@ html.motion .chroma::after{background:var(--sig);transform:scaleX(var(--ul,1))}
 [data-booking][hidden]{display:none}
 footer .links{display:flex;gap:14px;flex-wrap:wrap}
 @media (max-width:860px){
+  .who{padding-top:16vh}
   .proj{grid-template-columns:1fr}
   .paper{grid-template-columns:1fr}
   .paths{grid-template-columns:1fr}
   .proj .plate{min-height:56svh}
   .pab div{grid-template-columns:1fr;gap:6px}
 }
-@media (max-width:1023px){.moments{grid-template-columns:1fr 1fr}}
-@media (max-width:520px){.moments{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){
   html.motion .rv,html.motion .line>span{opacity:1;transform:none}
   .pill-in{transition:none}
@@ -237,10 +244,10 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
 </style>
 
 
-<div class="progress" id="progress"></div>
 
 <main>
   <section class="hero" id="top">
+    <div class="hero-pin">
     <div class="hero-view">
       <picture class="hero-poster"><source media="(orientation: portrait)" srcset="assets/hero/poster-portrait.webp"><img src="assets/hero/poster.webp" alt=""></picture>
       <div class="hero-stage"></div>
@@ -253,39 +260,22 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     <nav class="hero-pieces" aria-label="Projects"><a data-piece="cyrus" href="#proj-cyrus">Cyrus</a><a data-piece="zagros" href="#proj-zagros">Zagros</a><a data-piece="onepharma" href="#proj-onepharma">OnePharma</a><a data-piece="pearl" href="#proj-pearl">Black Pearl</a><a data-piece="falah" href="#proj-falah">Falah</a><a data-piece="nids" href="#proj-nids">Network Intrusion Detection</a></nav>
     <span class="mono hero-label" aria-hidden="true"></span>
     <span class="mono cue">Scroll &darr;</span>
+    </div>
   </section>
 
   <section class="who" id="who">
-    <div class="chap rv"><span class="mono sig">01</span><i></i><span class="mono">Who</span><i></i><span class="mono"><span class="sig">&#9679;</span> Dubai <span data-clock>GST</span></span></div>
+    <div class="who-in">
     <h2 class="who-head" aria-label="I'm Farhad. I turn chaos into systems that think.">
-      <span class="ln" aria-hidden="true"><span class="w">I'm</span> <span class="w">Farhad</span><span class="pill" data-photo=""><span class="dot"></span><span class="pill-in"><span class="ph"><span>F</span></span></span></span><span class="w">.</span></span>
-      <span class="ln" aria-hidden="true"><span class="w">I</span> <span class="w">turn</span> <span class="w"><em>chaos</em></span><span class="pill" data-pill="chaos"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">into</span></span>
-      <span class="ln" aria-hidden="true"><span class="w">systems</span><span class="pill" data-pill="graph"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">that</span> <span class="w"><em class="sig">think.</em></span></span>
+      <span class="ln" aria-hidden="true"><span class="w">I'm</span> <span class="w">Farhad</span><span class="pill" data-photo=""><span class="dot"></span><span class="pill-in"><span class="ph"><span>F</span></span></span></span></span>
+      <span class="ln" aria-hidden="true"><span class="w">I</span> <span class="w">turn</span> <span class="w"><em class="chaos"><span class="ch">c</span><span class="ch">h</span><span class="ch">a</span><span class="ch">o</span><span class="ch">s</span></em></span><span class="pill" data-pill="chaos"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">into</span></span>
+      <span class="ln" aria-hidden="true"><span class="w">systems</span><span class="pill" data-pill="graph"><span class="dot"></span><span class="pill-in"><canvas></canvas></span></span><span class="w">that</span> <span class="w"><em class="sig">think</em></span></span>
     </h2>
-    <div class="who-body">
-      <p class="rv">CTO at OnePharma in Dubai. I design the layer most companies skip: ontologies, knowledge graphs and governance layers that let AI <em>understand</em> a business, not just store it.</p>
-      <p class="rv">I build ontology platforms, constitutional governance and detection models, and I took one of them all the way to a Springer paper.</p>
-      <a class="btn rv" href="#contact">Get in touch <span>&#8599;</span></a>
     </div>
-    <div class="facts rv">
-      <div><b>6</b><span class="mono">Featured systems</span></div>
-      <div><b>1</b><span class="mono">Springer paper</span></div>
-      <div><b>AR/EN</b><span class="mono">Bilingual systems</span></div>
-    </div>
-  </section>
-  <section class="drive" id="drive">
-    <div class="chap rv"><span class="mono sig">02</span><i></i><span class="mono">What drives me</span></div>
-    <h2 class="rv">Obsessed with the <em>hardest</em> problem in the room.</h2>
-    <div class="moments">
-      <div class="moment rv"><div class="t">13</div><div><h3>Security as architecture</h3><p>Cyrus is built to 21 CFR Part 11, SOC 2 Type II and ISO 27001 controls, with thirteen security layers and a hash-chained audit trail.</p></div></div>
-      <div class="moment rv"><div class="t">3 / 5</div><div><h3>Power that needs a quorum</h3><p>Zagros comes alive through a sealed Genesis ceremony: no single key can run it.</p></div></div>
-      <div class="moment rv"><div class="t">99.34%</div><div><h3>Published, not just shipped</h3><p>CNN-RNN botnet detection on N-BaIoT (TCP removed), Springer LNCS, NEW2AN 2023.</p></div></div>
-      <div class="moment rv"><div class="t">0</div><div><h3>Demo without the machine</h3><p>Black Pearl runs its whole CNC rig in a browser, and the same build drives the real factory floor.</p></div></div>
     </div>
   </section>
   <section class="work-intro" id="work">
-    <div class="rv"><div class="chap"><span class="mono sig">03</span><i></i><span class="mono">Proof</span></div><h2>The work.</h2></div>
-    <p class="mono rv" style="max-width:34ch">Each plate is a live scene drawn in the project&rsquo;s own language. No stock imagery.</p>
+    <h2 class="rv">Selected <em>work</em></h2>
+    <span class="mono rv">06 projects</span>
   </section>
   <section class="proj" data-i="0" data-id="cyrus" id="proj-cyrus">
     <div class="plate"><canvas role="img" aria-label="Live scene for Cyrus"></canvas><div class="num" aria-hidden="true">01</div></div>
@@ -420,7 +410,7 @@ window.heroLayout = null; window.heroLive = null;
 function heroOrientation(){ return matchMedia("(orientation: portrait)").matches ? "portrait" : "landscape"; }
 /* where the poster lands in the hero: full width, centred vertically (cropped or letterboxed) */
 function heroCover(aspect){
-  var s = document.getElementById("top"), W = s.clientWidth, H = s.clientHeight, h = W/aspect;
+  var s = document.querySelector("#top .hero-pin") || document.getElementById("top"), W = s.clientWidth, H = s.clientHeight, h = W/aspect;
   return { w:W, h:h, dx:0, dy:(H-h)/2 };
 }
 window.heroOrientation = heroOrientation; window.heroCover = heroCover;
@@ -441,9 +431,20 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
   }
   function place(){
     var L = window.heroLayout; if (!L) return;
+    /* live: the boxes come from the scene's own camera (phones frame closer and pan, see hero.js PHONE_CAM).
+       A piece turned out of view takes its link out of the tab order until it is back. */
+    var B = window.heroLive && window.heroLive.boxes ? window.heroLive.boxes() : null;
     var v = L[heroOrientation()], c = heroCover(v.aspect);
     links.forEach(function(a){
-      var b = v.pieces[a.getAttribute("data-piece")]; if (!b) return;
+      var id = a.getAttribute("data-piece");
+      if (B) {
+        var r = B[id]; if (!r) return;
+        a.style.left = r.x+"px"; a.style.top = r.y+"px"; a.style.width = r.w+"px"; a.style.height = r.h+"px";
+        if (r.on) a.removeAttribute("tabindex"); else a.setAttribute("tabindex", "-1");
+        return;
+      }
+      a.removeAttribute("tabindex");
+      var b = v.pieces[id]; if (!b) return;
       a.style.left = (c.dx + (b.cx-b.w/2)*c.w)+"px"; a.style.top = (c.dy + (b.cy-b.h/2)*c.h)+"px";
       a.style.width = (b.w*c.w)+"px"; a.style.height = (b.h*c.h)+"px";
     });
@@ -463,6 +464,17 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
   });
   addEventListener("resize", place);
+  /* the scene's scroll move: 0..1 over the first 0.7 of the pinned stretch, or over the whole hero where
+     nothing is pinned. The raw position; hero.js eases after it. Fed at mount too, so a reload partway down
+     starts where the page is. Plain scroll events, so it works without GSAP. */
+  var pinEl = sec.querySelector(".hero-pin");
+  function feedScroll(){
+    if (!window.heroLive) return;
+    var x = sec.offsetHeight - pinEl.offsetHeight, y = -sec.getBoundingClientRect().top;
+    window.heroLive.setScroll(y / (x > 0 ? x * 0.7 : sec.offsetHeight));
+  }
+  addEventListener("scroll", feedScroll, { passive:true });
+  addEventListener("resize", feedScroll);
   function posterBack(why){ if (window.heroPosterBack) window.heroPosterBack(why); }
   if (!window.fetch) return posterBack();
   fetch("assets/hero/layout.json").then(function(r){ if (!r.ok) throw new Error(r.status); return r.json(); })
@@ -476,16 +488,23 @@ window.heroOrientation = heroOrientation; window.heroCover = heroCover;
     if (!gl) return posterBack("webgl2 context refused");
     var lose = gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     var started = false;
-    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); posterBack(typeof why === "string" ? why : "mount failed"); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
+    function fallBack(why){ sec.classList.remove("live"); window.heroLive = null; showLabel(null); place(); posterBack(typeof why === "string" ? why : "mount failed"); if (typeof why === "string") console.warn("hero: live scene stopped (" + why + "), showing the poster."); }
     function start(){
       if (started) return; started = true;
       /* the stall timer now counts from here: a slow first visit gets 8 s for the mount itself */
       clearTimeout(window.heroWaitTimer); window.heroWaitTimer = setTimeout(function(){ posterBack("8 s and the mount is not up"); }, 8000); window.heroWhy("mount started");
       import("./hero.js").then(function(m){
-        return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack });
+        return m.mountHero(stage, window.heroLayout, { orientation:heroOrientation, onPick:go, onHover:showLabel, onLost:fallBack,
+          onBoxes:function(){ if (window.heroLive) place(); } });
       }).then(function(h){
-        window.heroLive = h; clearTimeout(window.heroWaitTimer); sec.classList.add("live");
-        window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms");
+        window.heroLive = h; clearTimeout(window.heroWaitTimer); sec.classList.add("live"); place();
+        /* up after a timer had already given up on it: pin again, if they have not scrolled into the hero yet */
+        var de = document.documentElement;
+        if (!de.classList.contains("hero-pin") && (window.scrollY || 0) < innerHeight * 0.5) { de.classList.add("hero-pin"); if (window.ScrollTrigger) window.ScrollTrigger.refresh(); }
+        feedScroll();
+        window.heroWhy("LIVE · level " + h.level + " · mount " + (h.mountMs || 0).toFixed(1) + " ms"
+          + (h.ladder ? " · " + h.ladder : "") + (h.phone ? " · phone " + h.phone : "") + (h.pr != null ? " · pr " + h.pr.toFixed(2) : "") + (h.buf ? " · " + h.buf : "")
+          + (h.msaa != null ? " · msaa " + h.msaa : "") + (h.half != null ? (h.half ? " · half" : " · 8bit") : "") + (h.halfPost === false ? " · post 8bit" : ""));
       }).catch(function(e){ fallBack("mount error: " + (e && e.message || e)); console.warn("hero: live scene unavailable, showing the poster.", e); });
     }
     function near(){
@@ -514,15 +533,6 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
   };
 })();
 
-/* Dubai clock beside the Who chapter mark */
-(function(){
-  var el = document.querySelector("[data-clock]"); if (!el) return;
-  function tick(){
-    try { el.textContent = new Intl.DateTimeFormat("en-GB", { timeZone:"Asia/Dubai", hour:"2-digit", minute:"2-digit" }).format(new Date()) + " GST"; } catch (e) {}
-  }
-  tick(); setInterval(tick, 20000);
-})();
-
 /* WHO PILLS: two tiny live scenes set into the headline.
    chaos: loose data points wander, then lock into a lattice, hold, and let go.
    graph: a small knowledge graph with query pulses running its edges. */
@@ -534,7 +544,8 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function ease(x){ return x < .5 ? 4*x*x*x : 1 - Math.pow(-2*x + 2, 3) / 2; }
   function fit(sc){
-    var c = sc.cv, r = c.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+    if (!sc.r || sc.dirty) { sc.r = { width:sc.cv.offsetWidth, height:sc.cv.offsetHeight }; sc.dirty = false; }
+    var c = sc.cv, r = sc.r, d = Math.min(devicePixelRatio || 1, 2);
     var w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
     sc.w = r.width; sc.h = r.height; sc.d = d;
@@ -624,7 +635,7 @@ import("./mark.js").then(function(m){ return m.mountMark(document.querySelector(
       .observe(document.querySelector(".who-head"));
   } else { on = true; run(); }
   document.addEventListener("visibilitychange", run);
-  addEventListener("resize", run);
+  addEventListener("resize", function(){ scenes.forEach(function(sc){ sc.dirty = true; }); run(); });
 })();
 
 /* ============================================================
@@ -1100,40 +1111,72 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   document.documentElement.classList.add("motion");
   var EASE = "expo.out";
   gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
-  gsap.to(".hero-head", { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top", end:"60% top", scrub:true } });
-  gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true,
-    onUpdate:function(st){ if (window.heroLive) window.heroLive.setScroll(st.progress); } } });
+  /* The hero. Pinned (html.hero-pin): the title and the cue clear in the first 0.3 of the extra height, the
+     scene plays its scroll move over the first 0.7 (fed from the hero block above, not from here), and the
+     picture fades from 0.8 until the pin has let go and half of it has gone, so the page hands over to 01.
+     Not pinned: as before (title by 60% of the hero, the picture over all of it), and the poster pushes in. */
+  var heroSec = document.getElementById("top"), heroPinEl = heroSec.querySelector(".hero-pin");
+  var heroExtra = function(){ return Math.max(0, heroSec.offsetHeight - heroPinEl.offsetHeight); };
+  gsap.to([".hero-head", ".hero .cue"], { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top",
+    end:function(){ var x = heroExtra(); return "+=" + Math.round(x ? x * 0.3 : heroPinEl.offsetHeight * 0.6); }, scrub:true } });
+  gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero",
+    start:function(){ var x = heroExtra(); return x ? "top+=" + Math.round(x * 0.8) + " top" : "top top"; },
+    end:function(){ var x = heroExtra(); return x ? "+=" + Math.round(x * 0.2 + heroPinEl.offsetHeight * 0.5) : "bottom top"; }, scrub:true } });
+  /* the poster's push-in: only where nothing is pinned; heroPosterBack() starts it when a live try falls back */
+  var heroPushed = false;
+  window.heroPosterPush = function(){
+    if (heroPushed) return; heroPushed = true;
+    gsap.fromTo(".hero-poster img", { yPercent:-50, y:0, scale:1 }, { yPercent:-46, y:0, scale:1.06, ease:"none",
+      scrollTrigger:{ trigger:".hero", start:"top top", end:"bottom top", scrub:true } });
+  };
+  if (!document.documentElement.classList.contains("hero-pin")) window.heroPosterPush();
   ScrollTrigger.batch(".rv", {
     start:"top 88%", once:true,
     onEnter:function(els){ gsap.fromTo(els, { opacity:0, y:40 }, { opacity:1, y:0, duration:1.1, ease:EASE, stagger:.08, overwrite:true }); }
   });
-  /* who headline: words rise out of a blur; each pill starts as an amber dot on the baseline, then unfolds
-     into its window and the words beside it part to make room */
+  /* who headline: words rise (transform + opacity only, no blur, no layout). Each pill keeps its full size in
+     the layout from the start and opens by clip-path: a point, an amber dot, a slit across, then the full window.
+     The letters of "chaos" start scattered and settle into the word. */
   (function(){
     var head = document.querySelector(".who-head"); if (!head) return;
-    var parts = [].slice.call(head.querySelectorAll(".w,.pill"));
-    var words = parts.filter(function(el){ return el.classList.contains("w"); });
-    var pills = parts.filter(function(el){ return el.classList.contains("pill"); });
-    gsap.set(words, { opacity:0, y:"0.42em", filter:"blur(10px)" });
-    gsap.set(pills, { width:0, height:0, marginLeft:".1em", marginRight:".1em" });
+    var words = [].slice.call(head.querySelectorAll(".w"));
+    var pills = [].slice.call(head.querySelectorAll(".pill"));
+    var chars = [].slice.call(head.querySelectorAll(".chaos .ch"));
+    var r = (function(a){ return function(){ a = (a * 16807) % 2147483647; return a / 2147483647; }; })(11);
+    function px(v){ return v.toFixed(1) + "px"; }
+    function clip(y, x, out){ return "inset(" + px(y) + " " + px(x) + " " + px(y) + " " + px(x) + " round " + px(out || 999) + ")"; }
+    gsap.set(words, { opacity:0, y:"0.38em", force3D:true });
+    gsap.set(chars, { opacity:0, x:function(){ return (r()-.5)*1.4 + "em"; }, y:function(){ return (r()-.5)*.9 + "em"; },
+      rotation:function(){ return (r()-.5)*70; }, force3D:true });
     gsap.set(head.querySelectorAll(".pill .dot"), { opacity:1 });
-    gsap.set(head.querySelectorAll(".pill-in"), { opacity:0, scale:1.5 });
+    gsap.set(head.querySelectorAll(".pill-in"), { scale:1.25 });
     var tl = gsap.timeline({ paused:true }), wi = 0;
-    parts.forEach(function(el){
+    pills.forEach(function(el){ el._w = el.offsetWidth; el._h = el.offsetHeight; gsap.set(el, { clipPath:clip(el._h/2, el._w/2) }); });
+    [].slice.call(head.querySelectorAll(".w,.pill")).forEach(function(el){
+      var at = wi * .075;
       if (el.classList.contains("w")) {
-        tl.to(el, { opacity:1, y:0, filter:"blur(0px)", duration:1.25, ease:EASE }, wi * .07); wi++;
+        tl.to(el, { opacity:1, y:0, duration:1.3, ease:EASE }, at); wi++;
+        if (el.querySelector(".chaos")) {
+          tl.set(el, { opacity:1 }, at);
+          tl.to(chars, { opacity:1, x:0, y:0, rotation:0, duration:1.8, ease:"expo.out", stagger:{ each:.06, from:"random" } }, at + .1);
+        }
         return;
       }
-      var at = wi * .07 + .25, dot = el.querySelector(".dot"), inn = el.querySelector(".pill-in");
-      var fs = parseFloat(getComputedStyle(head).fontSize), d = fs * .16;
-      tl.to(el, { width:d, height:d, duration:.45, ease:"back.out(3)" }, at)
-        .to(el, { width:"1.72em", marginLeft:".2em", marginRight:".2em", duration:1.1, ease:"expo.inOut" }, at + .4)
-        .to(el, { height:".8em", duration:.9, ease:"expo.inOut" }, at + .62)
-        .to(dot, { opacity:0, duration:.6, ease:"power2.out" }, at + .85)
-        .to(inn, { opacity:1, scale:1, duration:1.4, ease:EASE }, at + .8);
+      var w = el._w, h = el._h, d = Math.max(6, h * .2), fs = parseFloat(getComputedStyle(el).fontSize);
+      var dot = el.querySelector(".dot"), inn = el.querySelector(".pill-in");
+      at += .3;
+      tl.to(el, { clipPath:clip((h-d)/2, (w-d)/2), duration:.5, ease:"back.out(2.6)" }, at)
+        .to(el, { clipPath:clip((h-d)/2, 0), duration:.9, ease:"expo.inOut" }, at + .45)
+        .to(el, { clipPath:clip(-fs*.6, -fs*.6, h/2 + fs*.6), duration:.9, ease:"expo.inOut" }, at + .9)
+        .to(dot, { opacity:0, duration:.7, ease:"power2.out" }, at + 1.05)
+        .to(inn, { scale:1, duration:1.6, ease:EASE }, at + .9);
     });
-    tl.eventCallback("onComplete", function(){ gsap.set(pills.concat(words), { clearProps:"width,height,marginLeft,marginRight,filter,transform,opacity" }); });
-    ScrollTrigger.create({ trigger:head, start:"top 80%", once:true, onEnter:function(){ tl.play(); } });
+    tl.eventCallback("onComplete", function(){
+      gsap.set(pills, { clearProps:"clipPath" });
+      gsap.set(words.concat(chars), { clearProps:"transform,opacity" });
+      gsap.set(head.querySelectorAll(".pill-in"), { clearProps:"transform" });
+    });
+    ScrollTrigger.create({ trigger:head, start:"top 78%", once:true, onEnter:function(){ tl.play(); } });
   })();
   /* plate parallax: the big outline numeral drifts against the scene (moving the canvas itself would expose its edges) */
   gsap.utils.toArray(".proj .plate .num").forEach(function(n){
@@ -1159,9 +1202,6 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
       .to(el, { "--ul":1, duration:.9, ease:EASE }, .7);
     ScrollTrigger.create({ trigger:el, start:"top 82%", once:true, onEnter:function(){ tl.play(); } });
   });
-  /* scroll progress bar */
-  gsap.to("#progress", { scaleX:1, ease:"none",
-    scrollTrigger:{ trigger:document.body, start:"top top", end:"bottom bottom", scrub:.3 } });
 }
 })();
 </script>
