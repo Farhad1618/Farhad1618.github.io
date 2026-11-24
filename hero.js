@@ -1332,15 +1332,64 @@ export async function mountHero(stage, layout, opts = {}) {
     handle.frameCount++;
   }
 
+  // freeze(t): every time-dependent input held still for pixel-exact refactor checks (scripts/hero-snapshot.md).
+  // Scene time t, ignite (fully lit, entrance done), wake, drift, hover, scroll, phone pan and rig springs are
+  // set to rest, and frame() steps with dt 0, so every frame is identical. freeze(null) lets time run again.
+  let frozenT = null;
+  function holdFrozen() {
+    t = frozenT; igHold = frozenT;
+    pointer.set(0, 0); drift.set(0, 0); pointerIn = false; hoverId = null; touchHover = null;
+    scrollP = scrollNow = 0;
+  }
+  function freeze(tv) {
+    if (typeof tv !== "number") { frozenT = null; last = performance.now(); return; }
+    frozenT = tv; holdFrozen();
+    wakeAge.fill(99); wakePeak.fill(0); wakeSpeed = 0;
+    for (let i = 0; i < WAKE_N; i++) { wakeD[i].set(0, 0, -1, 0); wakeV[i].set(0, 0, 0, 1); }
+    panGoal = panNow = panVel = 0; drag = null; nudge = -2; focusNow = 0;
+    for (const id of IDS) {
+      state[id].lift = 0;
+      const rg = rigs[id];
+      if (rg) { rg.t = 99; rg.was = false; for (const L of rg.parts) { L.x = 0; L.v = 0; rg.A[L.r.part - 1].w = 0; } }
+    }
+    update(0); t = tv;
+  }
+  // render once and read the whole default framebuffer (RGBA8)
+  function readFrame() {
+    render();
+    const gl = renderer.getContext(), w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return { px, w, h };
+  }
+  function hash() {
+    const { px } = readFrame();
+    let x = 0x811c9dc5;
+    for (let i = 0; i < px.length; i++) { x ^= px[i]; x = Math.imul(x, 0x01000193); }
+    return (x >>> 0).toString(16).padStart(8, "0");
+  }
+  // 64x40 grid of block-averaged RGB (0-255), row-major from the top; tolerant check for a refactor
+  function sig() {
+    const { px, w, h } = readFrame(), GX = 64, GY = 40, out = new Array(GX * GY * 3).fill(0), cnt = new Array(GX * GY).fill(0);
+    for (let y = 0; y < h; y++) {
+      const gy = Math.min(GY - 1, Math.floor(((h - 1 - y) * GY) / h));
+      for (let x = 0; x < w; x++) {
+        const g = gy * GX + Math.min(GX - 1, Math.floor((x * GX) / w)), p = (y * w + x) * 4;
+        out[g * 3] += px[p]; out[g * 3 + 1] += px[p + 1]; out[g * 3 + 2] += px[p + 2]; cnt[g]++;
+      }
+    }
+    return out.map((v, i) => Math.round((v / cnt[(i / 3) | 0]) * 100) / 100);
+  }
+
   function frame(now) {
     raf = 0;
     if (!running || disposed) return;
     // never negative: the first frame after the mount test can carry a timestamp from before it, which ran
     // the entrance clock backwards by half a second
-    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0.016));
-    if (last) { fpsAvg += (1000 / Math.max(now - last, 1) - fpsAvg) * 0.05; stepDown(now - last, now); }
+    const dt = frozenT !== null ? 0 : Math.max(0, Math.min(0.05, (now - last) / 1000 || 0.016));
+    if (last && frozenT === null) { fpsAvg += (1000 / Math.max(now - last, 1) - fpsAvg) * 0.05; stepDown(now - last, now); }
     last = now;
-    update(dt); render();
+    update(dt); if (frozenT !== null) holdFrozen(); render();
     if (readout && handle.frameCount % 20 === 0) showReadout();
     raf = requestAnimationFrame(frame);
   }
@@ -1387,7 +1436,7 @@ export async function mountHero(stage, layout, opts = {}) {
   // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
   // weights uTightK, uWideK, and uIgnite), .bright (bloom threshold uThresh), .motes (uGain, uCol); .ignite() replays the light
   Object.assign(handle, { setOrientation, setHover, setScroll, render, start, stop, dispose, resize, boxes,
-    ignite: s => { igHold = typeof s === "number" ? s : -1; if (igHold < 0) igT = 0; }, grain: setGrain, motes: moteMat.uniforms,
+    ignite: s => { igHold = typeof s === "number" ? s : -1; if (igHold < 0) igT = 0; }, grain: setGrain, motes: moteMat.uniforms, freeze, hash, sig,
     setLevel: i => { level = LADDER[i] || level; handle.level = LADDER.indexOf(level); resize(); },
     board: boardMesh.material.uniforms, fog: fogMat.uniforms, post: postMat.uniforms, fxaa: fxaaMat.uniforms, bright: brightMat.uniforms });
 
