@@ -76,6 +76,10 @@ check("work chapters: names in h3, problem/built/matters rows", () => {
     const id = (p.match(/data-id="([^"]+)"/) || [])[1];
     if (!/<div class="plate"[\s>]/.test(p)) errs.push(`proj ${i + 1} lacks class="plate"`);
     const solo = (p.match(/<div class="plate"[^>]*\sdata-solo="([^"]*)"/) || [])[1];
+    // a chapter has its solo piece or its Canvas 2D scene, never neither (an empty plate)
+    const canvas = /<canvas class="plate-scene"/.test(p);
+    if ((solo !== undefined) === canvas) errs.push(`proj ${i + 1}: needs exactly one of data-solo or canvas.plate-scene`);
+    if (canvas && !new RegExp(`SCENES = \\{[^}]*\\b${id}:`).test(src)) errs.push(`proj ${i + 1}: no scene for ${id}`);
     if (solo !== undefined && solo !== id) errs.push(`proj ${i + 1}: data-solo="${solo}" but data-id="${id}"`);
     if (solo !== undefined && !p.includes(`src="assets/solo/${id}/poster.webp"`)) errs.push(`proj ${i + 1}: poster for ${id} missing`);
   });
@@ -83,7 +87,7 @@ check("work chapters: names in h3, problem/built/matters rows", () => {
   if (/<a\s/.test(zag)) errs.push("Zagros must have no link");
   const nids = parts[5] || "";
   if (!nids.includes('href="research.html"') || !nids.includes("10.1007/978-3-031-60994-7_4")) errs.push("nids links missing");
-  for (const gone of ["SCENES", "sceneCyrus", "fitPlate", "docsCache", "drawPlate"]) if (src.includes(gone)) errs.push(`old canvas plate remnant "${gone}"`);
+  for (const gone of ["sceneCyrus", "docsCache"]) if (src.includes(gone)) errs.push(`old canvas plate remnant "${gone}"`);
   const css = src.replace(/\/\*[\s\S]*?\*\//g, "");
   if (!/\.proj \.num\{[^}]*z-index\s*:/.test(css)) errs.push(".proj .num needs a z-index (the live canvas sits in the plate)");
   return errs;

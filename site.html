@@ -236,7 +236,7 @@ html.motion .chroma::after{background:var(--sig);transform:scaleX(var(--ul,1))}
    mountSolo) when this chapter is the most on screen; .live fades the stage in after its first frame.
    Desktop: the plate holds still (sticky, one screen) while the text column scrolls past it. */
 .proj .plate{position:sticky;top:0;height:100svh;align-self:start;overflow:hidden;background:#0E0E11}
-.plate-poster,.plate-stage{position:absolute;inset:0;width:100%;height:100%}
+.plate-poster,.plate-stage,.plate-scene{position:absolute;inset:0;width:100%;height:100%}
 .plate-poster{display:block;object-fit:cover}
 .plate-stage{opacity:0;transition:opacity .9s ease}
 .plate.live .plate-stage{opacity:1}
@@ -364,7 +364,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="proj" data-i="1" data-id="zagros" id="proj-zagros">
-    <div class="plate"><div class="num" aria-hidden="true">02</div></div>
+    <div class="plate"><canvas class="plate-scene" role="img" aria-label="Live scene for Zagros"></canvas><div class="num" aria-hidden="true">02</div></div>
     <div class="txt rv">
       <span class="mono sig">Zagros &middot; Identity &amp; governance platform</span>
       <h3>Zagros</h3>
@@ -376,7 +376,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="proj" data-i="2" data-id="onepharma" id="proj-onepharma">
-    <div class="plate"><div class="num" aria-hidden="true">03</div></div>
+    <div class="plate"><canvas class="plate-scene" role="img" aria-label="Live scene for OnePharma"></canvas><div class="num" aria-hidden="true">03</div></div>
     <div class="txt rv">
       <span class="mono sig">OnePharma &middot; Pharmaceutical intelligence</span>
       <h3>OnePharma</h3>
@@ -388,7 +388,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="proj" data-i="3" data-id="pearl" id="proj-pearl">
-    <div class="plate"><div class="num" aria-hidden="true">04</div></div>
+    <div class="plate"><canvas class="plate-scene" role="img" aria-label="Live scene for Black Pearl"></canvas><div class="num" aria-hidden="true">04</div></div>
     <div class="txt rv">
       <span class="mono sig">Black Pearl &middot; Machine control &amp; visualization</span>
       <h3>Black Pearl</h3>
@@ -400,7 +400,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="proj" data-i="4" data-id="falah" id="proj-falah">
-    <div class="plate"><div class="num" aria-hidden="true">05</div></div>
+    <div class="plate"><canvas class="plate-scene" role="img" aria-label="Live scene for Falah"></canvas><div class="num" aria-hidden="true">05</div></div>
     <div class="txt rv">
       <span class="mono sig">Falah &middot; Full-stack budgeting app</span>
       <h3>Falah</h3>
@@ -412,7 +412,7 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     </div>
   </section>
   <section class="proj" data-i="5" data-id="nids" id="proj-nids">
-    <div class="plate"><div class="num" aria-hidden="true">06</div></div>
+    <div class="plate"><canvas class="plate-scene" role="img" aria-label="Live scene for Network Intrusion Detection"></canvas><div class="num" aria-hidden="true">06</div></div>
     <div class="txt rv">
       <span class="mono sig">Network Intrusion Detection &middot; Applied research</span>
       <h3>Network Intrusion Detection</h3>
@@ -828,7 +828,7 @@ Promise.resolve(window.heroReady).then(function(){ return import("./mark.js"); }
    canvas goes back to it and the hero resumes quietly. If the hero falls back to its poster for any reason,
    the chapters keep their posters too and nothing retries. A visit that starts down the page (a #proj- link,
    a reload partway down) mounts the canvas from here, through the same speed test.
-   Plates without data-solo have no piece yet: a plain dark plate.
+   Plates without data-solo have no piece yet: they keep their Canvas 2D scene (PLATE SCENES below).
    ============================================================ */
 (function(){
   var plates = [].slice.call(document.querySelectorAll(".proj .plate"));
@@ -952,6 +952,403 @@ Promise.resolve(window.heroReady).then(function(){ return import("./mark.js"); }
   }, { threshold:[0, .25, .5, .75, 1] });
   plates.forEach(function(p){ io.observe(p); });
   if (top) new IntersectionObserver(function(es){ heroNear = es[es.length - 1].isIntersecting; update(); }, { rootMargin:"100% 0px" }).observe(top);
+})();
+
+/* ============================================================
+   PLATE SCENES: the chapters whose solo piece is not made yet keep their own Canvas 2D scene, drawn only while
+   on screen. When a piece lands (data-solo), take its <canvas class="plate-scene"> and its scene out.
+   ============================================================ */
+(function(){
+/* deterministic pseudo-random so every visitor sees the same composition */
+function mk(seed){ var s=seed>>>0; return function(){ s=(s*1664525+1013904223)>>>0; return s/4294967296; }; }
+/* ============================================================
+   SCENE 2 — ZAGROS : K-of-N key ceremony
+   ============================================================ */
+function sceneZagros(g,w,h,t,e){
+  var cx=w/2, cy=h/2, R=Math.min(w,h)*0.27;
+  /* dashed range rings */
+  g.setLineDash([2,7]);
+  for(var i=1;i<=4;i++){
+    g.strokeStyle=rgba(C.dim,.10*e); g.lineWidth=1;
+    g.beginPath(); g.arc(cx,cy,R*(0.5+i*0.32),0,TAU); g.stroke();
+  }
+  g.setLineDash([]);
+  /* radar sweep */
+  var sa=t*0.55;
+  var sg=g.createConicGradient? null : null;
+  g.save(); g.translate(cx,cy); g.rotate(sa);
+  var lg=g.createLinearGradient(0,0,R*2.1,0);
+  lg.addColorStop(0,rgba(C.trace,.16*e)); lg.addColorStop(1,rgba(C.trace,0));
+  g.fillStyle=lg; g.beginPath(); g.moveTo(0,0); g.arc(0,0,R*2.1,-0.22,0.02); g.closePath(); g.fill();
+  g.restore();
+
+  /* five keys, three turned */
+  var turned=[1,1,1,0,0];
+  var rot=t*0.09;
+  for(var k=0;k<5;k++){
+    var ang=rot + k*(TAU/5) - Math.PI/2;
+    var kx=cx+Math.cos(ang)*R, ky=cy+Math.sin(ang)*R;
+    if(turned[k]){
+      var pulse=.45+.3*Math.sin(t*1.5+k);
+      g.strokeStyle=rgba(C.sig,pulse*e); g.lineWidth=1;
+      g.beginPath(); g.moveTo(kx,ky); g.lineTo(cx,cy); g.stroke();
+      /* travelling charge */
+      var p=((t*0.42+k*0.2)%1);
+      g.fillStyle=rgba(C.sig,.9*e);
+      g.beginPath(); g.arc(kx+(cx-kx)*p, ky+(cy-ky)*p, 2.2, 0, TAU); g.fill();
+    }
+    g.beginPath(); g.arc(kx,ky, turned[k]?9:7, 0, TAU);
+    if(turned[k]){ g.fillStyle=rgba(C.sig,.92*e); g.fill(); }
+    else { g.fillStyle=rgba(C.ink,1); g.fill(); g.strokeStyle=rgba(C.dim,.45*e); g.lineWidth=1; g.stroke(); }
+    g.font="400 10px 'IBM Plex Mono', monospace"; g.textAlign="center"; g.textBaseline="middle";
+    g.fillStyle=rgba(turned[k]?C.sig:C.muted,.8*e);
+    g.fillText("K"+(k+1), kx+Math.cos(ang)*24, ky+Math.sin(ang)*24);
+  }
+  g.textAlign="left";
+
+  /* sealed core */
+  function hex(rr,rotr){ g.beginPath(); for(var i=0;i<6;i++){ var a=rotr+i*TAU/6; var fx=cx+Math.cos(a)*rr, fy=cy+Math.sin(a)*rr; i?g.lineTo(fx,fy):g.moveTo(fx,fy);} g.closePath(); }
+  var br=.5+.18*Math.sin(t*1.1);
+  g.fillStyle=rgba(C.ink,.94); hex(34,t*0.05); g.fill();
+  g.strokeStyle=rgba(C.dim,.5*e); g.lineWidth=1; hex(34,t*0.05); g.stroke();
+  g.strokeStyle=rgba(C.sig,br*e); g.lineWidth=1.2; hex(19,-t*0.11); g.stroke();
+  /* expanding seal pulse */
+  var sp=(t*0.35)%1;
+  g.strokeStyle=rgba(C.sig,(1-sp)*0.35*e); g.lineWidth=1;
+  g.beginPath(); g.arc(cx,cy, 34+sp*R*1.5, 0, TAU); g.stroke();
+
+  g.font="400 10px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.sig,.85*e);
+  g.textAlign="center"; g.fillText("SEALED", cx, cy+54); g.textAlign="left";
+}
+
+/* ============================================================
+   SCENE 3 — ONEPHARMA : the knowledge graph
+   ============================================================ */
+var GN=[
+ {id:"onyxs",l:"Cyrus",k:2},{id:"sr71",l:"Zagros",k:2},{id:"onepharma",l:"OnePharma",k:2},
+ {id:"pearl",l:"Black Pearl",k:2},{id:"purple",l:"Falah",k:2},{id:"nids",l:"NIDS",k:2},
+ {id:"ontology",l:"Ontology",k:1},{id:"graphdb",l:"Knowledge Graph",k:1},{id:"agentic",l:"Agentic AI",k:1},
+ {id:"gov",l:"Governance",k:1},{id:"audit",l:"Audit Trail",k:1},{id:"semantic",l:"Semantic Search",k:1},
+ {id:"tenancy",l:"Multi-tenancy",k:1},{id:"cfr",l:"21 CFR Part 11",k:1},
+ {id:"neo4j",l:"Neo4j",k:0},{id:"pg",l:"PostgreSQL",k:0},{id:"click",l:"ClickHouse",k:0},
+ {id:"rust",l:"Rust",k:0},{id:"go",l:"Go",k:0},{id:"cpp",l:"C++",k:0},{id:"py",l:"Python",k:0},
+ {id:"fastapi",l:"FastAPI",k:0},{id:"next",l:"Next.js",k:0},{id:"react",l:"React",k:0},
+ {id:"ts",l:"TypeScript",k:0},{id:"swift",l:"Swift",k:0},{id:"k8s",l:"Kubernetes",k:0},
+ {id:"aws",l:"AWS",k:0},{id:"kafka",l:"Kafka",k:0},{id:"gql",l:"GraphQL",k:0},{id:"ws",l:"WebSocket",k:0},
+ {id:"cerbos",l:"Cerbos",k:0},{id:"passkey",l:"Passkeys",k:0},{id:"torch",l:"TensorFlow",k:0},
+ {id:"llm",l:"LLM Gateway",k:0},{id:"embed",l:"EmbeddingGemma",k:0}];
+var GE=[["onyxs","neo4j"],["onyxs","pg"],["onyxs","click"],["onyxs","rust"],["onyxs","go"],["onyxs","cpp"],
+ ["onyxs","py"],["onyxs","k8s"],["onyxs","embed"],["onyxs","ontology"],["onyxs","audit"],["onyxs","cfr"],
+ ["onyxs","tenancy"],["onyxs","semantic"],["sr71","fastapi"],["sr71","next"],["sr71","pg"],["sr71","cerbos"],
+ ["sr71","passkey"],["sr71","ts"],["sr71","py"],["sr71","gov"],["sr71","audit"],["sr71","tenancy"],
+ ["onepharma","next"],["onepharma","react"],["onepharma","ts"],["onepharma","gql"],["onepharma","neo4j"],
+ ["onepharma","passkey"],["onepharma","llm"],["onepharma","agentic"],["onepharma","ontology"],["onepharma","gov"],
+ ["pearl","ws"],["pearl","ts"],["pearl","react"],["purple","swift"],["purple","ts"],["nids","py"],["nids","torch"],
+ ["ontology","graphdb"],["graphdb","neo4j"],["semantic","embed"],["semantic","graphdb"],["agentic","llm"],
+ ["agentic","ontology"],["gov","cerbos"],["gov","audit"],["gov","cfr"],["gov","tenancy"],["k8s","aws"],
+ ["fastapi","py"],["next","react"],["react","ts"],["pg","kafka"],["click","kafka"],["llm","py"],["torch","py"]];
+var gmap={}, gnodes=[], glinks=[], gSized=0, pulses=[];
+GN.forEach(function(n,i){ var o={id:n.id,l:n.l,k:n.k,i:i}; gmap[n.id]=o; gnodes.push(o); });
+GE.forEach(function(e){ if(gmap[e[0]]&&gmap[e[1]]) glinks.push({a:gmap[e[0]],b:gmap[e[1]]}); });
+
+function graphLayout(w,h){
+  var r=mk(20231618);
+  gnodes.forEach(function(n,i){
+    var ang=(i/gnodes.length)*TAU;
+    var rad=(n.k===2?0.16:n.k===1?0.27:0.38)*Math.min(w,h);
+    n.x=w/2+Math.cos(ang)*rad*1.35+(r()-.5)*60;
+    n.y=h/2+Math.sin(ang)*rad+(r()-.5)*60;
+    n.vx=0; n.vy=0;
+  });
+  for(var s=0;s<320;s++) graphStep(w,h,1);
+  gSized=w;
+}
+function graphStep(w,h,al){
+  var i,j,a,b,dx,dy,d2,d,f;
+  for(i=0;i<gnodes.length;i++){ a=gnodes[i];
+    for(j=i+1;j<gnodes.length;j++){ b=gnodes[j];
+      dx=b.x-a.x; dy=b.y-a.y; d2=dx*dx+dy*dy||.01; if(d2>140000) continue;
+      f=3200/d2; d=Math.sqrt(d2);
+      a.vx-=dx/d*f; a.vy-=dy/d*f; b.vx+=dx/d*f; b.vy+=dy/d*f;
+    }
+  }
+  for(i=0;i<glinks.length;i++){ var L=glinks[i]; a=L.a; b=L.b;
+    dx=b.x-a.x; dy=b.y-a.y; d=Math.sqrt(dx*dx+dy*dy)||.01;
+    var rest=(a.k===2||b.k===2)?128:92;
+    f=(d-rest)*0.012;
+    a.vx+=dx/d*f; a.vy+=dy/d*f; b.vx-=dx/d*f; b.vy-=dy/d*f;
+  }
+  for(i=0;i<gnodes.length;i++){ var n=gnodes[i];
+    n.vx+=(w/2-n.x)*0.0024; n.vy+=(h/2-n.y)*0.0032;
+    n.vx*=0.855; n.vy*=0.855;
+    n.x+=n.vx*al; n.y+=n.vy*al;
+    n.x=Math.max(30,Math.min(w-30,n.x)); n.y=Math.max(36,Math.min(h-36,n.y));
+  }
+}
+function sceneGraph(g,w,h,t,e){
+  if(gSized!==w) graphLayout(w,h);
+  graphStep(w,h,0.04);                        /* gentle perpetual drift */
+
+  /* query pulses travelling along edges */
+  if(pulses.length<7 && Math.random()<0.035){
+    pulses.push({ l:glinks[(Math.random()*glinks.length)|0], p:0, sp:0.006+Math.random()*0.01, dir:Math.random()<.5 });
+  }
+  for(var i=0;i<glinks.length;i++){
+    var L=glinks[i];
+    g.strokeStyle=rgba(C.trace,.17*e); g.lineWidth=.8;
+    g.beginPath(); g.moveTo(L.a.x,L.a.y); g.lineTo(L.b.x,L.b.y); g.stroke();
+  }
+  for(var p=pulses.length-1;p>=0;p--){
+    var q=pulses[p]; q.p+=q.sp; if(q.p>1){ pulses.splice(p,1); continue; }
+    var f=q.dir?q.p:1-q.p;
+    var px=q.l.a.x+(q.l.b.x-q.l.a.x)*f, py=q.l.a.y+(q.l.b.y-q.l.a.y)*f;
+    g.strokeStyle=rgba(C.sig,(1-Math.abs(q.p-.5)*2)*.55*e); g.lineWidth=1.2;
+    g.beginPath(); g.moveTo(q.l.a.x,q.l.a.y); g.lineTo(q.l.b.x,q.l.b.y); g.stroke();
+    g.fillStyle=rgba(C.sig,.95*e); g.beginPath(); g.arc(px,py,2.4,0,TAU); g.fill();
+  }
+  for(var k=0;k<gnodes.length;k++){
+    var n=gnodes[k], isP=n.k===2, r=isP?6.5:(n.k===1?4.2:3);
+    g.beginPath(); g.arc(n.x,n.y,r,0,TAU);
+    if(isP){ g.fillStyle=rgba(C.sig,.92*e); g.fill(); }
+    else { g.fillStyle=rgba(C.ink,1); g.fill(); g.strokeStyle=rgba(C.dim,.45*e); g.lineWidth=1; g.stroke(); }
+    if(n.k>=1){
+      g.font=(isP?"500 11px":"400 10px")+" 'IBM Plex Mono', monospace";
+      g.fillStyle=rgba(isP?C.dim:C.muted,(isP?.72:.5)*e);
+      g.textBaseline="middle";
+      var lw=g.measureText(n.l).width, lx=n.x+r+8;
+      if(lx+lw>w-12) lx=Math.max(12,n.x-r-8-lw);
+      g.fillText(n.l,lx,n.y);
+    }
+  }
+}
+
+/* ============================================================
+   SCENE 4 — BLACK PEARL : telemetry + toolpath
+   ============================================================ */
+function scenePearl(g,w,h,t,e){
+  /* three scrolling oscilloscope traces */
+  var lanes=[{y:h*0.2,amp:26,f:2.1,c:C.trace},{y:h*0.34,amp:18,f:3.4,c:C.dim},{y:h*0.48,amp:32,f:1.3,c:C.sig}];
+  for(var L=0;L<lanes.length;L++){
+    var ln=lanes[L];
+    g.strokeStyle=rgba(C.dim,.08*e); g.lineWidth=1;
+    g.beginPath(); g.moveTo(0,ln.y); g.lineTo(w,ln.y); g.stroke();
+    g.strokeStyle=rgba(ln.c,(L===2?.8:.42)*e); g.lineWidth=L===2?1.4:1;
+    g.beginPath();
+    for(var x=0;x<=w;x+=3){
+      var u=(x/w)*9 + t*ln.f;
+      var v=Math.sin(u)*0.6+Math.sin(u*2.7+L)*0.28+Math.sin(u*6.1)*0.12;
+      var y=ln.y+v*ln.amp;
+      x?g.lineTo(x,y):g.moveTo(x,y);
+    }
+    g.stroke();
+  }
+  /* CNC toolpath drawing itself — a steel frame profile */
+  var pw=Math.min(w*0.5,460), ph=pw*0.42, ox=(w-pw)/2, oy=h*0.62;
+  var pts=[[0,ph],[0,0],[pw,0],[pw,ph],[pw*0.78,ph],[pw*0.78,ph*0.3],[pw*0.22,ph*0.3],[pw*0.22,ph],[0,ph]];
+  var segs=[], total=0, s;
+  for(s=1;s<pts.length;s++){
+    var dx=pts[s][0]-pts[s-1][0], dy=pts[s][1]-pts[s-1][1];
+    var len=Math.hypot(dx,dy); segs.push(len); total+=len;
+  }
+  var trav=((t*0.24)%1.25)*total;
+  g.strokeStyle=rgba(C.dim,.16*e); g.lineWidth=1;
+  g.beginPath(); g.moveTo(ox+pts[0][0],oy+pts[0][1]);
+  for(s=1;s<pts.length;s++) g.lineTo(ox+pts[s][0],oy+pts[s][1]);
+  g.stroke();
+  /* drawn portion */
+  var acc=0, hx=null, hy=null;
+  g.strokeStyle=rgba(C.sig,.85*e); g.lineWidth=1.6;
+  g.beginPath(); g.moveTo(ox+pts[0][0],oy+pts[0][1]);
+  for(s=1;s<pts.length;s++){
+    var segLen=segs[s-1];
+    if(trav>=acc+segLen){ g.lineTo(ox+pts[s][0],oy+pts[s][1]); hx=ox+pts[s][0]; hy=oy+pts[s][1]; }
+    else if(trav>acc){
+      var f=(trav-acc)/segLen;
+      hx=ox+pts[s-1][0]+(pts[s][0]-pts[s-1][0])*f;
+      hy=oy+pts[s-1][1]+(pts[s][1]-pts[s-1][1])*f;
+      g.lineTo(hx,hy); break;
+    } else break;
+    acc+=segLen;
+  }
+  g.stroke();
+  if(hx!==null){
+    g.fillStyle=rgba(C.sig,e); g.beginPath(); g.arc(hx,hy,3.4,0,TAU); g.fill();
+    g.strokeStyle=rgba(C.sig,.4*e); g.lineWidth=1;
+    g.beginPath(); g.arc(hx,hy,3.4+8*((t*2)%1),0,TAU); g.stroke();
+  }
+  /* axis readouts */
+  var ax=["X","Y","Z"], base=h-96;
+  for(var a=0;a<3;a++){
+    var val=0.5+0.42*Math.sin(t*(0.7+a*0.35)+a);
+    var bx=40, bw=Math.min(240,w*0.22), by=base+a*20;
+    g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.muted,.8*e);
+    g.textBaseline="middle"; g.fillText(ax[a],bx-14,by);
+    g.strokeStyle=rgba(C.dim,.18*e); g.lineWidth=1; g.strokeRect(bx+.5,by-4.5,bw,9);
+    g.fillStyle=rgba(a===2?C.sig:C.dim,.55*e); g.fillRect(bx+1,by-3.5,(bw-2)*val,7);
+    g.fillStyle=rgba(C.muted,.8*e); g.fillText((val*1000).toFixed(1)+" mm", bx+bw+12, by);
+  }
+}
+
+/* ============================================================
+   SCENE 5 — FALAH : budget against target
+   ============================================================ */
+function sceneFalah(g,w,h,t,e){
+  var months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug"];
+  var n=months.length;
+  var bw=Math.min(52,w/(n*2.1)), gap=bw*0.85;
+  var totalW=n*bw+(n-1)*gap, ox=(w-totalW)/2, base=h*0.72, maxH=h*0.4;
+  var target=base-maxH*0.66;
+
+  /* target line */
+  g.setLineDash([4,5]); g.strokeStyle=rgba(C.sig,.5*e); g.lineWidth=1;
+  g.beginPath(); g.moveTo(ox-40,target); g.lineTo(ox+totalW+40,target); g.stroke();
+  g.setLineDash([]);
+  g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.sig,.85*e);
+  g.textBaseline="bottom"; g.fillText("BUDGET TARGET", ox-40, target-8);
+
+  for(var i=0;i<n;i++){
+    var seed=Math.sin(i*12.9898)*43758.5453; seed=seed-Math.floor(seed);
+    var v=0.35+seed*0.55+Math.sin(t*0.5+i*0.7)*0.05;
+    var bh=maxH*v*e, bx=ox+i*(bw+gap), by=base-bh;
+    var over=by<target;
+    g.fillStyle=over?rgba(C.sig,.88*e):rgba(C.dim,.32*e);
+    g.fillRect(bx,by,bw,bh);
+    if(over){
+      g.fillStyle=rgba(C.ink,.9);
+      g.fillRect(bx,target,bw,base-target);
+      g.fillStyle=rgba(C.sig,.88*e); g.fillRect(bx,by,bw,target-by);
+      g.fillStyle=rgba(C.sig,.30*e); g.fillRect(bx,target,bw,base-target);
+    }
+    g.fillStyle=rgba(C.muted,.8*e); g.textBaseline="top";
+    g.textAlign="center"; g.fillText(months[i],bx+bw/2,base+10); g.textAlign="left";
+  }
+  g.strokeStyle=rgba(C.dim,.25*e); g.lineWidth=1;
+  g.beginPath(); g.moveTo(ox-40,base); g.lineTo(ox+totalW+40,base); g.stroke();
+
+  /* income particles falling into the bars */
+  for(var p=0;p<26;p++){
+    var ph=((t*0.35+p*0.13)%1);
+    var col=(p*7)%n;
+    var px=ox+col*(bw+gap)+bw/2+Math.sin(p*3.1)*bw*0.3;
+    var py=h*0.16+ph*(base-h*0.16);
+    g.fillStyle=rgba(C.trace,(1-ph)*0.5*e);
+    g.fillRect(px,py,1.5,5);
+  }
+}
+
+/* ============================================================
+   SCENE 6 — NIDS : packet stream through CNN-RNN gates
+   ============================================================ */
+var pkts=null;
+function sceneNids(g,w,h,t,e){
+  if(!pkts){ var r=mk(9731); pkts=[]; for(var i=0;i<130;i++) pkts.push({ y:r(), o:r(), sp:.1+r()*.12, bad:r()<0.09 }); }
+  var gates=[0.3,0.48,0.66].map(function(f){ return f*w; });
+  var top=h*0.2, bot=h*0.74;
+
+  /* conv gates */
+  for(var q=0;q<gates.length;q++){
+    var gx=gates[q], cells=9-q*2, ch=(bot-top)/cells;
+    for(var c=0;c<cells;c++){
+      var yy=top+c*ch+ch*0.18, hh=ch*0.64;
+      g.strokeStyle=rgba(C.dim,.22*e); g.lineWidth=1;
+      g.strokeRect(gx-7.5, yy+.5, 15, hh);
+      var act=0.5+0.5*Math.sin(t*2+c*0.8+q);
+      g.fillStyle=rgba(C.trace,act*0.18*e); g.fillRect(gx-6.5,yy+1,13,hh-1);
+    }
+    g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.muted,.75*e);
+    g.textAlign="center"; g.textBaseline="bottom";
+    g.fillText(["CONV","RNN","DENSE"][q], gx, top-12); g.textAlign="left";
+  }
+  /* verdict trays */
+  var vx=w*0.84;
+  g.fillStyle=rgba(C.sig,.85*e); g.fillRect(vx,h*0.36,Math.min(140,w*0.11),26);
+  g.font="400 9.5px 'IBM Plex Mono', monospace"; g.fillStyle=rgba(C.ink,1);
+  g.textBaseline="middle"; g.fillText("BOTNET", vx+8, h*0.36+13);
+  g.strokeStyle=rgba(C.dim,.3*e); g.lineWidth=1; g.strokeRect(vx+.5,h*0.46+.5,Math.min(140,w*0.11),26);
+  g.fillStyle=rgba(C.muted,.85*e); g.fillText("BENIGN", vx+8, h*0.46+13);
+
+  /* packets */
+  for(var k=0;k<pkts.length;k++){
+    var p=pkts[k];
+    var f=((t*p.sp+p.o)%1);
+    var px=f*w, py=top+p.y*(bot-top);
+    /* bend toward its verdict tray after the last gate */
+    if(px>gates[2]){
+      var g2=(px-gates[2])/(w-gates[2]);
+      var ty=p.bad? h*0.36+13 : h*0.46+13;
+      py=py+(ty-py)*Math.min(1,g2*1.6);
+    }
+    g.fillStyle=p.bad?rgba(C.sig,.9*e):rgba(C.trace,.45*e);
+    g.fillRect(px,py,p.bad?7:5,1.6);
+  }
+  g.strokeStyle=rgba(C.dim,.1*e); g.lineWidth=1;
+  g.beginPath(); g.moveTo(0,top-1); g.lineTo(w,top-1); g.moveTo(0,bot+1); g.lineTo(w,bot+1); g.stroke();
+}
+
+var SCENES = { zagros:sceneZagros, onepharma:sceneGraph, pearl:scenePearl, falah:sceneFalah, nids:sceneNids };
+
+var plates = [];
+(function(){
+  var t0 = performance.now(), raf = 0, pending = 0;
+  Array.prototype.forEach.call(document.querySelectorAll(".proj"), function(sec){
+    var i = sec.getAttribute("data-id"), cv = sec.querySelector(".plate-scene");
+    if (!cv || !cv.getContext || !SCENES[i]) return;
+    plates.push({ cv:cv, g:cv.getContext("2d"), box:sec.querySelector(".plate"), w:0, h:0, i:i, visible:false, enterT:0 });
+  });
+
+  function fitPlate(p){
+    var dpr = Math.min(window.devicePixelRatio||1, 2);
+    var r = p.box.getBoundingClientRect();
+    var nw = Math.max(1,Math.round(r.width)), nh = Math.max(1,Math.round(r.height));
+    if (nw === p.w && nh === p.h && p.cv.width) return; /* mobile address bar resize: keep layout */
+    p.w = nw; p.h = nh;
+    p.cv.width = p.w*dpr; p.cv.height = p.h*dpr;
+    p.g.setTransform(dpr,0,0,dpr,0,0);
+    if (p.i === "onepharma") gSized = 0;
+  }
+  function drawPlate(p,t,e){
+    p.g.clearRect(0,0,p.w,p.h);
+    p.g.fillStyle = C.ink; p.g.fillRect(0,0,p.w,p.h);
+    SCENES[p.i](p.g,p.w,p.h,t,e);
+  }
+  function anyVisible(){ for (var k=0;k<plates.length;k++) if (plates[k].visible) return true; return false; }
+  function frame(now){
+    raf = 0;
+    var t = (now-t0)/1000;
+    for (var k=0;k<plates.length;k++){
+      var p = plates[k]; if (!p.visible) continue;
+      var e = Math.min(1,(now-p.enterT)/900); e = 1-Math.pow(1-e,3);
+      drawPlate(p,t,e);
+    }
+    if (!document.hidden && anyVisible()) raf = requestAnimationFrame(frame);
+  }
+  function run(){ if (!raf && !document.hidden && anyVisible()) raf = requestAnimationFrame(frame); }
+  function stillAll(){ plates.forEach(function(p){ drawPlate(p,2,1); }); }
+
+  plates.forEach(fitPlate);
+  addEventListener("resize", function(){
+    if (pending) return;
+    pending = requestAnimationFrame(function(){
+      pending = 0; plates.forEach(fitPlate);
+      if (reduced) stillAll();
+    });
+  });
+  if (reduced) { stillAll(); if (document.fonts) document.fonts.ready.then(stillAll); return; }
+  if ("IntersectionObserver" in window) {
+    var plateIO = new IntersectionObserver(function(es){
+      es.forEach(function(en){
+        var p = plates.filter(function(q){ return q.box === en.target; })[0];
+        if (!p) return;
+        if (en.isIntersecting && !p.visible) p.enterT = performance.now();
+        p.visible = en.isIntersecting;
+      });
+      run();
+    }, { rootMargin:"100px" });
+    plates.forEach(function(p){ plateIO.observe(p.box); });
+  } else plates.forEach(function(p){ p.visible = true; p.enterT = performance.now(); });
+  document.addEventListener("visibilitychange", run);
+  run();
+})();
 })();
 
 document.querySelectorAll("[data-booking]").forEach(function(a){

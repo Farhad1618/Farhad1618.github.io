@@ -81,7 +81,7 @@ One scrolling story page in `site.html`. Six chapters:
 6. Contact (05)
 
 Key facts:
-- One shared rAF drives all project plates; the hero has its own rAF inside `hero.js`.
+- Work plates: Cyrus has its solo 3D piece (`data-solo`, `hero-solo.js`, `assets/solo/cyrus`); the other five keep their Canvas 2D scenes (`canvas.plate-scene`, PLATE SCENES in `site.html`, one shared rAF) until their pieces are made. A plate never ships empty (check-site tests it). The hero has its own rAF inside `hero.js`.
 - GSAP + ScrollTrigger reveals are gated by `html.motion`.
 - `BOOKING_URL` (JS constant). Empty means the "Book a time" button is hidden.
 - Who headline (01): centred sentence with three inline pills (portrait, `chaos` lattice canvas, `graph` canvas). Each pill unfolds from an amber dot on the baseline (GSAP, in the motion block). Photo slot: `data-photo` on the first `.pill`. Empty means the F monogram shows.
