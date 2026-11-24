@@ -265,16 +265,26 @@ def _matcap(path, size=256):
     _write_png(np.clip(out, 0, 1) ** (1 / 2.2), path)
 
 
-def bake_and_export(objs, assets_dir, out_dir, draft):
+def bake_and_export(objs, assets_dir, out_dir, draft, ids=pieces.PIECE_IDS, cam="landscape", sizes=None,
+                    glb_name="pieces.glb", mode="hero"):
+    """Bake the board, then each piece and plinth in ids, from camera cam, and export glb_name.
+    sizes: texture sizes in pixels, {"board", "piece", "plinth"} (defaults are the hero's, halved in draft).
+    mode "solo" arrives with the solo stage."""
+    if mode != "hero":
+        raise NotImplementedError("bake mode " + mode)
+    sizes = sizes or {}
+    sz_board = sizes.get("board", 1024 if draft else 2048)
+    sz_piece = sizes.get("piece", 512 if draft else 1024)
+    sz_plinth = sizes.get("plinth", 256 if draft else 512)
     sc = bpy.context.scene
     # The fog stays in for the bakes: it is what throws the one light back onto the faces turned to the camera
     # (the lit marble fronts and their highlights in the posters). Without it those faces bake near black.
     objs["haze"].hide_render = False
-    scene.set_camera(objs, "landscape")
+    scene.set_camera(objs, cam)
 
     baked = []
     # board: full shading as seen from the landscape camera, so reflections are in the texture
-    lin = _bake(objs["board"], 1024 if draft else 2048, glossy=True, from_camera=True)
+    lin = _bake(objs["board"], sz_board, glossy=True, from_camera=True)
     png = os.path.join(out_dir, "board.png")
     _write_png(_tonemap(lin), png)
     baked.append((objs["board"], png))
@@ -283,8 +293,8 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
     # subsurface glow through thin alabaster and ivory, the specular sheen and the true depth of the
     # shadows are in the texture exactly as the poster shows them (hero.js adds only a faint matcap glint,
     # uSheen 0.06 on every piece). Baked from the landscape camera only: portrait views reuse these highlights.
-    for pid in pieces.PIECE_IDS:
-        for ob, s in ((objs["pieces"][pid], 512 if draft else 1024), (objs["plinths"][pid], 256 if draft else 512)):
+    for pid in ids:
+        for ob, s in ((objs["pieces"][pid], sz_piece), (objs["plinths"][pid], sz_plinth)):
             lin = _bake(ob, s, glossy=True, from_camera=True)
             png = os.path.join(out_dir, ob.name + ".png")
             _write_png(_tonemap(lin), png)
@@ -299,13 +309,14 @@ def bake_and_export(objs, assets_dir, out_dir, draft):
         o.select_set(False)
     for ob, _png in baked:
         ob.select_set(True)
-    raw = os.path.join(out_dir, "pieces.raw.glb")
+    stem = os.path.splitext(glb_name)[0]
+    raw = os.path.join(out_dir, stem + ".raw.glb")
     bpy.ops.export_scene.gltf(filepath=raw, export_format="GLB", use_selection=True, export_yup=True,
                               export_apply=True, export_normals=True, export_tangents=False,
                               export_cameras=False, export_lights=False, export_materials="EXPORT",
                               export_vertex_color="ACTIVE", export_extras=True)   # part ids (COLOR_0) and rigs (extras) for the hover moves
-    mid = os.path.join(out_dir, "pieces.webp.glb")
+    mid = os.path.join(out_dir, stem + ".webp.glb")
     cli = ["npx", "--yes", "@gltf-transform/cli@4.1.0"]
     subprocess.run(cli + ["webp", raw, mid, "--quality", "82"], check=True)
-    subprocess.run(cli + ["meshopt", mid, os.path.join(assets_dir, "pieces.glb")], check=True)
-    print("wrote pieces.glb", os.path.getsize(os.path.join(assets_dir, "pieces.glb")), "bytes")
+    subprocess.run(cli + ["meshopt", mid, os.path.join(assets_dir, glb_name)], check=True)
+    print("wrote", glb_name, os.path.getsize(os.path.join(assets_dir, glb_name)), "bytes")

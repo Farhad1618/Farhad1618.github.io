@@ -257,14 +257,16 @@ def board_material():
     return mat
 
 
-def build_board():
+def build_board(center=BOARD_CENTER, size=BOARD_SIZE, placement=PLACEMENT, platform=PLATFORM, seed=11,
+                back=False, name="board"):
     """Blocks of stone at uneven heights. Tops carry the inlay; sides are plain dark stone.
     UVs: tops are a straight top-down projection in the upper 80% of the map, the visible
-    sides (front, left, right) are packed into a strip along the bottom."""
-    rng = random.Random(11)
-    x0, y0 = BOARD_CENTER[0] - BOARD_SIZE[0] / 2, BOARD_CENTER[1] - BOARD_SIZE[1] / 2
-    kx = range(int(math.floor(x0 / TILE)), int(math.ceil((x0 + BOARD_SIZE[0]) / TILE)) + 1)
-    ky = range(int(math.floor(y0 / TILE)), int(math.ceil((y0 + BOARD_SIZE[1]) / TILE)) + 1)
+    sides (front, left, right) are packed into a strip along the bottom. back=True also builds the back face
+    (the hero never does; a close, tilted solo view can see it). The rng call order is the hero's."""
+    rng = random.Random(seed)
+    x0, y0 = center[0] - size[0] / 2, center[1] - size[1] / 2
+    kx = range(int(math.floor(x0 / TILE)), int(math.ceil((x0 + size[0]) / TILE)) + 1)
+    ky = range(int(math.floor(y0 / TILE)), int(math.ceil((y0 + size[1]) / TILE)) + 1)
     W, D = len(kx) * TILE, len(ky) * TILE
     ox, oy = (kx[0] - 0.5) * TILE, (ky[0] - 0.5) * TILE
     reach = REACH
@@ -275,16 +277,16 @@ def build_board():
         for j in ky:
             cx, cy = i * TILE, j * TILE
             h = rng.choice((0.0, 0.0, 0.07, 0.14, 0.22, 0.32, 0.44))     # steps deep enough to throw a shadow
-            for pid, (px, py, _yaw) in PLACEMENT.items():
+            for pid, (px, py, _yaw) in placement.items():
                 if abs(cx - px) < reach and abs(cy - py) < reach:
-                    h = PLATFORM[pid]
+                    h = platform[pid]
             a = TILE / 2 - TILE_GAP / 2
             lo = -0.6
             c = [(cx - a, cy - a), (cx + a, cy - a), (cx + a, cy + a), (cx - a, cy + a)]
             top = bm.faces.new([bm.verts.new((x, y, h)) for x, y in c])
             for loop in top.loops:
                 loop[uv].uv = ((loop.vert.co.x - ox) / W, 0.2 + 0.8 * (loop.vert.co.y - oy) / D)
-            for e in ((0, 1), (1, 2), (3, 0)):          # front, right, left; the back is never seen
+            for e in ((0, 1), (1, 2), (3, 0)) + (((2, 3),) if back else ()):   # front, right, left; the back only on request
                 p, q = c[e[0]], c[e[1]]
                 f = bm.faces.new([bm.verts.new((p[0], p[1], lo)), bm.verts.new((q[0], q[1], lo)),
                                   bm.verts.new((q[0], q[1], h)), bm.verts.new((p[0], p[1], h))])
@@ -298,10 +300,10 @@ def build_board():
         for loop, (du, dv) in zip(f.loops, ((0.1, 0.1), (0.9, 0.1), (0.9, 0.9), (0.1, 0.9))):
             loop[uv].uv = (u0 + du * cw, v0 + dv * ch)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-    me = bpy.data.meshes.new("board")
+    me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
-    ob = bpy.data.objects.new("board", me)
+    ob = bpy.data.objects.new(name, me)
     bpy.context.scene.collection.objects.link(ob)
     return ob
 
@@ -331,10 +333,30 @@ def set_camera(objs, which):
     return cam
 
 
-def fov_y_deg(which):
-    _, _, lens, (w, h) = CAMERAS[which]
+def fov_y(lens, w, h):
     half = 18.0 / lens                       # sensor 36 mm fits the longer side
     return math.degrees(2 * math.atan(half / (w / h) if w >= h else half))
+
+
+def fov_y_deg(which):
+    _, _, lens, (w, h) = CAMERAS[which]
+    return fov_y(lens, w, h)
+
+
+def add_camera(name, pos, target, lens, res, focus_ob, fstop=FSTOP):
+    cd = bpy.data.cameras.new(name)
+    cd.lens = lens
+    cd.sensor_width = 36.0
+    cd.sensor_fit = "AUTO"
+    cd.dof.use_dof = True
+    cd.dof.focus_object = focus_ob
+    cd.dof.aperture_fstop = fstop
+    cam = bpy.data.objects.new(name, cd)
+    cam.location = pos
+    cam["res"] = list(res)
+    bpy.context.scene.collection.objects.link(cam)
+    _look_at(cam, target)
+    return cam
 
 
 def clay_lines(mat, axis_z, lines=44, depth=0.6):
@@ -393,8 +415,8 @@ def clay_lines(mat, axis_z, lines=44, depth=0.6):
     L.new(dark.outputs["Result"], bsdf.inputs["Base Color"])
 
 
-def build_scene():
-    sc = bpy.context.scene
+def make_materials():
+    """Every material the scene uses, by role."""
     # ivory with only a whisper of veining: the reference statues are almost plain
     # ivory marble: light comes through where it is thin (wings, rims, chains) and not where it is thick
     pale = marble("marble-pale", (0.84, 0.79, 0.69), (0.60, 0.555, 0.48), vein_scale=1.1, rough=0.42, sss=0.14, aged=True, sss_scale=0.03)
@@ -416,59 +438,43 @@ def build_scene():
     # polished marble takes the light as a clear, tight highlight: unlike the satin ivory, the matte clay or the honed tiles
     _set(plinth_mat.node_tree.nodes["Principled BSDF"], **{"Coat Weight": 0.6, "Coat Roughness": 0.06})
     plinth_mat.node_tree.nodes["Color Ramp"].color_ramp.elements[1].position = 0.04
+    return {"pale": pale, "clay": clay, "mount": alabaster, "gem": gem, "dark": dark, "plinth": plinth_mat,
+            "board": board_material(),    # the board mesh is in world coordinates, so tiles are centred on multiples of TILE
+            "tile-side": marble("tile-side", (0.012, 0.011, 0.010), (0.03, 0.027, 0.024), vein_scale=1.0, rough=0.45, sss=0.0)}
 
-    out = {"pieces": {}, "plinths": {}}
-    for pid in pieces.PIECE_IDS:
-        x, y, yaw = PLACEMENT[pid]
-        pl = pieces.build_plinth(pid)
-        pl.location = (x, y, PLATFORM[pid])
-        pl.data.materials.append(plinth_mat)
-        ob = pieces.BUILDERS[pid]()
-        ob.location = (x, y, PLATFORM[pid] + PLINTH_H)
-        ob.rotation_euler = (0, 0, math.radians(yaw))
-        if pid == "pearl":
-            for m in (dark, pale, gem):
-                ob.data.materials.append(m)
-        else:
-            for m in ((clay, alabaster) if pid == "cyrus" else (pale,)):
-                ob.data.materials.append(m)
-        out["pieces"][pid], out["plinths"][pid] = ob, pl
 
-    board = build_board()
-    bmat = board_material()        # the mesh is in world coordinates, so tiles are centred on multiples of TILE
-    board.data.materials.append(bmat)
-    board.data.materials.append(marble("tile-side", (0.012, 0.011, 0.010), (0.03, 0.027, 0.024), vein_scale=1.0, rough=0.45, sss=0.0))
-    out["board"] = board
+def assign(pid, piece_ob, plinth_ob, M):
+    """Put the materials on a piece and its plinth (slot order is part of the bake contract)."""
+    plinth_ob.data.materials.append(M["plinth"])
+    if pid == "pearl":
+        slots = (M["dark"], M["pale"], M["gem"])
+    elif pid == "cyrus":
+        slots = (M["clay"], M["mount"])
+    else:
+        slots = (M["pale"],)
+    for m in slots:
+        piece_ob.data.materials.append(m)
 
-    world = bpy.data.worlds.new("world")
-    world.use_nodes = True
-    bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (0.0011, 0.0019, 0.0055, 1)    # a hint of dark blue in the shadows and the fog
-    bg.inputs["Strength"].default_value = 1.0
-    sc.world = world
 
-    # One light, after the reference: a single source hidden right behind the Cyrus Cylinder, at its height.
-    # It lights the fog from inside, rims the cylinder, lights the faces of the pieces that turn toward the
-    # centre, and falls off to nothing at the left and right edges of the board. No spots, no fill.
-    cx, cy, _ = PLACEMENT[FOCUS_ID]
+def add_light(loc, energy=900, soft=0.12, color=(1.0, 0.92, 0.80)):
+    """One point light the camera cannot see."""
     ld = bpy.data.lights.new("source", "POINT")
-    ld.energy = 900
-    ld.shadow_soft_size = 0.12
-    ld.color = (1.0, 0.92, 0.80)
+    ld.energy = energy
+    ld.shadow_soft_size = soft
+    ld.color = color
     lo = bpy.data.objects.new("source", ld)
-    # behind the cylinder (not in it), level with the middle of the barrel: the camera cannot see it.
-    # The barrel stands dark against it with a lit outline, and its shadow runs through the air toward the camera.
-    lo.location = (cx, cy + 1.5, PLATFORM[FOCUS_ID] + PLINTH_H + 0.80)
-    sc.collection.objects.link(lo)
+    lo.location = loc
+    bpy.context.scene.collection.objects.link(lo)
     lo.visible_camera = False
-    lights = [lo]
-    out["lights"] = lights
+    return lo
 
-    # haze: used for posters only (bakes hide it)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 4))
+
+def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens=(0.0035, 0.15)):
+    """Banks of low fog in a box. The noise and the height falloff are in the box's object coordinates (-0.5..0.5)."""
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
     haze = bpy.context.object
     haze.name = "haze"
-    haze.scale = (40, 44, 8)
+    haze.scale = scale
     hm = bpy.data.materials.new("haze")
     hm.use_nodes = True
     hn = hm.node_tree
@@ -476,11 +482,11 @@ def build_scene():
     vol = hn.nodes.new("ShaderNodeVolumePrincipled")
     vol.inputs["Color"].default_value = (0.76, 0.81, 0.92, 1)     # smoke-grey with a cold edge
     # Not an even haze: banks of low fog that lie between the pieces, thick in places, thin in others.
-    # The box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
+    # The hero box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
     htc = hn.nodes.new("ShaderNodeTexCoord")
     hmap = hn.nodes.new("ShaderNodeMapping")
     hmap.inputs["Scale"].default_value = (21.0, 23.0, 6.0)
-    hmap.inputs["Location"].default_value = (3.1, 0.7, 0.0)
+    hmap.inputs["Location"].default_value = noise_loc
     hn.links.new(htc.outputs["Object"], hmap.inputs["Vector"])
     hnoise = hn.nodes.new("ShaderNodeTexNoise")
     hnoise.inputs["Scale"].default_value = 1.0
@@ -506,28 +512,56 @@ def build_scene():
     mul.operation = "MULTIPLY"
     hn.links.new(bank.outputs["Result"], mul.inputs[0])
     hn.links.new(low.outputs["Result"], mul.inputs[1])
-    dens = hn.nodes.new("ShaderNodeMapRange")
-    dens.inputs["To Min"].default_value = 0.0035        # thin air everywhere: enough to show light shafts
-    dens.inputs["To Max"].default_value = 0.15         # the thick of a bank
-    hn.links.new(mul.outputs[0], dens.inputs["Value"])
-    hn.links.new(dens.outputs["Result"], vol.inputs["Density"])
+    d = hn.nodes.new("ShaderNodeMapRange")
+    d.inputs["To Min"].default_value = dens[0]        # thin air everywhere: enough to show light shafts
+    d.inputs["To Max"].default_value = dens[1]        # the thick of a bank
+    hn.links.new(mul.outputs[0], d.inputs["Value"])
+    hn.links.new(d.outputs["Result"], vol.inputs["Density"])
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)
-    out["haze"] = haze
+    return haze
 
-    for which, (pos, target, lens, _res) in CAMERAS.items():
-        cd = bpy.data.cameras.new("cam-" + which)
-        cd.lens = lens
-        cd.sensor_width = 36.0
-        cd.sensor_fit = "AUTO"
-        cd.dof.use_dof = True
-        cd.dof.focus_object = out["pieces"][FOCUS_ID]
-        cd.dof.aperture_fstop = FSTOP
-        cam = bpy.data.objects.new("cam-" + which, cd)
-        cam.location = pos
-        sc.collection.objects.link(cam)
-        _look_at(cam, target)
-        out["cam_" + which] = cam
+
+def build_scene():
+    sc = bpy.context.scene
+    M = make_materials()
+
+    out = {"pieces": {}, "plinths": {}}
+    for pid in pieces.PIECE_IDS:
+        x, y, yaw = PLACEMENT[pid]
+        pl = pieces.build_plinth(pid)
+        pl.location = (x, y, PLATFORM[pid])
+        ob = pieces.BUILDERS[pid]()
+        ob.location = (x, y, PLATFORM[pid] + PLINTH_H)
+        ob.rotation_euler = (0, 0, math.radians(yaw))
+        assign(pid, ob, pl, M)
+        out["pieces"][pid], out["plinths"][pid] = ob, pl
+
+    board = build_board()
+    board.data.materials.append(M["board"])
+    board.data.materials.append(M["tile-side"])
+    out["board"] = board
+
+    world = bpy.data.worlds.new("world")
+    world.use_nodes = True
+    bg = world.node_tree.nodes["Background"]
+    bg.inputs["Color"].default_value = (0.0011, 0.0019, 0.0055, 1)    # a hint of dark blue in the shadows and the fog
+    bg.inputs["Strength"].default_value = 1.0
+    sc.world = world
+
+    # One light, after the reference: a single source hidden right behind the Cyrus Cylinder, at its height.
+    # It lights the fog from inside, rims the cylinder, lights the faces of the pieces that turn toward the
+    # centre, and falls off to nothing at the left and right edges of the board. No spots, no fill.
+    # Behind the cylinder (not in it), level with the middle of the barrel: the camera cannot see it.
+    # The barrel stands dark against it with a lit outline, and its shadow runs through the air toward the camera.
+    cx, cy, _ = PLACEMENT[FOCUS_ID]
+    out["lights"] = [add_light((cx, cy + 1.5, PLATFORM[FOCUS_ID] + PLINTH_H + 0.80))]
+
+    # haze: switched on for the posters and, in bake_and_export, for the bakes
+    out["haze"] = build_haze()
+
+    for which, (pos, target, lens, res) in CAMERAS.items():
+        out["cam_" + which] = add_camera("cam-" + which, pos, target, lens, res, out["pieces"][FOCUS_ID])
 
     try:
         sc.view_settings.view_transform = "AgX"
