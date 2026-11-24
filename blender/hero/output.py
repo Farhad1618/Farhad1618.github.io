@@ -59,6 +59,21 @@ def render_posters(objs, draft, assets_dir, out_dir=None):
     sc.render.resolution_percentage = 100
 
 
+def render_poster(objs, cam, name, assets_dir, out_dir, draft, max_bytes=POSTER_MAX):
+    """One poster from camera object cam (its stored res), with the glow, as name.webp in assets_dir."""
+    sc = bpy.context.scene
+    scene.set_camera(objs, cam)
+    sc.render.resolution_percentage = 50 if draft else 100
+    sc.render.image_settings.file_format = "PNG"
+    png = os.path.join(out_dir, name + ".png")
+    sc.render.filepath = png
+    bpy.ops.render.render(write_still=True)
+    _glow(png)
+    _save_webp(png, os.path.join(assets_dir, name + ".webp"), max_bytes)
+    sc.render.resolution_percentage = 100
+    return png
+
+
 def _smooth_rgba(png_path, r):
     """Fog has no fine detail: blur away the render grain (alpha is never denoised), premultiplied."""
     import numpy as np
@@ -144,6 +159,41 @@ def write_layout(objs, assets_dir):
     print("wrote layout.json")
 
 
+def write_solo_layout(objs, assets_dir):
+    """layout.json for one solo piece, in glTF axes: camera, light, board patch, piece box, tilt range."""
+    from . import solo
+    pid = objs["id"]
+    S = solo.SOLO[pid]
+    cam = objs["cam_solo"]
+    w, h = cam["res"]
+    ob = objs["pieces"][pid]
+    pts = [_gltf(ob.matrix_world @ Vector(c)) for c in ob.bound_box]
+    lo = [min(p[i] for p in pts) for i in range(3)]
+    hi = [max(p[i] for p in pts) for i in range(3)]
+    top = max((ob.matrix_world @ v.co for v in ob.data.vertices), key=lambda q: q.z)
+    (cx, cy), extent = objs["patch"]
+    lt = objs["lights"][0]
+    data = {
+        "id": pid,
+        "camera": {"position": _gltf(S["cam"]["pos"]), "target": _gltf(S["cam"]["target"]),
+                   "fovY": round(scene.fov_y(S["cam"]["lens"], w, h), 3), "aspect": round(w / h, 4)},
+        "light": _gltf(lt.location),
+        "lightCol": [round(c, 4) for c in lt.data.color],
+        "board": {"center": [cx, -cy], "size": list(extent)},
+        "piece": {"min": lo, "max": hi, "top": _gltf(top)},
+        "tilt": list(S["tilt"]),
+    }
+    def tidy(v):                                   # no -0.0 in the file
+        if isinstance(v, dict):
+            return {k: tidy(x) for k, x in v.items()}
+        if isinstance(v, list):
+            return [tidy(x) for x in v]
+        return v + 0.0 if isinstance(v, float) else v
+    with open(os.path.join(assets_dir, "layout.json"), "w") as f:
+        json.dump(tidy(data), f, indent=1)
+    print("wrote", os.path.join(assets_dir, "layout.json"))
+
+
 # ---------------------------------------------------------------- bakes
 
 import math  # noqa: E402
@@ -154,12 +204,17 @@ EXPOSURE = 0.85
 INK_LIN = 0.0037            # --ink #0C0C0E in linear
 
 
-def _tonemap(lin):
-    """Scene-linear -> display sRGB, a filmic curve close to the posters' AgX look."""
+def _tonemap(lin, shoulder=False):
+    """Scene-linear -> display sRGB, a filmic curve close to the posters' AgX look.
+    shoulder: roll display values off from 0.8 toward 1.0 instead of clipping, so faces toward the light
+    keep their modelling instead of burning to flat white (the solo bakes)."""
     x = np.clip(lin * EXPOSURE, 0, None)
     y = (x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14)
-    y = np.clip(y, 0, 1)
-    return np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(y, 1 / 2.4) - 0.055)
+    if not shoulder:
+        y = np.clip(y, 0, 1)
+        return np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(y, 1 / 2.4) - 0.055)
+    d = np.where(y <= 0.0031308, y * 12.92, 1.055 * np.power(np.maximum(y, 0), 1 / 2.4) - 0.055)
+    return np.where(d <= 0.8, d, 0.8 + 0.2 * np.tanh((d - 0.8) / 0.2))
 
 
 def _write_png(arr, path):
@@ -188,7 +243,7 @@ def _bake_target(mat, img):
     N.active = node
 
 
-def _bake(ob, size, glossy, from_camera=False):
+def _bake(ob, size, glossy, from_camera=False, kind="COMBINED", direct=True, indirect=True, color=True):
     sc = bpy.context.scene
     img = bpy.data.images.new("bake-" + ob.name, size, size, alpha=False, float_buffer=True)
     img.colorspace_settings.name = "Non-Color"
@@ -199,14 +254,15 @@ def _bake(ob, size, glossy, from_camera=False):
     ob.select_set(True)
     bpy.context.view_layer.objects.active = ob
     b = sc.render.bake
-    b.use_pass_direct = b.use_pass_indirect = True
+    b.use_pass_direct, b.use_pass_indirect = direct, indirect
     b.use_pass_diffuse = b.use_pass_emit = b.use_pass_transmission = True
     b.use_pass_glossy = glossy
+    b.use_pass_color = color
     b.margin = 16
     b.view_from = "ACTIVE_CAMERA" if from_camera else "ABOVE_SURFACE"
     b.use_selected_to_active = False
-    sc.cycles.bake_type = "COMBINED"
-    bpy.ops.object.bake(type="COMBINED")
+    sc.cycles.bake_type = kind
+    bpy.ops.object.bake(type=kind)
     px = np.empty(size * size * 4, dtype=np.float32)
     img.pixels.foreach_get(px)
     bpy.data.images.remove(img)
@@ -270,6 +326,8 @@ def bake_and_export(objs, assets_dir, out_dir, draft, ids=pieces.PIECE_IDS, cam=
     """Bake the board, then each piece and plinth in ids, from camera cam, and export glb_name.
     sizes: texture sizes in pixels, {"board", "piece", "plinth"} (defaults are the hero's, halved in draft).
     mode "solo" arrives with the solo stage."""
+    if mode == "solo":
+        return _bake_solo(objs, assets_dir, out_dir, draft, ids[0], cam, sizes, glb_name)
     if mode != "hero":
         raise NotImplementedError("bake mode " + mode)
     sizes = sizes or {}
@@ -320,3 +378,154 @@ def bake_and_export(objs, assets_dir, out_dir, draft, ids=pieces.PIECE_IDS, cam=
     subprocess.run(cli + ["webp", raw, mid, "--quality", "82"], check=True)
     subprocess.run(cli + ["meshopt", mid, os.path.join(assets_dir, glb_name)], check=True)
     print("wrote", glb_name, os.path.getsize(os.path.join(assets_dir, glb_name)), "bytes")
+
+
+# ---------------------------------------------------------------- solo bakes
+# The solo view tilts by up to 20 degrees, so nothing that depends on the view is baked: the base map is
+# diffuse, translucency and emission, direct and indirect, with the fog in (its scattered light is what lights
+# the faces turned away from the light), from above each surface. Highlights are drawn live from the mask.
+
+
+def _denoise(lin):
+    """OIDN on a baked float image (Cycles never denoises bakes), through the compositor of a scratch scene."""
+    h, w, _ = lin.shape
+    main = bpy.context.window.scene if bpy.context.window else bpy.context.scene
+    tmp = bpy.data.scenes.new("denoise")
+    px = np.ones((h, w, 4), dtype=np.float32)
+    px[..., :3] = lin
+    img = bpy.data.images.new("noisy", w, h, alpha=False, float_buffer=True)
+    img.colorspace_settings.name = "Non-Color"
+    img.pixels.foreach_set(px.ravel())
+    tree = bpy.data.node_groups.new("denoise", "CompositorNodeTree")
+    tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+    n_in = tree.nodes.new("CompositorNodeImage")
+    n_in.image = img
+    dn = tree.nodes.new("CompositorNodeDenoise")
+    if "HDR" in dn.inputs:
+        dn.inputs["HDR"].default_value = True
+    n_out = tree.nodes.new("NodeGroupOutput")
+    tree.links.new(n_in.outputs["Image"], dn.inputs["Image"])
+    tree.links.new(dn.outputs["Image"], n_out.inputs[0])
+    tmp.compositing_node_group = tree
+    tmp.render.engine = "CYCLES"
+    tmp.render.use_compositing = True
+    tmp.render.resolution_x, tmp.render.resolution_y, tmp.render.resolution_percentage = w, h, 100
+    tmp.view_settings.view_transform = "Standard"
+    tmp.display_settings.display_device = "sRGB"
+    tmp.render.image_settings.file_format = "OPEN_EXR"
+    tmp.render.image_settings.color_depth = "32"
+    path = os.path.join(bpy.app.tempdir or "/tmp", "denoise.exr")
+    tmp.render.filepath = path
+    bpy.ops.render.render(write_still=True, scene=tmp.name)
+    out = bpy.data.images.load(path)
+    out.colorspace_settings.name = "Non-Color"
+    res = np.empty(w * h * 4, dtype=np.float32)
+    out.pixels.foreach_get(res)
+    for d in (out, img):
+        bpy.data.images.remove(d)
+    bpy.data.node_groups.remove(tree)
+    bpy.data.scenes.remove(tmp)
+    if bpy.context.window:
+        bpy.context.window.scene = main
+    return res.reshape(h, w, 4)[..., :3]
+
+
+def _emit_spec(ob):
+    """Swap ob's materials for flat emitters of their highlight strength (solo_pieces.SPEC); returns a restore."""
+    from . import solo_pieces
+    saved = [m for m in ob.data.materials]
+    flats = []
+    for m in saved:
+        key = m.name.split(".")[0]
+        f = bpy.data.materials.new("spec-" + key)
+        f.use_nodes = True
+        nt = f.node_tree
+        nt.nodes.remove(nt.nodes["Principled BSDF"])
+        em = nt.nodes.new("ShaderNodeEmission")
+        v = solo_pieces.SPEC.get(key, 0.35)
+        em.inputs["Color"].default_value = (v, v, v, 1)
+        em.inputs["Strength"].default_value = 1.0
+        nt.links.new(em.outputs["Emission"], nt.nodes["Material Output"].inputs["Surface"])
+        flats.append(f)
+    for i, f in enumerate(flats):
+        ob.data.materials[i] = f
+
+    def restore():
+        for i, m in enumerate(saved):
+            ob.data.materials[i] = m
+        for f in flats:
+            bpy.data.materials.remove(f)
+    return restore
+
+
+def _mask(ob, size, haze, draft):
+    """The piece's live-highlight mask: R gloss (1 - roughness), G direct light from the one light (no colour,
+    over its 99th percentile), B highlight strength per material."""
+    sc = bpy.context.scene
+    rough = _bake(ob, size, glossy=False, kind="ROUGHNESS")[..., 0]
+    haze.hide_render = True                       # visibility of the light itself, not of the fog
+    samples = sc.cycles.samples
+    sc.cycles.samples = 32 if draft else 128
+    direct = _denoise(_bake(ob, size, glossy=False, kind="DIFFUSE", direct=True, indirect=False, color=False))
+    sc.cycles.samples = samples
+    haze.hide_render = False
+    g = direct.mean(axis=-1)
+    lit = g[g > 1e-5]
+    p99 = float(np.percentile(lit, 99)) if lit.size else 1.0
+    g = np.clip(g / max(p99, 1e-6), 0, 1)
+    restore = _emit_spec(ob)
+    spec = _bake(ob, size, glossy=False, kind="EMIT")[..., 0]
+    restore()
+    m = np.stack([np.clip(1 - rough, 0, 1), g, np.clip(spec, 0, 1)], axis=-1)
+    print(f"mask {ob.name}: gloss {m[..., 0].mean():.2f} light p99 {p99:.4f} spec {m[..., 2].mean():.2f}")
+    return m
+
+
+def _swap_to_solo(ob, base_png, mask_png=None):
+    """The bake as base colour; the mask in the emissive slot (hero.js reads it as data, not as light)."""
+    _swap_to_baked(ob, base_png)
+    if mask_png:
+        nt = ob.data.materials[0].node_tree
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(mask_png)
+        bsdf = nt.nodes["Principled BSDF"]
+        nt.links.new(tex.outputs["Color"], bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = 1.0
+
+
+def _bake_solo(objs, assets_dir, out_dir, draft, pid, cam, sizes, glb_name):
+    sc = bpy.context.scene
+    haze = objs["haze"]
+    haze.hide_render = False
+    scene.set_camera(objs, cam)
+    board, piece, plinth = objs["board"], objs["pieces"][pid], objs["plinths"][pid]
+    done = []
+    for ob, size in ((board, sizes["board"]), (plinth, sizes["plinth"]), (piece, sizes["piece"])):
+        lin = _denoise(_bake(ob, size, glossy=False))
+        png = os.path.join(out_dir, ob.name + ".png")
+        _write_png(_tonemap(lin, shoulder=True), png)
+        done.append([ob, png, None])
+    mask_png = os.path.join(out_dir, piece.name + "-mask.png")
+    _write_png(_mask(piece, sizes["mask"], haze, draft), mask_png)
+    done[-1][2] = mask_png
+    for ob, png, mpng in done:
+        _swap_to_solo(ob, png, mpng)
+
+    for o in bpy.context.view_layer.objects:
+        o.select_set(False)
+    for ob, _p, _m in done:
+        ob.select_set(True)
+    stem = os.path.splitext(glb_name)[0]
+    raw = os.path.join(out_dir, stem + ".raw.glb")
+    bpy.ops.export_scene.gltf(filepath=raw, export_format="GLB", use_selection=True, export_yup=True,
+                              export_apply=True, export_normals=True, export_tangents=False,
+                              export_cameras=False, export_lights=False, export_materials="EXPORT",
+                              export_vertex_color="ACTIVE", export_extras=True)
+    mid = os.path.join(out_dir, stem + ".webp.glb")
+    mid2 = os.path.join(out_dir, stem + ".webp2.glb")
+    cli = ["npx", "--yes", "@gltf-transform/cli@4.1.0"]
+    subprocess.run(cli + ["webp", raw, mid, "--quality", "82", "--slots", "baseColorTexture"], check=True)
+    subprocess.run(cli + ["webp", mid, mid2, "--quality", "90", "--slots", "emissiveTexture"], check=True)
+    dst = os.path.join(assets_dir, glb_name)
+    subprocess.run(cli + ["meshopt", mid2, dst], check=True)
+    print("wrote", dst, os.path.getsize(dst), "bytes")

@@ -1,5 +1,6 @@
-// Asset contract and budget check for the chessboard hero.
-// Usage: node scripts/check-hero-assets.mjs
+// Asset contract and budget check for the chessboard hero, and for the solo close-ups (assets/solo/<id>/).
+// Usage: node scripts/check-hero-assets.mjs [--solo <id>]...
+//   Every folder in assets/solo/ is checked; --solo <id> also requires that piece's folder to exist.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,8 +17,8 @@ const has = f => fs.existsSync(path.join(dir, f));
 const isNums = (a, n) => Array.isArray(a) && a.length === n && a.every(v => typeof v === "number" && Number.isFinite(v));
 
 function readLayout() { return JSON.parse(fs.readFileSync(path.join(dir, "layout.json"), "utf8")); }
-function readGlb() {
-  const b = fs.readFileSync(path.join(dir, "pieces.glb"));
+function readGlb(file = path.join(dir, "pieces.glb")) {
+  const b = fs.readFileSync(file);
   if (b.readUInt32LE(0) !== 0x46546c67) throw new Error("not a GLB");
   const len = b.readUInt32LE(12), type = b.readUInt32LE(16);
   if (type !== 0x4e4f534a) throw new Error("first chunk is not JSON");
@@ -99,6 +100,62 @@ check("triangle cap", () => {
   }
   return errs;
 });
+
+// ---------------------------------------------------------------- solo close-ups
+const SOLO_DIR = path.join(root, "assets", "solo");
+const SOLO_FILES = ["solo.glb", "poster.webp", "layout.json"];
+const SOLO_TRI_MAX = 120000;
+const argv = process.argv.slice(2);
+const soloIds = new Set(fs.existsSync(SOLO_DIR) ? fs.readdirSync(SOLO_DIR).filter(f => fs.statSync(path.join(SOLO_DIR, f)).isDirectory()) : []);
+for (let i = 0; i < argv.length; i++) if (argv[i] === "--solo" && argv[i + 1]) soloIds.add(argv[++i]);
+
+for (const id of [...soloIds].sort()) {
+  const d = path.join(SOLO_DIR, id);
+  const at = f => path.join(d, f);
+  check(`solo ${id}: files`, () => SOLO_FILES.filter(f => !fs.existsSync(at(f))).map(f => `missing assets/solo/${id}/${f}`));
+  check(`solo ${id}: budget`, () => {
+    if (!fs.existsSync(d)) return [`assets/solo/${id} missing`];
+    const errs = [];
+    let total = 0;
+    for (const f of fs.readdirSync(d)) total += fs.statSync(at(f)).size;
+    if (total > BUDGET) errs.push(`assets/solo/${id} is ${total} bytes, over ${BUDGET}`);
+    if (fs.existsSync(at("poster.webp"))) {
+      const s = fs.statSync(at("poster.webp")).size;
+      if (s > POSTER_MAX) errs.push(`solo ${id} poster.webp is ${s} bytes, over ${POSTER_MAX}`);
+    }
+    if (!errs.length) console.log(`      total ${(total / 1024).toFixed(0)} KB`);
+    return errs;
+  });
+  check(`solo ${id}: glb`, () => {
+    if (!fs.existsSync(at("solo.glb"))) return [`missing assets/solo/${id}/solo.glb`];
+    const g = readGlb(at("solo.glb")), errs = [], names = (g.nodes || []).map(n => n.name);
+    for (const n of [`piece-${id}`, `plinth-${id}`, "board"]) if (!names.includes(n)) errs.push(`node ${n} missing`);
+    for (const e of ["EXT_meshopt_compression", "EXT_texture_webp"]) if (!(g.extensionsUsed || []).includes(e)) errs.push(`${e} not used`);
+    const node = (g.nodes || []).find(n => n.name === `piece-${id}`);
+    if (node && node.mesh !== undefined) {
+      let tris = 0, emissive = true;
+      for (const pr of g.meshes[node.mesh].primitives) {
+        tris += g.accessors[pr.indices].count / 3;
+        const m = (g.materials || [])[pr.material];
+        if (!m || !m.emissiveTexture) emissive = false;
+      }
+      if (tris > SOLO_TRI_MAX) errs.push(`piece-${id} has ${tris} triangles, over ${SOLO_TRI_MAX}`);
+      if (!emissive) errs.push(`piece-${id} has no emissive (mask) texture`);
+    } else errs.push(`piece-${id} has no mesh`);
+    return errs;
+  });
+  check(`solo ${id}: layout`, () => {
+    if (!fs.existsSync(at("layout.json"))) return [`missing assets/solo/${id}/layout.json`];
+    const L = JSON.parse(fs.readFileSync(at("layout.json"), "utf8")), errs = [];
+    const c = L.camera || {};
+    if (!isNums(c.position, 3) || !isNums(c.target, 3)) errs.push("camera.position/target must be 3-number arrays");
+    if (!(c.fovY >= 4 && c.fovY <= 40)) errs.push(`camera.fovY ${c.fovY} outside 4..40`);
+    if (!isNums(L.light, 3)) errs.push("light must be a 3-number array");
+    if (!L.board || !isNums(L.board.center, 2) || !isNums(L.board.size, 2)) errs.push("board.center / board.size must be 2-number arrays");
+    if (!isNums(L.tilt, 2)) errs.push("tilt must be a 2-number array");
+    return errs;
+  });
+}
 
 let failed = 0;
 for (const c of checks) {

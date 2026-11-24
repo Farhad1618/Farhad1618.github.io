@@ -324,10 +324,16 @@ def _area(name, loc, target, energy, size, color):
 
 
 def set_camera(objs, which):
+    """which: a CAMERAS key ("landscape", "portrait"), or a camera object made by add_camera (its stored res)."""
     sc = bpy.context.scene
-    cam = objs["cam_" + which]
+    if isinstance(which, str):
+        cam = objs["cam_" + which]
+        res = CAMERAS[which][3]
+    else:
+        cam = which
+        res = tuple(cam["res"])
     sc.camera = cam
-    sc.render.resolution_x, sc.render.resolution_y = CAMERAS[which][3]
+    sc.render.resolution_x, sc.render.resolution_y = res
     sc.render.resolution_percentage = 100
     bpy.context.view_layer.update()
     return cam
@@ -469,8 +475,15 @@ def add_light(loc, energy=900, soft=0.12, color=(1.0, 0.92, 0.80)):
     return lo
 
 
-def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens=(0.0035, 0.15)):
-    """Banks of low fog in a box. The noise and the height falloff are in the box's object coordinates (-0.5..0.5)."""
+HAZE_FREQ = (21.0 / 40, 23.0 / 44, 6.0 / 8)     # the hero's bank noise, in cycles per metre (x, y, z)
+HAZE_TOP = 2.88                                  # the banks thin out from the board to about this high (m)
+
+
+def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens=(0.0035, 0.15),
+               noise_scale=(21.0, 23.0, 6.0), low_z=(-0.5, -0.14)):
+    """Banks of low fog in a box. The noise and the height falloff are in the box's object coordinates (-0.5..0.5).
+    noise_scale and low_z (where the height falloff runs from 1 to 0) are in those coordinates too; the defaults are the hero's 40 x 44 x 8 m box. For another
+    box, haze_mapping(loc, scale) gives the values that keep the banks the hero's size in metres."""
     bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
     haze = bpy.context.object
     haze.name = "haze"
@@ -485,7 +498,7 @@ def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens
     # The hero box is 40 x 44 x 8 m and object coordinates run -0.5..0.5 across it.
     htc = hn.nodes.new("ShaderNodeTexCoord")
     hmap = hn.nodes.new("ShaderNodeMapping")
-    hmap.inputs["Scale"].default_value = (21.0, 23.0, 6.0)
+    hmap.inputs["Scale"].default_value = noise_scale
     hmap.inputs["Location"].default_value = noise_loc
     hn.links.new(htc.outputs["Object"], hmap.inputs["Vector"])
     hnoise = hn.nodes.new("ShaderNodeTexNoise")
@@ -503,8 +516,8 @@ def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens
     hn.links.new(htc.outputs["Object"], sep.inputs["Vector"])
     low = hn.nodes.new("ShaderNodeMapRange")          # 1 at the board, 0 about 2.6 m up
     low.interpolation_type = "SMOOTHSTEP"
-    low.inputs["From Min"].default_value = -0.5
-    low.inputs["From Max"].default_value = -0.14
+    low.inputs["From Min"].default_value = low_z[0]
+    low.inputs["From Max"].default_value = low_z[1]
     low.inputs["To Min"].default_value = 1.0
     low.inputs["To Max"].default_value = 0.0
     hn.links.new(sep.outputs["Z"], low.inputs["Value"])
@@ -520,6 +533,14 @@ def build_haze(loc=(0, 0, 4), scale=(40, 44, 8), noise_loc=(3.1, 0.7, 0.0), dens
     hn.links.new(vol.outputs["Volume"], hn.nodes["Material Output"].inputs["Volume"])
     haze.data.materials.append(hm)
     return haze
+
+
+def haze_mapping(loc, scale):
+    """noise_scale and low_z for build_haze so a box at loc of size scale has the hero's banks, metre for metre
+    (same bank size, same height falloff from z 0 to HAZE_TOP)."""
+    ns = tuple(round(f * s, 4) for f, s in zip(HAZE_FREQ, scale))
+    lo = ((0.0 - loc[2]) / scale[2], (HAZE_TOP - loc[2]) / scale[2])
+    return ns, lo
 
 
 def build_scene():

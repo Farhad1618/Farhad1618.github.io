@@ -1,12 +1,16 @@
 """Builds the chessboard hero assets.
 
     blender --background --factory-startup --python blender/build_hero.py -- --stage <pieces|stills|export|all> [--draft]
+    blender --background --factory-startup --python blender/build_hero.py -- --stage solo --piece cyrus [--draft]
 
 pieces  clay contact sheet of the six pieces  -> blender/out/pieces-sheet.png
 stills  posters + layout.json                 -> assets/hero/
 atmos   the fog on its own (atmos*.webp)      -> assets/hero/  (not used by the site; for comparison)
-export  baked textures, sprites, pieces.glb   -> assets/hero/
+export  baked textures, matcap, pieces.glb   -> assets/hero/
 all     stills + export
+solo        per --piece (repeatable; default every piece with a solo builder): the detailed piece alone on
+            its tile: poster.webp, solo.glb, layout.json -> assets/solo/<id>/, intermediates in blender/out/solo/<id>/
+solo-clay   the detailed piece in plain clay, three sides and a close-up -> blender/out/solo/<id>/clay*.png
 """
 import argparse
 import math
@@ -24,13 +28,17 @@ from hero import pieces  # noqa: E402
 OUT = os.path.join(HERE, "out")
 ASSETS = os.path.join(ROOT, "assets", "hero")
 TRI_MAX, H_MIN, H_MAX = 15000, 1.0, 1.3
+SOLO_TRI_MAX = 120000
 
 
 def parse():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     ap = argparse.ArgumentParser()
-    ap.add_argument("--stage", choices=["pieces", "stills", "atmos", "export", "all"], default="all")
+    ap.add_argument("--stage", choices=["pieces", "stills", "atmos", "export", "all", "solo", "solo-clay"],
+                    default="all")
     ap.add_argument("--draft", action="store_true")
+    ap.add_argument("--piece", action="append", help="solo stages: a piece id (repeatable)")
+    ap.add_argument("--poster-only", action="store_true", help="solo: poster and layout, no bakes (for tuning)")
     return ap.parse_args(argv)
 
 
@@ -54,11 +62,11 @@ def use_cycles(samples):
         print("cycles: GPU unavailable, using CPU:", e)
 
 
-def report(objs):
+def report(objs, tri_max=TRI_MAX):
     bad = False
     for pid, ob in objs.items():
         t, h = pieces.tri_count(ob), pieces.height(ob)
-        ok = t <= TRI_MAX and H_MIN <= h <= H_MAX
+        ok = t <= tri_max and H_MIN <= h <= H_MAX
         bad |= not ok
         print(f"{pid} tris={t} height={h:.3f}{'' if ok else '  <-- OUT OF RANGE'}")
     return not bad
@@ -124,11 +132,45 @@ def stage_pieces():
     return ok
 
 
+def stage_solo(ids, draft, clay_only, poster_only=False):
+    import time
+    from hero import output, solo
+    ok = True
+    for pid in ids:
+        t0 = time.time()
+        out_dir = os.path.join(OUT, "solo", pid)
+        assets_dir = os.path.join(ROOT, "assets", "solo", pid)
+        os.makedirs(out_dir, exist_ok=True)
+        reset()
+        S = solo.SOLO[pid]
+        use_cycles(64 if draft else 128)
+        if clay_only:
+            ok &= report(solo.clay_sheet(pid, out_dir, draft), SOLO_TRI_MAX)
+            continue
+        objs = solo.build_solo(pid, draft)
+        ok &= report(objs["pieces"], SOLO_TRI_MAX)
+        os.makedirs(assets_dir, exist_ok=True)
+        use_cycles(64 if draft else S["samples"])
+        output.render_poster(objs, objs["cam_solo"], "poster", assets_dir, out_dir, draft)
+        output.write_solo_layout(objs, assets_dir)
+        if poster_only:
+            continue
+        sizes = {k: (v // 2 if draft else v) for k, v in S["tex"].items()}
+        use_cycles(48 if draft else S["samples"])
+        output.bake_and_export(objs, assets_dir, out_dir, draft, ids=[pid], cam=objs["cam_solo"], sizes=sizes,
+                               glb_name="solo.glb", mode="solo")
+        print(f"solo {pid}: {time.time() - t0:.0f} s")
+    return ok
+
+
 def main():
     args = parse()
     ok = True
     if args.stage == "pieces":
         ok = stage_pieces()
+    elif args.stage in ("solo", "solo-clay"):
+        from hero import solo
+        ok = stage_solo(args.piece or list(solo.SOLO), args.draft, args.stage == "solo-clay", args.poster_only)
     else:
         from hero import output, scene
         reset()
