@@ -9,7 +9,7 @@ const src = readFileSync(join(root, "site.html"), "utf8");
 const all = process.argv.includes("--all");
 
 const TOKENS = {
-  ink: "#0A0F1C", "ink-2": "#12192B", rule: "#1E2539", "rule-soft": "#151C2D",
+  ink: "#08090D", "ink-2": "#121319", rule: "#22242C", "rule-soft": "#17181E",
   bone: "#ECE7DC", dim: "#A8A49C", muted: "#716E68", sig: "#E9A03B", trace: "#5FA8B8",
 };
 const JS_KEYS = { ink: "ink", ink2: "ink-2", bone: "bone", dim: "dim", muted: "muted", sig: "sig", trace: "trace" };

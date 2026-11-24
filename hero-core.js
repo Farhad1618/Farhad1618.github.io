@@ -122,7 +122,7 @@ export async function createCore(opts = {}) {
     uniforms: {
       tColor: { value: rt.texture }, tDepth: { value: rt.depthTexture }, uPx: { value: new THREE.Vector2() },
       uNear: { value: 0.5 }, uFar: { value: 60 }, uFocus: { value: 10 }, uAperture: { value: 25 },
-      uMaxR: { value: 14 }, uFade: { value: 1 },
+      uMaxR: { value: 14 }, uFade: { value: 1 }, uBleed: { value: 0 },
       uInk: { value: new THREE.Vector3(...INK) },
       tFog: { value: null }, uFogSize: { value: new THREE.Vector2(1, 1) }, uFull: { value: new THREE.Vector2(1, 1) },
       uDepthTol: { value: 600 },        // 1/tol^2: fog texels more than ~4% off this pixel's depth barely count

@@ -80,11 +80,14 @@ const BOARD_VS_SRC = `
 attribute float aLift; uniform float uLiftAmt[NOCC];
 attribute vec3 aIn; uniform float uInT;      // entrance: a block's top starts aIn.x off its height, settles after aIn.y s over aIn.z s
 attribute vec2 aScr; uniform float uScroll; uniform float uNearZ;   // scroll: a free block's top moves aScr.y, starting at aScr.x
-varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
+attribute float aCut; uniform float uEdgeZ;  // the board's front edge: a block whose centre (aCut, world z) is nearer than uEdgeZ is not drawn
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth; varying float vSide;
 void main(){
+  if (aCut > uEdgeZ) { gl_Position = vec4(0.0, 0.0, 2.0, 1.0); return; }
   vUv = uv; vWN = normalize(mat3(modelMatrix) * normal);
   vec4 w = modelMatrix * vec4(position, 1.0);
   vBaseY = w.y;
+  vSide = step(-0.3, w.y);       // up a block's side: 0 at its foot, 1 at the top edge
   if (aLift > -0.5) w.y += uLiftAmt[int(aLift + 0.5)];
   if (aIn.z > 0.0) { float x = 1.0 - clamp((uInT - aIn.y) / aIn.z, 0.0, 1.0); w.y += aIn.x * x * x * x; }
   // the ripple; blocks right in front of the lens stay put (they would loom), fading in from uNearZ back
@@ -95,8 +98,8 @@ void main(){
   gl_Position = projectionMatrix * mv;
 }`;
 const BOARD_FS_SRC = `
-uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte; uniform float uLightK;
-varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth;
+uniform sampler2D map; uniform vec3 uHaze; uniform vec2 uCentre; uniform vec2 uHalf; uniform vec3 uLight; uniform float uMatte; uniform float uLightK; uniform float uSink;
+varying vec2 vUv; varying vec3 vWN; varying vec3 vWorld; varying float vBaseY; varying float vDepth; varying float vSide;
 void main(){
   vec3 c = texture2D(map, vUv).rgb;
   c = c / (1.0 + max(c.r, max(c.g, c.b)) * 1.1);      // keep the moon's reflection from burning out
@@ -111,6 +114,14 @@ void main(){
     vec3 q = uLight - vWorld; float d2 = dot(q, q);
     float lam = max(dot(n, q * inversesqrt(d2)), 0.0) / (1.0 + d2 * 0.35);
     c = (vec3(0.0075, 0.0085, 0.0115) + vec3(0.014, 0.016, 0.021) * lam * uLightK) * (0.45 + 0.55 * smoothstep(-0.5, 0.3, vWorld.y));
+    // going down past the floor (uSink, hero.js SCROLL.sink): a side seen close must read as a thick block of
+    // stone, not a flat black sheet. Its top edge catches a little of the light, the face under it falls
+    // away fast to a black deeper than at rest. Nothing changes while uSink is 0.
+    if (uSink > 0.0) {
+      float fall = exp(-(1.0 - vSide) * 5.0);
+      vec3 deep = c * (0.12 + 1.5 * fall) + (vec3(0.011, 0.014, 0.022) * fall * fall + vec3(0.030, 0.036, 0.052) * smoothstep(0.955, 1.0, vSide)) * uLightK;
+      c = mix(c, deep, uSink);
+    }
   }
   // the board has no edge: its outer blocks sink into the fog
   vec2 e = abs(vWorld.xz - uCentre) / uHalf;
@@ -263,7 +274,7 @@ export const POST_VS = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = v
 export const POST_FS = `
 uniform sampler2D tColor; uniform sampler2D tDepth; uniform vec2 uPx; uniform float uNear; uniform float uFar;
 uniform float uFocus; uniform float uAperture; uniform float uMaxR; uniform float uFade; uniform vec3 uInk;
-uniform sampler2D tFog; uniform vec2 uFogSize; uniform vec2 uFull; uniform float uDepthTol;
+uniform sampler2D tFog; uniform vec2 uFogSize; uniform vec2 uFull; uniform float uDepthTol; uniform float uBleed;
 varying vec2 vUv;
 float linZ(float d){ d = d * 2.0 - 1.0; return 2.0 * uNear * uFar / (uFar + uNear - d * (uFar - uNear)); }
 float viewZ(vec2 uv){ return linZ(texture2D(tDepth, uv).x); }
@@ -346,6 +357,23 @@ void main(){
   } else {
     vec4 fog = fogAt(vUv, z);
     c = c * fog.a + fog.rgb * fog.rgb;
+  }
+  // Going down past the floor (uBleed: a radius in pixels, 0 at rest): the board's front edge passes right in
+  // front of the lens, far out of focus. The gather above never lets a near surface spread over what is
+  // behind it, so that edge stayed a hard line. Here anything very near (view depth under ~2.2, none by 4.5)
+  // spreads uBleed wide: each pixel is covered by it as far as its neighbours are near, on both sides of the edge.
+  if (uBleed > 0.5) {
+    vec3 nA = vec3(0.0), fA = vec3(0.0); float nW = 0.0, fW = 0.0;
+    for (int i = 0; i < 12; i++) {
+      float fi = float(i) + 0.5, rr = sqrt(fi / 12.0) * uBleed, a = fi * 2.39996323;
+      vec2 uv = vUv + vec2(cos(a), sin(a)) * rr * uPx;
+      float wn = 1.0 - smoothstep(2.2, 4.5, viewZ(uv));
+      vec3 s = texture2D(tColor, uv).rgb;
+      nA += s * wn; nW += wn; fA += s * (1.0 - wn); fW += 1.0 - wn;
+    }
+    float self = 1.0 - smoothstep(2.2, 4.5, z);
+    vec3 behind = fW > 1e-3 ? mix(c, fA / fW, self) : c;
+    c = mix(behind, nA / max(nW, 1e-4), nW / 12.0);
   }
   c = mix(uInk, c, uFade);
 #ifdef DITHER_POST

@@ -56,17 +56,21 @@ const TOUR = {
   back: [0.01, 0.6],    // the swipe offset: [progress moved after the swipe before it goes home, seconds home]
   home: [0, 0.6],       // exit progress over which the look turns back to the centre
   drop: 0.3,            // exit progress after which nothing is presented any more (the fog takes over)
-  lean: 0.5,            // share of the camera's lean-in (SCROLL.dolly, .dip) spread over the tour; the rest in the exit
   swiped: 1.5,          // degrees off the tour path that count as swiped: then the piece nearest the centre is presented
 };
-// Scroll. Where the live scene runs the hero is pinned for 0.7 of a screen, and site.html feeds 0..1 over the
-// first 0.7 of that stretch (setScroll). All in the scene's own language, nothing flashy: the camera leans in,
-// the stone blocks answer in a ripple out from the Cyrus Cylinder while the pieces rise a little on their
+// Scroll. site.html feeds 0..1 (setScroll) as the hero scrolls away, or on phones over the exit after the tour.
+// The camera never comes nearer (no zoom: Farhad, Nov 24). It goes down instead (sink), like going down in a
+// lift, his picture for it: the gaze stays level, the pieces rise out of the top of the frame, and the board
+// ends at its front tile (edge), whose dark side comes up past the eye close and out of focus, then nothing.
+// The camera keeps its distance along the ground; only its height changes. The stone blocks answer in a ripple out from the Cyrus Cylinder while the pieces rise a little on their
 // platforms, then the fog banks thicken and rise and the one light goes down. update() reads it through
 // scrollNow, which eases after the page, so a flick of the finger still moves the scene smoothly.
 const SCROLL = {
-  dolly: 0.14,          // how much nearer the camera comes, a share of its distance to the target: small, the bakes are view-dependent
-  dip: 0.25,            // how far the look drops as it leans in
+  sink: 1.45,           // going down: how far the camera's eye drops. It starts 1.3 above the board and ends just under the floor's top, where the front tile's side fills the frame (2.0 would come out below the slab into open fog)
+  look: 0,              // how far the look tilts up as it drops; 0 keeps the gaze level, as in a lift
+  over: 0.4,            // the descent is done by this much of the scroll: early, while the hero still fills the screen
+  blur: 2.6,            // how wide the floor's edge blurs as it passes the lens, in depth-of-field radii (uMaxR)
+  edge: 0.8,            // the board's front edge, in tiles past where the bottom of the still frame meets the floor
   ease: 5,              // per second: how fast the scene catches up with the page
   rise: 0.18,           // how far a piece rises with its platform; Cyrus no more than LIFT_BY (the light hides behind it)
   block: [0.06, 0.36],  // how far a free block's top moves, least and most; three in ten sink (0.6 of it) instead
@@ -151,7 +155,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
       o.material = new THREE.ShaderMaterial({
         ...boardShaders({ nocc: IDS.length, zs: ZS }),
         uniforms: { map: { value: map }, uHaze: hazeU, uLiftAmt: { value: liftAmt }, uInT: { value: 0 }, uMatte: { value: 0.0 },
-          uScroll: { value: 0 }, uNearZ: { value: 99 }, uLightK: lightK, uLight: { value: new THREE.Vector3(...LIGHT) },
+          uScroll: { value: 0 }, uNearZ: { value: 99 }, uEdgeZ: { value: 99 }, uSink: { value: 0 }, uLightK: lightK, uLight: { value: new THREE.Vector3(...LIGHT) },
           uCentre: { value: new THREE.Vector2(layout.board.center[0], layout.board.center[1]) },
           uHalf: { value: new THREE.Vector2(layout.board.size[0] / 2, layout.board.size[1] / 2) } },
       });
@@ -229,12 +233,13 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     const ain = new Float32Array(pos.count * 3), T = TILE_IN;
     // the scroll ripple: every free block, starting later the farther it is from the cylinder, each by its own
     // amount, most up and some down. Worked out here in float64 and stored: a GPU sin-hash would not match.
-    const ascr = new Float32Array(pos.count * 2), c0 = state.cyrus.at, S = SCROLL;
+    const ascr = new Float32Array(pos.count * 2), acut = new Float32Array(pos.count), c0 = state.cyrus.at, S = SCROLL;
     const hash = (x, z, n) => { const h = Math.sin(x * 127.1 + z * 311.7 + n * 74.7) * 43758.5453; return h - Math.floor(h); };
     for (let i = 0; i < pos.count; i++) {
       v.fromBufferAttribute(pos, i).applyMatrix4(boardMesh.matrixWorld);
-      if (v.y < -0.3) continue;
       const ix = Math.round(v.x / TILE), iz = Math.round(v.z / TILE);
+      acut[i] = iz * TILE;                           // every corner of a block, the foot of its sides too
+      if (v.y < -0.3) continue;
       if (IDS.some(id => Math.abs(ix * TILE - state[id].at.x) < REACH && Math.abs(iz * TILE - state[id].at.z) < REACH)) continue;
       const amp = S.block[0] + (S.block[1] - S.block[0]) * hash(ix, iz, 6);
       ascr[i * 2] = Math.min(1, Math.hypot(ix * TILE - c0.x, iz * TILE - c0.z) / S.reach) * 0.5 + 0.15 * hash(ix, iz, 5);
@@ -247,6 +252,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     }
     boardMesh.geometry.setAttribute("aIn", new THREE.BufferAttribute(ain, 3));
     boardMesh.geometry.setAttribute("aScr", new THREE.BufferAttribute(ascr, 2));
+    boardMesh.geometry.setAttribute("aCut", new THREE.BufferAttribute(acut, 1));
     // the pieces rise as the ripple reaches their platforms
     for (const id of IDS) state[id].riseAt = Math.min(1, Math.hypot(state[id].at.x - c0.x, state[id].at.z - c0.z) / S.reach) * 0.5 + 0.05;
   }
@@ -345,6 +351,13 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     camera.fov = (2 * Math.atan(Math.tan(hfov / 2) / aspect)) / DEG;
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
+    // the board's front edge (SCROLL.sink): the nearest row kept is the one the bottom of the frame rests on, so
+    // nothing changes in the still view, and the rows between it and the camera are not drawn
+    {
+      const pitch = Math.atan2(camBase.y - camTarget.y, Math.hypot(camBase.x - camTarget.x, camBase.z - camTarget.z));
+      const hit = camBase.z - (camBase.y - 0.44) / Math.tan(pitch + (camera.fov * DEG) / 2 + 1.5 * DEG);
+      boardMesh.material.uniforms.uEdgeZ.value = hit + TILE * SCROLL.edge;
+    }
     // how far a drag may turn each way: until the outermost piece's edge is PAN_MARGIN inside the frame
     panLo = panHi = 0;
     if (phone > 0) {
@@ -409,7 +422,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     // placement (site.html) is the desktop one, and on leaving, the tour's piece must be named again
     if (tourOn) shownId = undefined;
   }
-  // the raw scroll position (0..1 of the pinned stretch); the first one is taken as is, so a reload partway down
+  // the raw scroll position (0..1 of the hero, or of the exit after the phone tour); the first one is taken as is, so a reload partway down
   // starts where the page is. tour: the phone tour's progress (0..1), or undefined where there is no tour; then
   // p is the exit (fog, light) that follows the tour.
   function setScroll(p, tour) {
@@ -519,8 +532,7 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
   function update(dt) {
     t += dt;
     // camera: a small arc with the mouse (DRIFT_YAW / DRIFT_PITCH degrees at the canvas edge), easing behind it,
-    // and it leans in as the hero is scrolled (SCROLL.dolly, SCROLL.dip), from wherever the base camera is
-    // (phone framing included; camBase itself never moves). The arc is a few degrees about the target, small
+    // from wherever the base camera is (phone framing included; camBase itself never moves). The arc is a few degrees about the target, small
     // enough that the view-dependent bakes still hold; the light stays put in the world, so the halo moves as
     // parallax would.
     const sWas = scrollNow, tWas = tourNow, follow = 1 - Math.exp(-dt * SCROLL.ease);
@@ -528,26 +540,27 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     if (Math.abs(scrollP - scrollNow) < 1e-4) scrollNow = scrollP;
     tourNow += (tourP - tourNow) * follow;
     if (Math.abs(tourP - tourNow) < 1e-4) tourNow = tourP;
-    const sp = scrollNow, inOut = x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(2 - 2 * x, 3) / 2);
-    // the lean-in: on the tour a share of it is spread over the stops (mild), the rest comes with the exit
-    const se = tourOn ? TOUR.lean * smooth(0, 1, tourNow) + (1 - TOUR.lean) * inOut(sp) : inOut(sp);
+    const sp = scrollNow;
     // the ripple and the pieces' rise: on the tour they play in the first stop, before the camera turns
     const rp = tourOn ? Math.min(1, tourNow * TOUR.stops.length) : sp;
     const de = 1 - Math.exp(-dt * 3.5), canDrift = fine.matches;
     drift.x += ((canDrift ? pointer.x : 0) - drift.x) * de;
     drift.y += ((canDrift ? pointer.y : 0) - drift.y) * de;
     tmp.copy(camBase).sub(camTarget);
-    const radius = tmp.length() * (1 - SCROLL.dolly * se);
+    const radius = tmp.length();
     const yaw = Math.atan2(tmp.x, tmp.z) - drift.x * DRIFT_YAW * DEG;
     const pitch = Math.asin(tmp.y / radius) + drift.y * DRIFT_PITCH * DEG;
     camera.position.set(
       camTarget.x + radius * Math.cos(pitch) * Math.sin(yaw),
       camTarget.y + radius * Math.sin(pitch),
       camTarget.z + radius * Math.cos(pitch) * Math.cos(yaw));
-    tmp.copy(camTarget); tmp.y -= SCROLL.dip * se;
+    // going down (SCROLL.sink): the eye drops straight down with the page, gaze level; no nearer, so nothing zooms
+    const dn = Math.min(1, sp / SCROLL.over);
+    camera.position.y -= SCROLL.sink * dn;
+    tmp.copy(camTarget); tmp.y += (SCROLL.look - SCROLL.sink) * dn;
     camera.lookAt(tmp);
     // the tour (TOUR): where the look turns to for this much scroll, and which piece it presents. Each stop's
-    // angle is its piece's direction from the camera as it stands now (lean-in included), within the pan limits.
+    // angle is its piece's direction from the camera as it stands now, within the pan limits.
     let tourId = null;
     panBase = 0;
     if (tourOn) {
@@ -599,6 +612,9 @@ function createHeroWorld(core, gltf, layout, opts = {}) {
     fogMat.uniforms.uDense.value = 1 + SCROLL.fog[1] * fc;
     fogMat.uniforms.uRise.value = SCROLL.fog[2] * fc;
     lightK.value = 1 - SCROLL.dim[1] * smooth(SCROLL.dim[0], 1, sp);
+    // going down: block sides take their close-up shading, and what passes right in front of the lens blurs wide
+    bu.uSink.value = smooth(0.02, 0.35, dn);
+    core.post.uBleed.value = SCROLL.blur * postU.uMaxR.value * smooth(0.02, 0.3, dn);
 
     // the entrance: the light comes up, pieces rise, blocks settle (replay from the console: heroLive.ignite(); heroLive.ignite(1.5) holds it at 1.5 s)
     igT = igHold >= 0 ? igHold : igT + dt;
@@ -798,7 +814,7 @@ export async function mountHero(stage, layout, opts = {}) {
       // tuning from the console: heroLive.fog, .post (depth of field, fog upsample), .fxaa (also the bloom
       // weights uTightK, uWideK, and uIgnite), .bright (bloom threshold uThresh), .motes (uGain, uCol); .ignite() replays the light
       ignite: world.ignite, grain: core.grain, motes: world.moteMat.uniforms, freeze: world.freeze, hash: core.hash, sig: core.sig,
-      setLevel: core.setLevel, tour: world.tour,
+      setLevel: core.setLevel, tour: world.tour, scroll: SCROLL,
       board: world.board, fog: world.fogMat.uniforms, post: core.post, fxaa: core.fxaa, bright: core.bright,
     };
     // live values from the core and the world

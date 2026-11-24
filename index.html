@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Farhad — AI &amp; Agentic Systems Engineer in Dubai. Ontologies, knowledge graphs, agentic AI and governance layers for regulated systems. CTO at OnePharma.">
 <meta name="author" content="Farhad">
-<meta name="theme-color" content="#0A0F1C">
+<meta name="theme-color" content="#08090D">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta property="og:description" content="Most systems remember. I build systems that understand.">
@@ -13,7 +13,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta name="twitter:description" content="Most systems remember. I build systems that understand.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230A0F1C'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%2308090D'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
 <style>
   html{ color-scheme: dark; }
   body{ margin:0; }
@@ -37,7 +37,7 @@
   window.heroWhy = function(t){
     if (!/[?&]why\b/.test(location.search)) return;
     var put = function(){ var d = document.getElementById("hero-why");
-      if (!d) { d = document.createElement("div"); d.id = "hero-why"; d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99;font:11px/1.4 monospace;color:#ECE7DC;background:rgba(10,15,28,.85);padding:6px 8px;white-space:pre-wrap;pointer-events:none"; document.body.appendChild(d); }
+      if (!d) { d = document.createElement("div"); d.id = "hero-why"; d.style.cssText = "position:fixed;left:8px;right:8px;top:8px;z-index:99;font:11px/1.4 monospace;color:#ECE7DC;background:rgba(8,9,13,.85);padding:6px 8px;white-space:pre-wrap;pointer-events:none"; document.body.appendChild(d); }
       d.textContent += t + "\n"; };
     document.body ? put() : addEventListener("DOMContentLoaded", put);
   };
@@ -108,7 +108,7 @@
    Content is visible without JS; hide-before-reveal only under html.motion.
    ============================================================ */
 :root{
-  --ink:#0A0F1C; --ink-2:#12192B; --rule:#1E2539; --rule-soft:#151C2D;
+  --ink:#08090D; --ink-2:#121319; --rule:#22242C; --rule-soft:#17181E;
   --bone:#ECE7DC; --dim:#A8A49C; --muted:#716E68; --sig:#E9A03B; --trace:#5FA8B8;
   --disp:'Bodoni Moda',serif; --who:'Fraunces',serif; --body:'Archivo',sans-serif; --mono:'IBM Plex Mono',monospace;
   --g:clamp(16px,4vw,56px);
@@ -134,12 +134,11 @@ section{position:relative;padding:0 var(--g)}
 
 /* 01 hero: a marble chessboard, one piece per project. Where the live scene (hero.js) will be tried, the hero
    starts dark (html.hero-wait hides the poster) and the scene fades in; the poster is the fallback.
-   Everything sits in .hero-pin. Where the scene is tried (html.hero-pinned, set with hero-wait) the hero is 170svh
-   and .hero-pin sticks for the extra 0.7 of a screen while the scene plays its scroll move (hero.js SCROLL).
-   Elsewhere (poster, reduced motion) both are one screen and nothing sticks. .hero itself must not clip
+   Everything sits in .hero-pin. On phones where the scene is tried (html.hero-pinned, set with hero-wait)
+   the hero is taller and .hero-pin sticks for the tour (see below). Everywhere else both are one screen, nothing
+   sticks and the page simply scrolls on while the scene plays its scroll move (hero.js SCROLL). .hero itself must not clip
    (overflow:hidden would make it the scroll box and sticky would never stick); .hero-pin clips instead. */
 .hero{height:100svh;min-height:560px;padding:0;text-align:center;background:var(--ink)}
-html.hero-pinned .hero{height:170svh;min-height:952px}
 .hero-pin{position:sticky;top:0;height:100svh;min-height:560px;overflow:hidden}
 .hero-view,.hero-poster,.hero-stage{position:absolute;inset:0;width:100%;height:100%}
 /* the poster always fits the width, so no piece is ever cropped out; top and bottom melt into the ground */
@@ -184,7 +183,7 @@ html.hero-wait .hero-poster{opacity:0}
 /* the phone tour (hero.js TOUR): wherever the live scene frames for a phone and the row is wider than the
    screen (portrait under aspect 0.72, hero.js PHONE_AT[1]; phones, and an iPad mini, whose 0.66 still gets part
    of the phone framing) the pin holds for 3 screens, the first 2.3 for the seven stops (about a third of a
-   screen each), the last 0.7 for the exit as on desktop. The same query is heroTourQ below. */
+   screen each), the last 0.7 for the exit. The same query is heroTourQ below. */
 @media (orientation:portrait) and (max-aspect-ratio:18/25){
   html.hero-pinned .hero{height:400svh;min-height:2240px}
 }
@@ -225,6 +224,11 @@ html.hero-ask .hero-loader .bar,html.hero-ask .hero-loader .txt{display:none}
    A small name line, then the statement: line two flush left, line three flush right.
    Each pill is always full size in the layout (nothing reflows); it opens from an amber dot by clip-path,
    so the reveal is transform/clip only. "chaos" arrives as scattered letters that settle into the word. */
+/* the hero's one light, carried down the page: near-black ground, blue only where light falls. Each glow fades
+   out inside its own section, so no edge shows where sections meet */
+.paper,.contact{background:radial-gradient(ellipse closest-side at var(--gx,50%) var(--gy,50%),rgba(74,86,132,.26),rgba(74,86,132,.19) 25%,rgba(74,86,132,.1) 50%,rgba(74,86,132,.03) 76%,transparent) no-repeat}
+.paper{--gx:64%}
+.contact{--gx:40%}
 .who{padding-top:24vh;padding-bottom:22vh;text-align:center}
 .who-in{max-width:1560px;margin:0 auto}
 .who-head{font-family:var(--who);font-weight:300;font-variation-settings:"opsz" 144,"SOFT" 50,"WONK" 0;
@@ -236,7 +240,7 @@ html.hero-ask .hero-loader .bar,html.hero-ask .hero-loader .txt{display:none}
 .who-head .ch{display:inline-block}
 .pill{--pw:1.72em;--ph:.78em;display:inline-block;position:relative;width:var(--pw);height:var(--ph);margin:0 .22em;vertical-align:-.02em;
   border-radius:999px;overflow:hidden;background:var(--ink-2);
-  box-shadow:0 0 0 .05em #05070E,0 0 0 calc(.05em + 1px) #262E42,0 .2em .5em rgba(0,0,0,.55)}
+  box-shadow:0 0 0 .05em #050609,0 0 0 calc(.05em + 1px) #2A2C35,0 .2em .5em rgba(0,0,0,.55)}
 .pill-in,.pill .dot{position:absolute;left:50%;top:50%;width:var(--pw);height:var(--ph);transform:translate(-50%,-50%);border-radius:999px}
 .pill-in{transition:transform .8s cubic-bezier(.16,1,.3,1)}
 .pill:hover .pill-in{transform:translate(-50%,-50%) scale(1.1)}
@@ -279,6 +283,19 @@ html.motion .chroma::after{background:var(--sig);transform:scaleX(var(--ul,1))}
 .plate.live .plate-stage{opacity:1}
 .plate-stage canvas{display:block;width:100%;height:100%;touch-action:pan-y}
 .proj .num{position:absolute;z-index:3;left:var(--g);top:28px;font-family:var(--disp);font-size:clamp(80px,12vw,180px);line-height:.8;color:transparent;-webkit-text-stroke:1px rgba(236,231,220,.18);pointer-events:none}
+/* a chapter whose piece is in (data-full): the scene fills the screen and the copy lies over it. The section is
+   taller than the screen, so the scene and the copy hold while the veil (::before, the page's ground) scrolls off
+   the top: there is no edge to arrive at. ::after lets it go back into the ground the same way. */
+.proj[data-full]{border-top:0;min-height:175svh}
+.proj[data-full]>*{grid-row:1}
+.proj[data-full] .plate{grid-column:1/-1;background:var(--ink)}
+.proj[data-full] .plate::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(90deg,transparent 38%,color-mix(in srgb,var(--ink) 82%,transparent) 72%)}
+.proj[data-full] .plate-poster{width:68%;-webkit-mask-image:linear-gradient(90deg,#000 60%,transparent);mask-image:linear-gradient(90deg,#000 60%,transparent)}
+.proj[data-full] .txt{grid-column:2;position:sticky;top:0;min-height:100svh;align-self:start;z-index:4}
+.proj[data-full]::before,.proj[data-full]::after{content:"";position:absolute;left:0;right:0;z-index:3;pointer-events:none}
+.proj[data-full]::before{top:-1px;height:75svh;background:linear-gradient(180deg,var(--ink),color-mix(in srgb,var(--ink) 86%,transparent) 22%,color-mix(in srgb,var(--ink) 45%,transparent) 58%,transparent)}
+.proj[data-full]::after{bottom:-1px;height:45svh;background:linear-gradient(0deg,var(--ink),color-mix(in srgb,var(--ink) 55%,transparent) 45%,transparent)}
+@media (min-width:861px) and (max-height:640px){.proj[data-full] .txt{position:relative}}
 .proj .txt{padding:clamp(32px,6vh,80px) var(--g);display:flex;flex-direction:column;justify-content:center;gap:28px}
 .proj h3{font-family:var(--disp);font-weight:400;font-size:clamp(40px,5vw,84px);line-height:.95;letter-spacing:-.02em}
 .pab{display:grid;gap:18px}
@@ -316,6 +333,14 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
   .paper{grid-template-columns:1fr}
   .paths{grid-template-columns:1fr}
   .proj .plate{position:relative;height:56svh}
+  /* full chapters: the scene stays behind, the copy scrolls up over it */
+  .proj[data-full]{min-height:0}
+  .proj[data-full] .plate{position:sticky;height:100svh}
+  .proj[data-full] .plate::after{background:none}
+  .proj[data-full] .plate-poster{width:100%;-webkit-mask-image:none;mask-image:none}
+  .proj[data-full] .txt{grid-column:1;position:relative;min-height:0;margin-top:72svh;padding-top:18svh;padding-bottom:24svh;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--ink) 88%,transparent) 22svh)}
+  .proj[data-full]::before{height:50svh}
+  .proj[data-full]::after{z-index:1;height:20svh}
   .pab div{grid-template-columns:1fr;gap:6px}
 }
 @media (prefers-reduced-motion:reduce){
@@ -367,14 +392,12 @@ footer .links{display:flex;gap:14px;flex-wrap:wrap}
     <h2 class="rv">Selected <em>work</em></h2>
     <span class="mono rv">06 projects</span>
   </section>
-  <section class="proj" data-i="0" data-id="cyrus" id="proj-cyrus">
+  <section class="proj" data-full data-i="0" data-id="cyrus" id="proj-cyrus">
     <div class="plate" data-solo="cyrus" role="img" aria-label="Cyrus: a worn clay cylinder with lines of writing, broken at one end, on a marble mount">
       <img class="plate-poster" src="assets/solo/cyrus/poster.webp" alt="" loading="lazy" decoding="async">
       <div class="plate-stage"></div>
-      <div class="num" aria-hidden="true">01</div>
     </div>
     <div class="txt rv">
-      <span class="mono sig">Cyrus &middot; Ontology platform &middot; pharma first</span>
       <h3>Cyrus</h3>
       <div class="pab">
         <div><span class="mono">The problem</span><p>Bilingual Arabic and English regulatory documents have to be classified, with every control around them able to survive an audit.</p></div>
@@ -485,7 +508,7 @@ var TAU = Math.PI * 2;
 /* ============================================================
    PALETTE
    ============================================================ */
-var C = { ink:"#0A0F1C", ink2:"#12192B", bone:"#ECE7DC", dim:"#A8A49C",
+var C = { ink:"#08090D", ink2:"#121319", bone:"#ECE7DC", dim:"#A8A49C",
           muted:"#716E68", sig:"#E9A03B", trace:"#5FA8B8" };
 function rgba(hex,a){
   var h=hex.replace("#",""); var n=parseInt(h,16);
@@ -514,7 +537,7 @@ function heroCover(aspect){
 }
 window.heroOrientation = heroOrientation; window.heroCover = heroCover;
 /* phones: the pinned stretch is longer (see the phone CSS) and its first part is the scene's tour, one stop
-   per piece (hero.js TOUR); TOUR_SHARE of the extra height is the tour, the rest the exit, as on desktop */
+   per piece (hero.js TOUR); TOUR_SHARE of the extra height is the tour, the rest the exit */
 window.heroTourQ = matchMedia("(orientation:portrait) and (max-aspect-ratio:18/25)");
 window.HERO_TOUR_SHARE = 2.3 / 3;
 /* the pinned extra height split into the tour (0 where there is none) and the exit */
@@ -585,17 +608,16 @@ window.heroSplit = function(x){ var t = x > 0 && window.heroTourQ.matches ? x * 
     a.addEventListener("click", function(e){ e.preventDefault(); go(id); });
   });
   addEventListener("resize", place);
-  /* the scene's scroll move: 0..1 over the first 0.7 of the pinned stretch, or over the whole hero where
-     nothing is pinned. The raw position; hero.js eases after it. Fed at mount too, so a reload partway down
+  /* the scene's scroll move: 0..1 over the hero's height as it scrolls away (nothing is pinned there). The raw position; hero.js eases after it. Fed at mount too, so a reload partway down
      starts where the page is. Plain scroll events, so it works without GSAP.
      Phones (heroSplit): the tour first, 0..1 over its share of the stretch (setScroll's second value), then
-     the exit, 0..1 over the first 0.7 of the rest, as on desktop. */
+     the exit, 0..1 over the first 0.7 of the rest. */
   var pinEl = sec.querySelector(".hero-pin");
   function feedScroll(){
     if (!window.heroLive) return;
     var x = sec.offsetHeight - pinEl.offsetHeight, y = -sec.getBoundingClientRect().top, s = window.heroSplit(x);
     if (s.tour) return window.heroLive.setScroll((y - s.tour) / (s.exit * 0.7), y / s.tour);
-    window.heroLive.setScroll(y / (x > 0 ? x * 0.7 : sec.offsetHeight));
+    window.heroLive.setScroll(y / sec.offsetHeight);
   }
   addEventListener("scroll", feedScroll, { passive:true });
   addEventListener("resize", feedScroll);
@@ -777,7 +799,7 @@ Promise.resolve(window.heroReady).then(function(){ return import("./mark.js"); }
   }
   function bg(g, w, h){
     var gr = g.createRadialGradient(w*.5, h*.45, 0, w*.5, h*.5, w*.6);
-    gr.addColorStop(0, "#182033"); gr.addColorStop(1, "#0C1221");
+    gr.addColorStop(0, "#1A1B22"); gr.addColorStop(1, "#0D0E13");
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
   }
   var COLS = 9, ROWS = 3;
@@ -1011,18 +1033,17 @@ if (window.gsap && window.ScrollTrigger && !reduced) {
   /* under the loader (html.hero-load) the name and subtitle reveal in CSS, on the loader's clock */
   if (!document.documentElement.classList.contains("hero-load"))
     gsap.fromTo(".hero .line>span", { yPercent:105, y:0 }, { yPercent:0, y:0, duration:1.4, ease:EASE, stagger:.18, delay:.15 });
-  /* The hero. Pinned (html.hero-pinned): the title and the cue clear in the first 0.3 of the extra height, the
-     scene plays its scroll move over the first 0.7 (fed from the hero block above, not from here), and the
-     picture fades from 0.8 until the pin has let go and half of it has gone, so the page hands over to 01.
-     Not pinned: as before (title by 60% of the hero, the picture over all of it), and the poster pushes in.
+  /* The hero. Not pinned (all but the phone tour): the title and the cue clear by 60% of the hero and the picture
+     keeps its full strength for the first 40%, then fades over the rest, while the scene plays its scroll move (fed from the hero block above, not from here).
      Phones (heroSplit): the title clears over the hold on the first stop (half of the tour's first seventh, as
-     the camera starts to turn), and the exit's share of the stretch plays as above after the tour. */
+     the camera starts to turn), and then the exit: the
+     picture fades from 0.8 of it until the pin has let go and half of it has gone. The poster alone pushes in. */
   var heroSec = document.getElementById("top"), heroPinEl = heroSec.querySelector(".hero-pin");
   var heroExtra = function(){ return Math.max(0, heroSec.offsetHeight - heroPinEl.offsetHeight); };
   gsap.to([".hero-head", ".hero .cue"], { yPercent:-40, opacity:0, ease:"none", scrollTrigger:{ trigger:".hero", start:"top top",
     end:function(){ var x = heroExtra(), s = window.heroSplit(x); return "+=" + Math.round(s.tour ? s.tour / 7 * 0.5 : x ? x * 0.3 : heroPinEl.offsetHeight * 0.6); }, scrub:true } });
   gsap.to(".hero-view", { opacity:0, ease:"none", scrollTrigger:{ trigger:".hero",
-    start:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "top+=" + Math.round(s.tour + s.exit * 0.8) + " top" : "top top"; },
+    start:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "top+=" + Math.round(s.tour + s.exit * 0.8) + " top" : "top+=" + Math.round(heroPinEl.offsetHeight * 0.4) + " top"; },
     end:function(){ var x = heroExtra(), s = window.heroSplit(x); return x ? "+=" + Math.round(s.exit * 0.2 + heroPinEl.offsetHeight * 0.5) : "bottom top"; }, scrub:true } });
   /* the poster's push-in: only where nothing is pinned; heroPosterBack() starts it when a live try falls back */
   var heroPushed = false;

@@ -11,7 +11,7 @@ cat <<'HEAD'
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Farhad — AI &amp; Agentic Systems Engineer in Dubai. Ontologies, knowledge graphs, agentic AI and governance layers for regulated systems. CTO at OnePharma.">
 <meta name="author" content="Farhad">
-<meta name="theme-color" content="#0A0F1C">
+<meta name="theme-color" content="#08090D">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta property="og:description" content="Most systems remember. I build systems that understand.">
@@ -19,7 +19,7 @@ cat <<'HEAD'
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Farhad — AI &amp; Agentic Systems Engineer">
 <meta name="twitter:description" content="Most systems remember. I build systems that understand.">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%230A0F1C'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%2308090D'/><circle cx='16' cy='16' r='5' fill='%23E9A03B'/><g stroke='%235FA8B8' stroke-width='1.4' fill='none'><path d='M16 16 L6 7M16 16 L26 8M16 16 L7 25M16 16 L25 24'/></g><g fill='%235FA8B8'><circle cx='6' cy='7' r='2.4'/><circle cx='26' cy='8' r='2.4'/><circle cx='7' cy='25' r='2.4'/><circle cx='25' cy='24' r='2.4'/></g></svg>">
 <style>
   html{ color-scheme: dark; }
   body{ margin:0; }
